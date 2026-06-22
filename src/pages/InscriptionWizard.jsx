@@ -9,6 +9,9 @@ import PreviewPlanilla from '../components/PreviewPlanilla'
 import ConfirmationScreen from '../components/ConfirmationScreen'
 import InvalidToken from './InvalidToken'
 import { buildMMExport } from '../utils/mmSchema'
+import { submitInscription } from '../services/api'
+import { downloadJson } from '../utils/download'
+import { DEMO_MODE } from '../config'
 
 export default function InscriptionWizard() {
   const token = new URLSearchParams(window.location.search).get('t') || ''
@@ -33,10 +36,10 @@ function WizardContent({ token, access }) {
     setSending(true)
     try {
       const output = await buildMMExport({ event: access.event, club: access.club, token, roster })
-      const response = await fetch('/api/submit-inscription', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, athletes: output.athletes, results: output.results, meta: output.meta, roster }) })
-      const result = await response.json()
-      if (!response.ok || !result.success) throw new Error(result.error || 'No se pudo enviar')
+      const result = await submitInscription({ token, athletes: output.athletes, results: output.results, meta: output.meta, roster })
+      if (!result.success) throw new Error(result.error || 'No se pudo enviar')
       const downloadable = { ...output, _swimtimer_roster: roster }
+      if (DEMO_MODE) downloadJson(downloadable, `inscripcion-${access.club.code}.json`)
       setFinalData(downloadable); localStorage.removeItem(`swimtimer-roster:${token}`); setScreen('done')
     } catch (error) { window.alert(`${error.message}. Tu roster sigue guardado en este navegador.`) } finally { setSending(false) }
   }

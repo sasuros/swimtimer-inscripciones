@@ -1,6 +1,6 @@
-# SWIMTIMER · Inscripciones
+# SWIMTIMER · Inscripciones — Demo
 
-Aplicación web para gestionar inscripciones de clubes y nadadores en competencias de piscina. Incluye un wizard público protegido por token, panel del organizador, exportación compatible con Meet Manager 2.0 y persistencia en Netlify Blobs.
+Demo estática para gestionar inscripciones de clubes y nadadores en competencias de piscina. Incluye wizard protegido por token, panel del organizador y exportación compatible con Meet Manager 2.0. Todos los datos se guardan en `localStorage`; no usa backend, Functions ni base de datos.
 
 ## Desarrollo
 
@@ -9,30 +9,22 @@ npm install
 npm run dev
 ```
 
-`npm run dev` levanta la interfaz con Vite. Para probar también las Netlify Functions y Blobs localmente:
+La app queda disponible normalmente en `http://localhost:5173`. El panel está en `/admin`; desde allí se generan los enlaces `/inscribir?t=TOKEN`.
 
-```bash
-npx netlify dev
-```
+## Acceso demo
 
-La app queda disponible normalmente en `http://localhost:8888`. El panel está en `/admin`; desde allí se generan los enlaces `/inscribir?t=TOKEN`.
+La contraseña está definida en `src/config.js`: `swimtimer2025`. Al ser una demo client-side, no ofrece seguridad real y no debe usarse con información sensible.
 
-## Variables de entorno
-
-Copia `.env.example` como `.env` para desarrollo local o configura estas variables en **Netlify → Site configuration → Environment variables**:
-
-- `ADMIN_PASSWORD`: contraseña del panel del organizador.
-- `ADMIN_SECRET`: secreto largo y aleatorio usado para firmar sesiones de administración.
-- `ALBERTO_WHATSAPP`: número en formato internacional, solo dígitos, por ejemplo `584121234567`.
-- `URL`: URL pública del sitio. Netlify también proporciona esta variable automáticamente.
+Los tokens e inscripciones solo existen en el navegador donde fueron creados. Para la presentación, genera y abre los enlaces desde el mismo perfil del navegador.
 
 ## Comandos
 
 - `npm run dev`: servidor Vite.
 - `npm test`: pruebas de reglas de negocio.
 - `npm run build`: build de producción.
-- `npx netlify deploy --prod`: despliegue manual después de vincular el sitio.
+- `npx netlify deploy --prod`: despliegue estático en Netlify.
+- `npx vercel --prod`: despliegue estático en Vercel.
 
-## Almacenamiento
+## Activar backend después
 
-Netlify Blobs usa el store `swimtimer` con claves `tokens:{token}`, `inscriptions:{clubCode}` e índices explícitos para las vistas administrativas. En desarrollo, `netlify dev` mantiene un sandbox local dentro de `.netlify/`.
+`src/config.js` exporta `DEMO_MODE = true`. Al cambiarlo a `false`, `src/services/api.js` usa los endpoints `/api` en lugar del adaptador local, sin modificar los hooks ni las pantallas.

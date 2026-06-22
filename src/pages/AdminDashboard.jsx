@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Check, Clipboard, Download, ExternalLink, LogOut, RefreshCw, Send } from 'lucide-react'
 import { downloadJson } from '../utils/download'
-
-const token = () => sessionStorage.getItem('swimtimer-admin-token')
-const authFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...options.headers, Authorization: `Bearer ${token()}` } })
+import { exportAll as exportAllData, generateTokens, getDashboard, getInscription } from '../services/api'
+import { DEMO_MODE } from '../config'
 
 export default function AdminDashboard() {
   const [data, setData] = useState(null)
@@ -11,16 +10,16 @@ export default function AdminDashboard() {
   const [generating, setGenerating] = useState(false)
   const [detail, setDetail] = useState(null)
   const [copied, setCopied] = useState('')
-  const load = async () => { try { const response = await authFetch('/api/admin/dashboard'); if (response.status === 401) return logout(); const result = await response.json(); if (!response.ok) throw new Error(result.error); setData(result); setError('') } catch (err) { setError(err.message) } }
+  const load = async () => { try { const result = await getDashboard(); setData(result); setError('') } catch (err) { setError(err.message) } }
   useEffect(() => { load() }, [])
   const logout = () => { sessionStorage.removeItem('swimtimer-admin-token'); window.location.reload() }
-  const generate = async () => { setGenerating(true); try { const response = await authFetch('/api/admin/generate-tokens', { method: 'POST' }); const result = await response.json(); if (!response.ok) throw new Error(result.error); await load() } catch (err) { setError(err.message) } finally { setGenerating(false) } }
+  const generate = async () => { setGenerating(true); try { await generateTokens(); await load() } catch (err) { setError(err.message) } finally { setGenerating(false) } }
   const registrationUrl = id => `${window.location.origin}/inscribir?t=${encodeURIComponent(id)}`
   const copy = async id => { await navigator.clipboard.writeText(registrationUrl(id)); setCopied(id); setTimeout(() => setCopied(''), 1500) }
-  const viewDetail = async club => { try { const response = await authFetch(`/api/admin/inscription/${club.code}`); const result = await response.json(); if (!response.ok) throw new Error(result.error); setDetail(result) } catch (err) { setError(err.message) } }
-  const exportAll = async () => { const response = await authFetch('/api/admin/export-all'); const result = await response.json(); if (response.ok) downloadJson(result, 'swimtimer-consolidado.json'); else setError(result.error) }
+  const viewDetail = async club => { try { setDetail(await getInscription(club.code)) } catch (err) { setError(err.message) } }
+  const exportAll = async () => { try { downloadJson(await exportAllData(), 'swimtimer-consolidado.json') } catch (err) { setError(err.message) } }
   if (!data) return <div className="flex min-h-screen items-center justify-center">{error || 'Cargando panel…'}</div>
-  return <><header className="border-b bg-white"><div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4"><img src="/logo.svg" className="size-10" alt="" /><div className="mr-auto"><h1 className="font-bold text-brand-800">SWIMTIMER · Organizador</h1><p className="text-xs text-slate-500">Panel administrativo</p></div><button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={logout}><LogOut className="size-4" />Salir</button></div></header>
+  return <><header className="border-b bg-white"><div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4"><img src="/logo.svg" className="size-10" alt="" /><div className="mr-auto"><h1 className="font-bold text-brand-800">SWIMTIMER · Organizador</h1><p className="text-xs text-slate-500">Panel administrativo {DEMO_MODE && '· Demo local'}</p></div><button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={logout}><LogOut className="size-4" />Salir</button></div></header>
   <main className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6"><section className="card p-5"><p className="text-sm font-semibold text-brand-600">Evento activo</p><h2 className="mt-1 text-xl font-bold">{data.event.name}</h2><p className="mt-1 text-sm text-slate-500">{data.event.date} · {data.event.venue}</p></section>
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[['Clubes',data.counts.total_clubs],['Recibidas',data.counts.received],['Pendientes',data.counts.pending],['Nadadores',data.counts.athletes]].map(([label,value]) => <div className="card p-4" key={label}><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-3xl font-bold text-brand-800">{value}</p></div>)}</section>
     {error && <p className="rounded-lg bg-danger-50 p-3 text-danger-700">{error}</p>}
