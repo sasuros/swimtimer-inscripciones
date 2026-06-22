@@ -10,7 +10,7 @@ export function calculateAge(birthDate, referenceDate) {
   return age
 }
 
-export function categoryForAge(age) {
-  const range = CATEGORIES.find(([min, max]) => age >= min && age <= max)
+export function categoryForAge(age, ranges = CATEGORIES) {
+  const range = ranges.find(([min, max]) => age >= min && age <= max)
   return range ? { min: range[0], max: range[1], label: `${range[0]}-${range[1]} Años` } : null
 }

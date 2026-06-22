@@ -1,4 +1,11 @@
-export const TIME_REGEX = /^(\d{1,2}:)?\d{1,2}\.\d{2}$/
+export const TIME_REGEX = /^(?:\d{1,2}:\d{2}|\d{1,2})\.\d{2}$/
+
+export function formatTimeInput(value) {
+  const clean = value.trim()
+  if (/^\d{4}$/.test(clean)) return `${clean.slice(0, 2)}.${clean.slice(2)}`
+  if (/^\d{5,6}$/.test(clean)) return `${clean.slice(0, -4)}:${clean.slice(-4, -2)}.${clean.slice(-2)}`
+  return clean
+}
 
 export function validateTime(value) {
   if (!value) return 'Escribe el tiempo de inscripción'

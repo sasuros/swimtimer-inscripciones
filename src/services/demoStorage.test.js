@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { demoDashboard, demoGenerateTokens, demoLogin, demoSubmitInscription, demoValidateToken } from './demoStorage'
+import { demoCloneEvent, demoDashboard, demoGenerateTokens, demoListEvents, demoLogin, demoSaveEvent, demoSubmitInscription, demoValidateToken } from './demoStorage'
 
 const memory = new Map()
 globalThis.localStorage = {
@@ -28,5 +28,15 @@ describe('storage local de la demo', () => {
 
     expect(demoValidateToken(generated.tokens[0].id).already_submitted).toBe(true)
     expect(demoDashboard().counts).toMatchObject({ received: 1, athletes: 1 })
+  })
+
+  it('crea y clona eventos sin copiar inscripciones', () => {
+    const source = demoListEvents()[0]
+    const draft = demoCloneEvent(source.id)
+    const saved = demoSaveEvent({ ...draft, name: 'Copa 2027', date_start: '2027-05-10', reference_date: '2027-05-10', venue: 'Piscina Olímpica' }, false)
+    expect(saved.id).not.toBe(source.id)
+    expect(saved.status).toBe('draft')
+    expect(saved.events).toHaveLength(76)
+    expect(demoDashboard(saved.id).counts.received).toBe(0)
   })
 })

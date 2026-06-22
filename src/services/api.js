@@ -1,5 +1,5 @@
 import { DEMO_MODE } from '../config'
-import { demoDashboard, demoExportAll, demoGenerateTokens, demoGetInscription, demoLogin, demoSubmitInscription, demoValidateToken } from './demoStorage'
+import { demoAddMasterClub, demoCloneEvent, demoDashboard, demoExportAll, demoGenerateTokens, demoGetEvent, demoGetInscription, demoGetMasterClubs, demoListEvents, demoLogin, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
 
 const authHeaders = () => ({ Authorization: `Bearer ${sessionStorage.getItem('swimtimer-admin-token')}` })
 const parse = async response => {
@@ -20,18 +20,26 @@ export const adminLogin = password => DEMO_MODE
   ? Promise.resolve(demoLogin(password))
   : fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) }).then(parse)
 
-export const getDashboard = () => DEMO_MODE
-  ? Promise.resolve(demoDashboard())
-  : fetch('/api/admin/dashboard', { headers: authHeaders() }).then(parse)
+export const getDashboard = eventId => DEMO_MODE
+  ? Promise.resolve(demoDashboard(eventId))
+  : fetch(`/api/admin/dashboard?eventId=${encodeURIComponent(eventId)}`, { headers: authHeaders() }).then(parse)
 
-export const generateTokens = () => DEMO_MODE
-  ? Promise.resolve(demoGenerateTokens())
-  : fetch('/api/admin/generate-tokens', { method: 'POST', headers: authHeaders() }).then(parse)
+export const generateTokens = eventId => DEMO_MODE
+  ? Promise.resolve(demoGenerateTokens(eventId))
+  : fetch('/api/admin/generate-tokens', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId }) }).then(parse)
 
-export const getInscription = clubCode => DEMO_MODE
-  ? Promise.resolve(demoGetInscription(clubCode))
-  : fetch(`/api/admin/inscription/${clubCode}`, { headers: authHeaders() }).then(parse)
+export const getInscription = (eventId, clubCode) => DEMO_MODE
+  ? Promise.resolve(demoGetInscription(eventId, clubCode))
+  : fetch(`/api/admin/inscription/${clubCode}?eventId=${encodeURIComponent(eventId)}`, { headers: authHeaders() }).then(parse)
 
-export const exportAll = () => DEMO_MODE
-  ? Promise.resolve(demoExportAll())
-  : fetch('/api/admin/export-all', { headers: authHeaders() }).then(parse)
+export const exportAll = eventId => DEMO_MODE
+  ? Promise.resolve(demoExportAll(eventId))
+  : fetch(`/api/admin/export-all?eventId=${encodeURIComponent(eventId)}`, { headers: authHeaders() }).then(parse)
+
+export const listEvents = () => DEMO_MODE ? Promise.resolve(demoListEvents()) : fetch('/api/admin/events', { headers: authHeaders() }).then(parse)
+export const getEvent = id => DEMO_MODE ? Promise.resolve(demoGetEvent(id)) : fetch(`/api/admin/events/${id}`, { headers: authHeaders() }).then(parse)
+export const getMasterClubs = () => DEMO_MODE ? Promise.resolve(demoGetMasterClubs()) : fetch('/api/admin/clubs', { headers: authHeaders() }).then(parse)
+export const addMasterClub = club => DEMO_MODE ? Promise.resolve(demoAddMasterClub(club)) : fetch('/api/admin/clubs', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(club) }).then(parse)
+export const saveEvent = (event, activate = false) => DEMO_MODE ? Promise.resolve(demoSaveEvent(event, activate)) : fetch('/api/admin/events', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ event, activate }) }).then(parse)
+export const updateEventStatus = (id, status) => DEMO_MODE ? Promise.resolve(demoUpdateEventStatus(id, status)) : fetch(`/api/admin/events/${id}/status`, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }).then(parse)
+export const cloneEvent = id => DEMO_MODE ? Promise.resolve(demoCloneEvent(id)) : fetch(`/api/admin/events/${id}/clone`, { headers: authHeaders() }).then(parse)

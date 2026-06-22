@@ -12,6 +12,7 @@ import { buildMMExport } from '../utils/mmSchema'
 import { submitInscription } from '../services/api'
 import { downloadJson } from '../utils/download'
 import { DEMO_MODE } from '../config'
+import BrandFooter from '../components/BrandFooter'
 
 export default function InscriptionWizard() {
   const token = new URLSearchParams(window.location.search).get('t') || ''
@@ -48,6 +49,6 @@ function WizardContent({ token, access }) {
   const total = roster.reduce((sum, athlete) => sum + athlete.events.length, 0)
   return <><Header event={access.event} club={access.club} /><main className="mx-auto max-w-[752px] space-y-4 p-4 pb-28"><RosterPanel roster={roster} onEdit={setEditing} onDelete={remove} highlightId={highlightId} />
     {access.already_submitted && <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800"><strong>Este club ya envió una inscripción.</strong> Puedes editarla y enviar una versión actualizada; la anterior será reemplazada.</div>}
-    <div className="flex justify-end"><ImportPrevious onImport={importPrevious} /></div><AthleteForm roster={roster} referenceDate={access.event.reference_date} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} onQuickImport={items => setRoster(current => [...current, ...items])} />
-  </main>{roster.length > 0 && <div className="fixed inset-x-0 bottom-0 border-t bg-white/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-[720px] items-center justify-between gap-3"><p className="hidden text-sm text-slate-600 sm:block">{roster.length} nadadores · {total} inscripciones</p><button className="btn-primary ml-auto" onClick={() => setScreen('preview')}>Finalizar y enviar inscripción</button></div></div>}</>
+    <div className="flex justify-end"><ImportPrevious onImport={importPrevious} /></div><AthleteForm roster={roster} referenceDate={access.event.reference_date} eventConfig={access.event} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} onQuickImport={items => setRoster(current => [...current, ...items])} />
+  </main><BrandFooter />{roster.length > 0 && <div className="fixed inset-x-0 bottom-0 border-t bg-white/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-[720px] items-center justify-between gap-3"><p className="hidden text-sm text-slate-600 sm:block">{roster.length} nadadores · {total} inscripciones</p><button className="btn-primary ml-auto px-6 py-3" onClick={() => setScreen('preview')}>Finalizar y enviar inscripción</button></div></div>}</>
 }
