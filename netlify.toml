@@ -1,0 +1,39 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/admin/login"
+  to = "/.netlify/functions/admin-login"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/dashboard"
+  to = "/.netlify/functions/admin-dashboard"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/generate-tokens"
+  to = "/.netlify/functions/admin-generate-tokens"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/inscription/:clubCode"
+  to = "/.netlify/functions/admin-inscription?clubCode=:clubCode"
+  status = 200
+
+[[redirects]]
+  from = "/api/admin/export-all"
+  to = "/.netlify/functions/admin-export-all"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
