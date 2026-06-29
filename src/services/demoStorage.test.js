@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { demoCloneEvent, demoDashboard, demoGenerateTokens, demoListEvents, demoLogin, demoSaveEvent, demoSubmitInscription, demoValidateToken } from './demoStorage'
+import { demoCloneEvent, demoDashboard, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
 
 const memory = new Map()
 globalThis.localStorage = {
@@ -38,5 +38,26 @@ describe('storage local de la demo', () => {
     expect(saved.status).toBe('draft')
     expect(saved.events).toHaveLength(76)
     expect(demoDashboard(saved.id).counts.received).toBe(0)
+  })
+
+  it('procesa tardías y genera los tres consolidados v2', async () => {
+    const token = demoGenerateTokens().tokens[0].id
+    const athlete = { Ath_no: 2001, Last_name: 'Suros', First_name: 'Ana', Ath_Sex: 'F', Birth_date: '2013-05-15', Team_no: 2, Ath_age: 12, Comp_no: 2001 }
+    const result = { Event_ptr: 1, Ath_no: 2001, ActSeed_course: 'S', ActualSeed_time: '32.50', ConvSeed_course: 'S', ConvSeed_time: '32.50' }
+    demoSubmitInscription({ token, meta: { club_code: 2 }, athletes: [athlete], results: [result], roster: [{ id: 'normal' }] })
+    demoUpdateEventStatus('evt_demo_2025', 'accepting_late')
+    const lateResult = demoSubmitInscription({ token, meta: { club_code: 2 }, athletes: [{ ...athlete, First_name: 'Bea' }], results: [result], roster: [{ id: 'late' }] })
+    expect(lateResult.late).toBe(true)
+    expect(demoDashboard().counts.late_pending).toBe(1)
+    demoReviewLate('evt_demo_2025', 2, 'approve_all')
+    const principal = await demoExportAll('evt_demo_2025', 'principal')
+    const complete = await demoExportAll('evt_demo_2025', 'completo')
+    const supplement = await demoExportAll('evt_demo_2025', 'supplement')
+    expect(principal.meta.type).toBe('principal')
+    expect(principal.athletes).toHaveLength(1)
+    expect(complete.athletes.map(item => item.Ath_no)).toEqual([2001, 2002])
+    expect(supplement.athletes[0].late).toBe(true)
+    expect(Object.keys(complete.results[0])).toHaveLength(87)
+    expect(complete.meta.sha256).toMatch(/^[a-f0-9]{64}$/)
   })
 })

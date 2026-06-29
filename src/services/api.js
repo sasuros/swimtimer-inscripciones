@@ -1,5 +1,5 @@
 import { DEMO_MODE } from '../config'
-import { demoAddMasterClub, demoCloneEvent, demoDashboard, demoExportAll, demoGenerateTokens, demoGetEvent, demoGetInscription, demoGetMasterClubs, demoListEvents, demoLogin, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
+import { demoAddMasterClub, demoCloneEvent, demoDashboard, demoExportAll, demoGenerateTokens, demoGetEvent, demoGetInscription, demoGetMasterClubs, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
 
 const authHeaders = () => ({ Authorization: `Bearer ${sessionStorage.getItem('swimtimer-admin-token')}` })
 const parse = async response => {
@@ -32,9 +32,13 @@ export const getInscription = (eventId, clubCode) => DEMO_MODE
   ? Promise.resolve(demoGetInscription(eventId, clubCode))
   : fetch(`/api/admin/inscription/${clubCode}?eventId=${encodeURIComponent(eventId)}`, { headers: authHeaders() }).then(parse)
 
-export const exportAll = eventId => DEMO_MODE
-  ? Promise.resolve(demoExportAll(eventId))
-  : fetch(`/api/admin/export-all?eventId=${encodeURIComponent(eventId)}`, { headers: authHeaders() }).then(parse)
+export const exportAll = (eventId, type = 'principal') => DEMO_MODE
+  ? Promise.resolve(demoExportAll(eventId, type))
+  : fetch(`/api/admin/export-all?eventId=${encodeURIComponent(eventId)}&type=${encodeURIComponent(type)}`, { headers: authHeaders() }).then(parse)
+
+export const reviewLate = (eventId, clubCode, action, athleteIds) => DEMO_MODE
+  ? Promise.resolve(demoReviewLate(eventId, clubCode, action, athleteIds))
+  : fetch('/api/admin/late/review', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId, clubCode, action, athleteIds }) }).then(parse)
 
 export const listEvents = () => DEMO_MODE ? Promise.resolve(demoListEvents()) : fetch('/api/admin/events', { headers: authHeaders() }).then(parse)
 export const getEvent = id => DEMO_MODE ? Promise.resolve(demoGetEvent(id)) : fetch(`/api/admin/events/${id}`, { headers: authHeaders() }).then(parse)

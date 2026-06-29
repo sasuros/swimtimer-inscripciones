@@ -4,6 +4,8 @@ Demo estática para gestionar inscripciones de clubes y nadadores en competencia
 
 La Fase 2 añade gestión completa de múltiples eventos, clonación, archivo, clubes y catálogo editable de 76 pruebas, junto con la identidad visual navy/dorado de SWIMTIMER.
 
+La Fase 3 incorpora importación de `config_evento.json` desde Meet Manager 2.0, distribución masiva de enlaces, inscripciones tardías con aprobación y exportaciones JSON v2.
+
 ## Desarrollo
 
 ```bash
@@ -17,6 +19,7 @@ La app queda disponible normalmente en `http://localhost:5173`. El panel está e
 
 - `/admin` y `/admin/eventos`: lista de eventos.
 - `/admin/eventos/nuevo`: crear evento.
+- `/admin/eventos/importar`: importar configuración desde Meet Manager.
 - `/admin/eventos/clonar/:id`: clonar configuración sin inscripciones.
 - `/admin/eventos/:id`: dashboard de un evento.
 - `/admin/eventos/:id/editar`: editar evento.
@@ -29,6 +32,16 @@ La contraseña está definida en `src/config.js`: `swimtimer2025`. Al ser una de
 Opcionalmente, `VITE_ALBERTO_WHATSAPP` define el WhatsApp predeterminado. Cada evento puede sobrescribirlo desde su editor.
 
 Los tokens e inscripciones solo existen en el navegador donde fueron creados. Para la presentación, genera y abre los enlaces desde el mismo perfil del navegador.
+
+## Flujo Meet Manager
+
+Desde **Mis eventos → Importar desde Meet Manager**, carga el JSON generado desde el MDB. La aplicación valida `meet`, `teams` y `events`, crea un borrador y abre el editor para revisión. Los campos de abreviatura faltantes se generan automáticamente.
+
+El dashboard permite descargar:
+
+- Consolidado principal: inscripciones normales.
+- Consolidado completo: normales y tardías aprobadas.
+- Suplemento tardías: únicamente tardías aprobadas.
 
 ## Comandos
 
