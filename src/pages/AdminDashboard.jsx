@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Archive, Clipboard, ExternalLink, Mail, MessageCircle, Pencil, RefreshCw, Send } from 'lucide-react'
+import { Archive, Clipboard, ExternalLink, Mail, MessageCircle, Pencil, RefreshCw, Send, Trash2 } from 'lucide-react'
 import AdminHeader from '../components/AdminHeader'
 import CloseRegistrationModal from '../components/CloseRegistrationModal'
 import ExportMenu from '../components/ExportMenu'
 import LateReviewPanel from '../components/LateReviewPanel'
 import LinkDistributionModal from '../components/LinkDistributionModal'
+import DeleteEventModal from '../components/DeleteEventModal'
 import { downloadJson } from '../utils/download'
 import { emailInvitation, whatsappInvitation } from '../utils/messageTemplates'
-import { exportAll, generateTokens, getDashboard, getInscription, reviewLate, updateEventStatus } from '../services/api'
+import { deleteEvent, exportAll, generateTokens, getDashboard, getInscription, reviewLate, updateEventStatus } from '../services/api'
 
 export default function AdminDashboard({ eventId }) {
   const [data, setData] = useState(null)
@@ -16,6 +17,7 @@ export default function AdminDashboard({ eventId }) {
   const [detail, setDetail] = useState(null)
   const [distributionOpen, setDistributionOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [toast, setToast] = useState('')
   const load = async () => { try { const result = await getDashboard(eventId); setData(result); setError(''); return result } catch (error) { setError(error.message) } }
   useEffect(() => { load() }, [eventId])
@@ -28,6 +30,11 @@ export default function AdminDashboard({ eventId }) {
   const archive = async () => { if (window.confirm('¿Archivar este evento? Podrás seguir consultando sus datos.')) await changeStatus('archived') }
   const openDistribution = async () => { if (data.clubs.some(club => !club.token)) { await generateTokens(eventId); await load() } setDistributionOpen(true) }
   const handleReview = async (clubCode, action, ids) => { await reviewLate(eventId, clubCode, action, ids); await load() }
+  const requestDelete = () => {
+    if (['active', 'accepting_late'].includes(data.event.status)) { setError('Cierra las inscripciones antes de eliminar el evento.'); return }
+    setDeleteOpen(true)
+  }
+  const confirmDelete = async () => { await deleteEvent(eventId); window.location.href = '/admin/eventos' }
   if (!data) return <div className="flex min-h-screen items-center justify-center">{error || 'Cargando panel…'}</div>
   const pending = data.clubs.filter(club => club.status !== 'received')
   return <><AdminHeader><a href="/admin/eventos" className="btn-secondary hidden text-sm sm:inline-flex">← Mis eventos</a></AdminHeader><main className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6">
@@ -39,7 +46,9 @@ export default function AdminDashboard({ eventId }) {
     <LateReviewPanel submissions={data.late || []} onReview={handleReview} />
     <section className="card overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-4"><div><h2 className="font-bold">Clubes y enlaces</h2><p className="text-sm text-slate-500">{pending.length ? `${pending.length} clubes todavía no han enviado` : 'Todos los clubes respondieron'}</p></div><div className="flex flex-wrap gap-2"><ExportMenu onExport={download} /><button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={openDistribution}><Send className="size-4" />Distribuir enlaces a todos</button><button className="btn-primary inline-flex items-center gap-2 text-sm" onClick={generate} disabled={generating}><RefreshCw className={`size-4 ${generating ? 'animate-spin' : ''}`} />Generar enlaces</button></div></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left text-sm"><thead className="bg-slate-50"><tr><th className="p-3">Estado</th><th className="p-3">Club</th><th className="p-3">Nadadores</th><th className="p-3">Envío</th><th className="p-3">Acciones</th></tr></thead><tbody>{data.clubs.map(club => <tr key={club.code} className="border-t transition hover:bg-slate-100"><td className="p-3"><ClubStatus status={club.status} /></td><td className="p-3 font-semibold">{club.name}<span className="ml-2 font-mono text-xs text-slate-500">{club.abbreviation}</span></td><td className="p-3">{club.athlete_count || '—'}</td><td className="p-3 text-slate-500">{club.submitted_at ? new Date(club.submitted_at).toLocaleString('es-VE') : '—'}</td><td className="p-3"><div className="flex items-center gap-1">{club.token && <><button className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" onClick={() => copyText(registrationUrl(club.token))}><Clipboard className="size-3" />Copiar</button><a className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" href={registrationUrl(club.token)} target="_blank" rel="noreferrer"><ExternalLink className="size-3" />Abrir</a><a className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" href={whatsappHref(data.event, club, registrationUrl(club.token))} target="_blank" rel="noreferrer"><MessageCircle className="size-3" />WhatsApp</a><a className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" href={mailHref(data.event, registrationUrl(club.token))}><Mail className="size-3" />Correo</a></>}{club.status === 'received' && <button className="ml-2 font-semibold text-brand-800" onClick={() => viewDetail(club)}>Ver detalle</button>}</div></td></tr>)}</tbody></table></div>
-    </section></main>{detail && <Detail inscription={detail} onClose={() => setDetail(null)} />}{distributionOpen && <LinkDistributionModal event={data.event} clubs={data.clubs} urlFor={registrationUrl} onCopy={copyText} onClose={() => setDistributionOpen(false)} />}{closeOpen && <CloseRegistrationModal event={data.event} clubs={data.clubs} urlFor={registrationUrl} onSelect={changeStatus} onClose={() => setCloseOpen(false)} />}</>
+    </section>
+    <section className="mt-12 flex justify-end border-t border-danger-700/20 pt-6"><button className="inline-flex items-center gap-2 rounded-lg border border-danger-700 px-4 py-2.5 font-bold text-danger-700 transition hover:bg-danger-50" onClick={requestDelete}><Trash2 className="size-4" />Eliminar evento</button></section>
+  </main>{detail && <Detail inscription={detail} onClose={() => setDetail(null)} />}{distributionOpen && <LinkDistributionModal event={data.event} clubs={data.clubs} urlFor={registrationUrl} onCopy={copyText} onClose={() => setDistributionOpen(false)} />}{closeOpen && <CloseRegistrationModal event={data.event} clubs={data.clubs} urlFor={registrationUrl} onSelect={changeStatus} onClose={() => setCloseOpen(false)} />}{deleteOpen && <DeleteEventModal event={data.event} onClose={() => setDeleteOpen(false)} onConfirm={confirmDelete} />}</>
 }
 
 function whatsappHref(event, club, url) { return `https://wa.me/${club.contact_whatsapp || ''}?text=${encodeURIComponent(whatsappInvitation(event, url))}` }

@@ -23,8 +23,9 @@ function legacyEvent() {
 }
 
 export function ensureDemoData() {
+  const firstVisit = localStorage.getItem(STORAGE_KEYS.eventsList) === null
   let ids = read(STORAGE_KEYS.eventsList, [])
-  if (!ids.length) { const event = legacyEvent(); ids = [event.id]; write(eventKey(event.id), event); write(STORAGE_KEYS.eventsList, ids) }
+  if (firstVisit) { const event = legacyEvent(); ids = [event.id]; write(eventKey(event.id), event); write(STORAGE_KEYS.eventsList, ids) }
   if (!localStorage.getItem(STORAGE_KEYS.clubsMaster)) write(STORAGE_KEYS.clubsMaster, clubs.map(teamIdentity))
   else write(STORAGE_KEYS.clubsMaster, read(STORAGE_KEYS.clubsMaster, []).map(teamIdentity))
   if (!localStorage.getItem(STORAGE_KEYS.eventsTemplate)) write(STORAGE_KEYS.eventsTemplate, standardEventTemplate())
@@ -71,6 +72,20 @@ export function demoUpdateEventStatus(id, status) {
   const saved = demoSaveEvent({ ...event, status, activated_at: status === 'active' ? (event.activated_at || new Date().toISOString()) : event.activated_at, closed_at: ['accepting_late','closed'].includes(status) ? new Date().toISOString() : event.closed_at }, false)
   if (status === 'active') demoGenerateTokens(id)
   return saved
+}
+
+export function demoDeleteEvent(id) {
+  const event = demoGetEvent(id)
+  if (!event) throw new Error('Evento no encontrado')
+  if (['active', 'accepting_late'].includes(event.status)) throw new Error('Cierra las inscripciones antes de eliminar el evento.')
+
+  const belongsToEvent = key => key.startsWith(`${id}:`) || (id === LEGACY_EVENT_ID && !key.includes(':'))
+  write(STORAGE_KEYS.eventsList, read(STORAGE_KEYS.eventsList, []).filter(eventId => eventId !== id))
+  localStorage.removeItem(eventKey(id))
+  write(STORAGE_KEYS.tokens, read(STORAGE_KEYS.tokens, []).filter(token => (token.eventId || LEGACY_EVENT_ID) !== id))
+  write(STORAGE_KEYS.inscriptions, Object.fromEntries(Object.entries(read(STORAGE_KEYS.inscriptions, {})).filter(([key, value]) => !belongsToEvent(key) && value?.eventId !== id)))
+  write(STORAGE_KEYS.lateInscriptions, Object.fromEntries(Object.entries(read(STORAGE_KEYS.lateInscriptions, {})).filter(([key, value]) => !key.startsWith(`${id}:`) && value?.eventId !== id)))
+  return { success: true }
 }
 
 export function demoCloneEvent(id) {

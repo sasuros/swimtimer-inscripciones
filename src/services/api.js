@@ -1,5 +1,5 @@
 import { DEMO_MODE } from '../config'
-import { demoAddMasterClub, demoCloneEvent, demoDashboard, demoExportAll, demoGenerateTokens, demoGetEvent, demoGetInscription, demoGetMasterClubs, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
+import { demoAddMasterClub, demoCloneEvent, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoGetEvent, demoGetInscription, demoGetMasterClubs, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
 
 const authHeaders = () => ({ Authorization: `Bearer ${sessionStorage.getItem('swimtimer-admin-token')}` })
 const parse = async response => {
@@ -47,3 +47,4 @@ export const addMasterClub = club => DEMO_MODE ? Promise.resolve(demoAddMasterCl
 export const saveEvent = (event, activate = false) => DEMO_MODE ? Promise.resolve(demoSaveEvent(event, activate)) : fetch('/api/admin/events', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ event, activate }) }).then(parse)
 export const updateEventStatus = (id, status) => DEMO_MODE ? Promise.resolve(demoUpdateEventStatus(id, status)) : fetch(`/api/admin/events/${id}/status`, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }).then(parse)
 export const cloneEvent = id => DEMO_MODE ? Promise.resolve(demoCloneEvent(id)) : fetch(`/api/admin/events/${id}/clone`, { headers: authHeaders() }).then(parse)
+export const deleteEvent = id => DEMO_MODE ? Promise.resolve(demoDeleteEvent(id)) : fetch(`/api/admin/events/${id}`, { method: 'DELETE', headers: authHeaders() }).then(parse)

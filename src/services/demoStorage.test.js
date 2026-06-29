@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { demoCloneEvent, demoDashboard, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
+import { demoCloneEvent, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
 
 const memory = new Map()
 globalThis.localStorage = {
@@ -38,6 +38,26 @@ describe('storage local de la demo', () => {
     expect(saved.status).toBe('draft')
     expect(saved.events).toHaveLength(76)
     expect(demoDashboard(saved.id).counts.received).toBe(0)
+  })
+
+  it('elimina un evento cerrado y todos sus datos asociados', () => {
+    const source = demoListEvents()[0]
+    const draft = demoSaveEvent({ ...demoCloneEvent(source.id), name: 'Evento eliminable', date_start: '2027-05-10', reference_date: '2027-05-10', venue: 'Piscina' }, false)
+    demoGenerateTokens(draft.id)
+    localStorage.setItem('swimtimer-demo:inscriptions', JSON.stringify({ [`${draft.id}:2`]: { eventId: draft.id } }))
+    localStorage.setItem('swimtimer-demo:inscriptions:late', JSON.stringify({ [`${draft.id}:2`]: { eventId: draft.id } }))
+
+    expect(demoDeleteEvent(draft.id)).toEqual({ success: true })
+    expect(demoListEvents().some(event => event.id === draft.id)).toBe(false)
+    expect(JSON.parse(localStorage.getItem('swimtimer-demo:tokens'))).toHaveLength(0)
+    expect(JSON.parse(localStorage.getItem('swimtimer-demo:inscriptions'))).toEqual({})
+    expect(JSON.parse(localStorage.getItem('swimtimer-demo:inscriptions:late'))).toEqual({})
+    expect(localStorage.getItem(`swimtimer-demo:event:${draft.id}`)).toBeNull()
+  })
+
+  it('no elimina eventos con inscripciones abiertas', () => {
+    const event = demoListEvents()[0]
+    expect(() => demoDeleteEvent(event.id)).toThrow('Cierra las inscripciones antes de eliminar el evento.')
   })
 
   it('procesa tardías y genera los tres consolidados v2', async () => {
