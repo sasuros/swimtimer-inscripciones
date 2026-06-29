@@ -18,7 +18,7 @@ export default function DeleteEventModal({ event, onClose, onConfirm }) {
       <input id="delete-confirmation" className="input" value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="off" placeholder="Escribe ELIMINAR" autoFocus />
       <p className="field-help">La palabra debe coincidir exactamente, en mayúsculas.</p>
       {error && <p className="mt-3 rounded-lg bg-danger-50 p-3 text-sm text-danger-700">{error}</p>}
-      <div className="mt-6 flex flex-wrap justify-end gap-2"><button className="btn-secondary" onClick={onClose} disabled={deleting}>Cancelar</button><button className="inline-flex items-center gap-2 rounded-lg border border-danger-700 px-4 py-2.5 font-bold text-danger-700 transition hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-40" onClick={remove} disabled={confirmation !== 'ELIMINAR' || deleting}><Trash2 className="size-4" />{deleting ? 'Eliminando…' : 'Eliminar permanentemente'}</button></div>
+      <div className="mt-6 flex flex-wrap justify-end gap-2"><button className="btn-secondary" onClick={onClose} disabled={deleting}>Cancelar</button><button className="btn-danger inline-flex items-center gap-2" onClick={remove} disabled={confirmation !== 'ELIMINAR' || deleting}><Trash2 className="size-4" />{deleting ? 'Eliminando…' : 'Eliminar permanentemente'}</button></div>
     </section>
   </div>
 }
