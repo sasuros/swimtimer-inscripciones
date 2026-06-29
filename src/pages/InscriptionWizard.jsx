@@ -35,8 +35,8 @@ function WizardContent({ token, access }) {
   const [finalData, setFinalData] = useState(null)
   const [lateSubmission, setLateSubmission] = useState(false)
   const save = athlete => { setRoster(current => editing ? current.map(item => item.id === athlete.id ? athlete : item) : [...current, athlete]); setEditing(null); setHighlightId(athlete.id); setTimeout(() => setHighlightId(null), 2000) }
-  const remove = athlete => { if (window.confirm(`¿Eliminar a ${athlete.firstName} ${athlete.lastName} del roster?`)) { setRoster(current => current.filter(item => item.id !== athlete.id)); if (editing?.id === athlete.id) setEditing(null) } }
-  const importPrevious = data => { const incoming = data.roster || data._swimtimer_roster; if (Array.isArray(incoming)) setRoster(incoming); else window.alert('Este JSON no incluye el roster editable. Usa un respaldo generado por esta versión.') }
+  const remove = athlete => { if (window.confirm(`¿Eliminar a ${athlete.firstName} ${athlete.lastName} de la lista?`)) { setRoster(current => current.filter(item => item.id !== athlete.id)); if (editing?.id === athlete.id) setEditing(null) } }
+  const importPrevious = data => { const incoming = data.roster || data._swimtimer_roster; if (Array.isArray(incoming)) setRoster(incoming); else window.alert('Este JSON no incluye la lista editable. Usa un respaldo generado por esta versión.') }
   const submit = async () => {
     setSending(true)
     try {
@@ -46,7 +46,7 @@ function WizardContent({ token, access }) {
       const downloadable = { ...output, _swimtimer_roster: roster }
       if (DEMO_MODE) downloadJson(downloadable, `inscripcion-${access.club.code}.json`)
       setLateSubmission(Boolean(result.late)); setFinalData(downloadable); localStorage.removeItem(`swimtimer-roster:${token}`); setScreen('done')
-    } catch (error) { window.alert(`${error.message}. Tu roster sigue guardado en este navegador.`) } finally { setSending(false) }
+    } catch (error) { window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`) } finally { setSending(false) }
   }
   if (screen === 'done') return <ConfirmationScreen data={finalData} club={access.club} whatsapp={access.whatsapp} late={lateSubmission} />
   if (screen === 'preview') return <PreviewPlanilla roster={roster} event={access.event} club={access.club} onBack={() => setScreen('form')} onConfirm={submit} sending={sending} />

@@ -6,7 +6,7 @@ export default function RosterPanel({ roster, onEdit, onDelete, highlightId }) {
   const total = roster.reduce((sum, athlete) => sum + athlete.events.length, 0)
   return <section className="card overflow-hidden">
     <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-4 py-3 text-left">
-      <div><h2 className="font-bold">Roster del club</h2><p className="text-sm text-slate-500">{roster.length} nadadores · {total} inscripciones</p></div>
+      <div><h2 className="font-bold">Lista de nadadores del club</h2><p className="text-sm text-slate-500">{roster.length} nadadores · {total} inscripciones</p></div>
       <ChevronDown className={`size-5 transition ${open ? 'rotate-180' : ''}`} />
     </button>
     {open && <div className="border-t">
