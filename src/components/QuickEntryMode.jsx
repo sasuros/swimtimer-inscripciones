@@ -2,6 +2,7 @@ import { useState } from 'react'
 import eventData from '../data/events.json'
 import { calculateAge, categoryForAge } from '../utils/ageCalculator'
 import { formatTimeInput, validateTime } from '../utils/timeParser'
+import { eventAllowsSex } from '../utils/eventEligibility'
 
 const SAMPLE = 'Rodriguez | Maria | F | 15/05/2013 | 25m Crawl | 32.56\nLopez | Carlos | M | 22/03/2012 | 100m Crawl | 1:15.30'
 
@@ -14,7 +15,7 @@ export default function QuickEntryMode({ referenceDate, eventConfig, roster, onI
       const birthDate = dateRaw?.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)?.slice(1).reverse().join('-')
       const sex = sexRaw?.toUpperCase(); const age = calculateAge(birthDate, referenceDate); const ranges = eventConfig?.events ? [...new Map(eventConfig.events.map(event => [`${event.age_lo}-${event.age_hi}`, [event.age_lo, event.age_hi]])).values()] : undefined; const category = categoryForAge(age, ranges); const time = formatTimeInput(rawTime || '')
       let candidate
-      if (Array.isArray(eventConfig?.events)) candidate = eventConfig.events.find(event => event.active && event.sex === sex && event.age_lo === category?.min && event.age_hi === category?.max && `${event.distance}m ${event.style}`.toLowerCase() === eventLabel?.toLowerCase())
+      if (Array.isArray(eventConfig?.events)) candidate = eventConfig.events.find(event => event.active !== false && eventAllowsSex(event.sex, sex) && event.age_lo === category?.min && event.age_hi === category?.max && `${event.distance}m ${event.style}`.toLowerCase() === eventLabel?.toLowerCase())
       else { const index = eventData.events.findIndex(event => `${event.distance}m ${event.style}`.toLowerCase() === eventLabel?.toLowerCase() && category && event.ages.some(([a,b]) => a === category.min && b === category.max)); if (index >= 0) candidate = { ...eventData.events[index], event_ptr: index } }
       const errors = []
       if (!lastName || !firstName) errors.push('Faltan nombre o apellido')
