@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { demoCloneEvent, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
+import { demoCloneEvent, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
 
 const memory = new Map()
 globalThis.localStorage = {
@@ -28,6 +28,31 @@ describe('storage local de la demo', () => {
 
     expect(demoValidateToken(generated.tokens[0].id).already_submitted).toBe(true)
     expect(demoDashboard().counts).toMatchObject({ received: 1, athletes: 1 })
+  })
+
+  it('abre y descarga desde otro dispositivo sin guardar la inscripción', () => {
+    const token = demoGenerateTokens().tokens[0].id
+    expect(token.length).toBeLessThan(8000)
+    memory.clear()
+
+    const access = demoValidateToken(token)
+    expect(access).toMatchObject({ valid: true, localMode: false, eventId: 'evt_demo_2025' })
+    expect(access.event.events).toHaveLength(76)
+    const result = demoSubmitInscription({ token, athletes: [{ Ath_no: 2001 }], results: [], meta: {}, roster: [] })
+    expect(result).toMatchObject({ success: true, external: true })
+    expect(localStorage.getItem('swimtimer-demo:inscriptions')).toBeNull()
+  })
+
+  it('mantiene compatibilidad con tokens v1 almacenados', () => {
+    const event = demoListEvents()[0]
+    const club = event.clubs[0]
+    localStorage.setItem('swimtimer-demo:tokens', JSON.stringify([{
+      id: 'AKP-2026-token-v1', eventId: event.id, event, club,
+      expires_at: '2099-01-01T00:00:00.000Z'
+    }]))
+    expect(demoValidateToken('AKP-2026-token-v1')).toMatchObject({
+      valid: true, localMode: true, eventId: event.id
+    })
   })
 
   it('crea y clona eventos sin copiar inscripciones', () => {
@@ -79,5 +104,21 @@ describe('storage local de la demo', () => {
     expect(supplement.athletes[0].late).toBe(true)
     expect(Object.keys(complete.results[0])).toHaveLength(87)
     expect(complete.meta.sha256).toMatch(/^[a-f0-9]{64}$/)
+  })
+
+  it('excluye clubes que no participan de pendientes y consolidado', async () => {
+    const token = demoGenerateTokens().tokens[0].id
+    const access = demoValidateToken(token)
+    const athlete = { Ath_no: 2001, Last_name: 'Suros', First_name: 'Ana', Ath_Sex: 'F', Birth_date: '2013-05-15', Team_no: access.club.code, Ath_age: 12, Comp_no: 2001 }
+    demoSubmitInscription({ token, meta: { club_code: access.club.code }, athletes: [athlete], results: [], roster: [] })
+    demoSetClubParticipation(access.eventId, access.club.code, false)
+
+    const dashboard = demoDashboard(access.eventId)
+    expect(dashboard.clubs.find(club => club.code === access.club.code).status).toBe('not_participating')
+    expect(dashboard.counts.pending).toBe(11)
+    expect((await demoExportAll(access.eventId)).athletes).toHaveLength(0)
+
+    demoSetClubParticipation(access.eventId, access.club.code, true)
+    expect(demoDashboard(access.eventId).clubs.find(club => club.code === access.club.code).status).toBe('received')
   })
 })

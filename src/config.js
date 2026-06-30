@@ -9,5 +9,6 @@ export const STORAGE_KEYS = {
   eventsPrefix: 'swimtimer-demo:event:',
   clubsMaster: 'swimtimer-demo:clubs:master',
   eventsTemplate: 'swimtimer-demo:events:template',
-  lateInscriptions: 'swimtimer-demo:inscriptions:late'
+  lateInscriptions: 'swimtimer-demo:inscriptions:late',
+  clubParticipation: 'swimtimer-demo:club-participation'
 }

@@ -4,13 +4,14 @@ import { DEMO_ADMIN_PASSWORD, DEMO_WHATSAPP, STORAGE_KEYS } from '../config'
 import { standardEventTemplate } from '../utils/eventTemplate'
 import { teamIdentity } from '../utils/teamUtils'
 import { buildConsolidatedExport } from '../utils/mmSchema'
+import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/demoToken'
 
 const LEGACY_EVENT_ID = 'evt_demo_2025'
 const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
 const write = (key, value) => localStorage.setItem(key, JSON.stringify(value))
-const tokenPrefix = name => name.slice(0, 3).toUpperCase().normalize('NFD').replace(/[^A-Z]/g, 'X')
 const eventKey = id => `${STORAGE_KEYS.eventsPrefix}${id}`
 const inscriptionKey = (eventId, clubCode) => `${eventId}:${clubCode}`
+const participationKey = (eventId, clubCode) => `${eventId}:${clubCode}`
 
 function legacyEvent() {
   return {
@@ -85,6 +86,7 @@ export function demoDeleteEvent(id) {
   write(STORAGE_KEYS.tokens, read(STORAGE_KEYS.tokens, []).filter(token => (token.eventId || LEGACY_EVENT_ID) !== id))
   write(STORAGE_KEYS.inscriptions, Object.fromEntries(Object.entries(read(STORAGE_KEYS.inscriptions, {})).filter(([key, value]) => !belongsToEvent(key) && value?.eventId !== id)))
   write(STORAGE_KEYS.lateInscriptions, Object.fromEntries(Object.entries(read(STORAGE_KEYS.lateInscriptions, {})).filter(([key, value]) => !key.startsWith(`${id}:`) && value?.eventId !== id)))
+  write(STORAGE_KEYS.clubParticipation, Object.fromEntries(Object.entries(read(STORAGE_KEYS.clubParticipation, {})).filter(([key]) => !key.startsWith(`${id}:`))))
   return { success: true }
 }
 
@@ -98,15 +100,26 @@ export function demoGenerateTokens(eventId = LEGACY_EVENT_ID) {
   const current = read(STORAGE_KEYS.tokens, [])
   const expires = new Date(); expires.setDate(expires.getDate() + 60)
   const otherTokens = current.filter(item => (item.eventId || LEGACY_EVENT_ID) !== event.id)
-  const eventTokens = event.clubs.map(club => current.find(item => (item.eventId || LEGACY_EVENT_ID) === event.id && Number(item.club.code) === Number(club.code)) || {
-    id: `${club.abbreviation || tokenPrefix(club.name)}-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8)}`, eventId: event.id,
+  const eventTokens = event.clubs.map(club => ({
+    id: encodeDemoToken(event, club), eventId: event.id,
     club, event, used: false, created_at: new Date().toISOString(), expires_at: expires.toISOString()
-  })
+  }))
   write(STORAGE_KEYS.tokens, [...otherTokens, ...eventTokens])
   return { success: true, tokens: eventTokens }
 }
 
 export function demoValidateToken(token) {
+  const embedded = decodeDemoToken(token)
+  if (embedded) {
+    const access = accessFromDemoToken(embedded)
+    const record = read(STORAGE_KEYS.tokens, []).find(item => item.id === token)
+    if (!record) return { ...access, localMode: false, already_submitted: false, inscription: null, normal_inscription: null }
+    const event = demoGetEvent(access.eventId) || access.event
+    const inscriptions = read(STORAGE_KEYS.inscriptions, {})
+    const inscription = inscriptions[inscriptionKey(access.eventId, access.club.code)] || null
+    const late = read(STORAGE_KEYS.lateInscriptions, {})[inscriptionKey(access.eventId, access.club.code)] || null
+    return { ...access, localMode: true, event: { ...event, date: event.date_start }, already_submitted: event.status === 'accepting_late' ? Boolean(late) : Boolean(inscription), inscription: event.status === 'accepting_late' ? late : inscription, normal_inscription: inscription, whatsapp: event.organizer_whatsapp || access.whatsapp || DEMO_WHATSAPP }
+  }
   ensureDemoData()
   const record = read(STORAGE_KEYS.tokens, []).find(item => item.id === token)
   if (!record || new Date(record.expires_at) < new Date()) return { valid: false }
@@ -115,13 +128,14 @@ export function demoValidateToken(token) {
   const inscriptions = read(STORAGE_KEYS.inscriptions, {})
   const inscription = inscriptions[inscriptionKey(eventId, record.club.code)] || (eventId === LEGACY_EVENT_ID ? inscriptions[record.club.code] : null) || null
   const late = read(STORAGE_KEYS.lateInscriptions, {})[inscriptionKey(eventId, record.club.code)] || null
-  return { valid: true, event: { ...event, date: event.date_start }, club: teamIdentity(record.club), eventId, already_submitted: event.status === 'accepting_late' ? Boolean(late) : Boolean(inscription), inscription: event.status === 'accepting_late' ? late : inscription, normal_inscription: inscription, whatsapp: event.organizer_whatsapp || DEMO_WHATSAPP }
+  return { valid: true, localMode: true, event: { ...event, date: event.date_start }, club: teamIdentity(record.club), eventId, already_submitted: event.status === 'accepting_late' ? Boolean(late) : Boolean(inscription), inscription: event.status === 'accepting_late' ? late : inscription, normal_inscription: inscription, whatsapp: event.organizer_whatsapp || DEMO_WHATSAPP }
 }
 
 export function demoSubmitInscription(payload) {
   const access = demoValidateToken(payload.token)
   if (!access.valid) throw new Error('El enlace no es válido o caducó')
   if (['draft','closed','archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
+  if (!access.localMode) return { success: true, external: true, late: access.event.status === 'accepting_late', summary: { athletes: payload.athletes.length, inscriptions: payload.results.length } }
   if (access.event.status === 'accepting_late') {
     const late = read(STORAGE_KEYS.lateInscriptions, {})
     late[inscriptionKey(access.eventId, access.club.code)] = { meta: payload.meta, athletes: payload.athletes, results: payload.results, roster: payload.roster, submitted_at: new Date().toISOString(), token: payload.token, eventId: access.eventId, club: access.club, status: 'pending', approved_athletes: [], rejected_athletes: [] }
@@ -142,14 +156,25 @@ export function demoDashboard(eventId = LEGACY_EVENT_ID) {
   const tokens = read(STORAGE_KEYS.tokens, [])
   const inscriptions = read(STORAGE_KEYS.inscriptions, {})
   const lateMap = read(STORAGE_KEYS.lateInscriptions, {})
+  const participation = read(STORAGE_KEYS.clubParticipation, {})
   const clubRows = event.clubs.map(club => {
     const token = tokens.find(item => (item.eventId || LEGACY_EVENT_ID) === event.id && Number(item.club.code) === Number(club.code))
     const inscription = inscriptions[inscriptionKey(event.id, club.code)] || (event.id === LEGACY_EVENT_ID ? inscriptions[club.code] : null)
-    return { ...club, status: inscription ? 'received' : token ? 'sent' : 'missing', athlete_count: inscription?.athletes?.length || 0, submitted_at: inscription?.submitted_at || null, token: token?.id || null, expires_at: token?.expires_at || null }
+    const participating = participation[participationKey(event.id, club.code)] !== false
+    return { ...club, status: participating ? (inscription ? 'received' : token ? 'sent' : 'missing') : 'not_participating', athlete_count: participating ? (inscription?.athletes?.length || 0) : 0, submitted_at: participating ? (inscription?.submitted_at || null) : null, token: token?.id || null, expires_at: token?.expires_at || null }
   })
   const late = Object.entries(lateMap).filter(([key]) => key.startsWith(`${eventId}:`)).map(([, value]) => value)
   const submittedDates = clubRows.map(club => club.submitted_at).filter(Boolean).sort()
-  return { event, clubs: clubRows, late, counts: { total_clubs: clubRows.length, received: clubRows.filter(item => item.status === 'received').length, pending: clubRows.filter(item => item.status !== 'received').length, athletes: clubRows.reduce((sum, item) => sum + item.athlete_count, 0), late_pending: late.filter(item => ['pending','partially_approved'].includes(item.status)).length }, timestamps: { opened_at: event.activated_at || event.created_at || null, last_submission_at: submittedDates.at(-1) || null, closed_at: event.closed_at || null } }
+  return { event, clubs: clubRows, late, counts: { total_clubs: clubRows.length, received: clubRows.filter(item => item.status === 'received').length, pending: clubRows.filter(item => !['received','not_participating'].includes(item.status)).length, athletes: clubRows.reduce((sum, item) => sum + item.athlete_count, 0), late_pending: late.filter(item => ['pending','partially_approved'].includes(item.status)).length }, timestamps: { opened_at: event.activated_at || event.created_at || null, last_submission_at: submittedDates.at(-1) || null, closed_at: event.closed_at || null } }
+}
+
+export function demoSetClubParticipation(eventId, clubCode, participates) {
+  const event = demoGetEvent(eventId)
+  if (!event?.clubs.some(club => Number(club.code) === Number(clubCode))) throw new Error('Club no encontrado')
+  const participation = read(STORAGE_KEYS.clubParticipation, {})
+  participation[participationKey(eventId, clubCode)] = Boolean(participates)
+  write(STORAGE_KEYS.clubParticipation, participation)
+  return { success: true }
 }
 
 export function demoGetInscription(eventId, clubCode) {
@@ -174,7 +199,8 @@ export function demoReviewLate(eventId, clubCode, action, athleteIds = []) {
 
 export async function demoExportAll(eventId = LEGACY_EVENT_ID, type = 'principal') {
   const prefix = `${eventId}:`; const all = read(STORAGE_KEYS.inscriptions, {})
-  const inscriptions = Object.entries(all).filter(([key]) => key.startsWith(prefix) || (eventId === LEGACY_EVENT_ID && !key.includes(':'))).map(([, value]) => value)
-  const late = Object.entries(read(STORAGE_KEYS.lateInscriptions, {})).filter(([key]) => key.startsWith(prefix)).map(([, value]) => value)
+  const excluded = new Set(Object.entries(read(STORAGE_KEYS.clubParticipation, {})).filter(([key, participates]) => key.startsWith(prefix) && participates === false).map(([key]) => Number(key.slice(prefix.length))))
+  const inscriptions = Object.entries(all).filter(([key]) => key.startsWith(prefix) || (eventId === LEGACY_EVENT_ID && !key.includes(':'))).map(([, value]) => value).filter(value => !excluded.has(Number(value.meta?.club_code)))
+  const late = Object.entries(read(STORAGE_KEYS.lateInscriptions, {})).filter(([key]) => key.startsWith(prefix)).map(([, value]) => value).filter(value => !excluded.has(Number(value.meta?.club_code || value.club?.code)))
   return buildConsolidatedExport({ event: demoGetEvent(eventId) || legacyEvent(), inscriptions, lateInscriptions: late, type })
 }
