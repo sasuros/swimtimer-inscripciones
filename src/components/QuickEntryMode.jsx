@@ -1,38 +1,81 @@
-import { useState } from 'react'
-import eventData from '../data/events.json'
-import { calculateAge, categoryForAge } from '../utils/ageCalculator'
-import { formatTimeInput, validateTime } from '../utils/timeParser'
-import { eventAllowsSex } from '../utils/eventEligibility'
+import { useMemo, useState } from 'react'
+import { ChevronDown, Download, FileSpreadsheet } from 'lucide-react'
+import { downloadCsv, eventLabel, parseQuickEntry, safeFilename } from '../utils/quickEntry'
 
-const SAMPLE = 'Rodriguez | Maria | F | 15/05/2013 | 25m Crawl | 32.56\nLopez | Carlos | M | 22/03/2012 | 100m Crawl | 1:15.30'
+const EXAMPLES = [
+  ['Rodriguez', 'Maria', 'F', '15/05/2013', '25m Crawl', '32.56'],
+  ['Lopez', 'Carlos', 'M', '22/03/2012', '50m Espalda', '45.20'],
+  ['Lopez', 'Carlos', 'M', '22/03/2012', '100m Crawl', '1:35.40'],
+  ['Torres', 'Ana', 'F', '10/08/2015', '25m Pecho', '28.90']
+]
+const HEADERS = ['Apellido', 'Nombre', 'Sexo', 'Fecha Nac.', 'Evento', 'Tiempo']
+const NOTES = [
+  'Si un nadador tiene varios eventos, repítelo en varias filas (una fila por cada evento)',
+  'El sexo puede ser F o M',
+  'La fecha puede ser DD/MM/AAAA o AAAA-MM-DD',
+  'El tiempo puede ser SS.CC o MM:SS.CC (centésimas obligatorias)',
+  'Los nombres de eventos deben coincidir con los del evento: 25m Crawl, 50m Espalda, 25m Pecho, etc.',
+  'Puedes copiar desde Excel o Google Sheets y pegar directamente'
+]
 
-export default function QuickEntryMode({ referenceDate, eventConfig, roster, onImport }) {
+export default function QuickEntryMode({ referenceDate, eventConfig, club, roster, onImport }) {
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState(null)
-  const parse = () => {
-    const rows = text.split(/\r?\n/).filter(Boolean).map((line, rowIndex) => {
-      const [lastName, firstName, sexRaw, dateRaw, eventLabel, rawTime] = line.split('|').map(value => value?.trim())
-      const birthDate = dateRaw?.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)?.slice(1).reverse().join('-')
-      const sex = sexRaw?.toUpperCase(); const age = calculateAge(birthDate, referenceDate); const ranges = eventConfig?.events ? [...new Map(eventConfig.events.map(event => [`${event.age_lo}-${event.age_hi}`, [event.age_lo, event.age_hi]])).values()] : undefined; const category = categoryForAge(age, ranges); const time = formatTimeInput(rawTime || '')
-      let candidate
-      if (Array.isArray(eventConfig?.events)) candidate = eventConfig.events.find(event => event.active !== false && eventAllowsSex(event.sex, sex) && event.age_lo === category?.min && event.age_hi === category?.max && `${event.distance}m ${event.style}`.toLowerCase() === eventLabel?.toLowerCase())
-      else { const index = eventData.events.findIndex(event => `${event.distance}m ${event.style}`.toLowerCase() === eventLabel?.toLowerCase() && category && event.ages.some(([a,b]) => a === category.min && b === category.max)); if (index >= 0) candidate = { ...eventData.events[index], event_ptr: index } }
-      const errors = []
-      if (!lastName || !firstName) errors.push('Faltan nombre o apellido')
-      if (!['F', 'M'].includes(sex)) errors.push('Sexo debe ser F o M')
-      if (!birthDate || !category) errors.push('Fecha o edad inválida')
-      if (!candidate) errors.push('Evento no reconocido o fuera de categoría')
-      const timeError = validateTime(time); if (timeError) errors.push(timeError)
-      return { rowIndex: rowIndex + 1, lastName, firstName, sex, birthDate, age, category, eventIndex: candidate?.event_ptr, label: candidate ? `${candidate.distance}m ${candidate.style}` : eventLabel, time, errors }
-    })
-    setParsed(rows)
-  }
+  const [guideOpen, setGuideOpen] = useState(true)
+  const events = useMemo(() => (eventConfig?.events || []).filter(event => event.active !== false), [eventConfig])
+  const parse = () => setParsed(parseQuickEntry(text, { referenceDate, events }))
+  const validRows = parsed?.filter(row => !row.errors.length && !row.warnings.length) || []
+
   const importValid = () => {
     const grouped = new Map()
-    parsed.filter(row => !row.errors.length).forEach(row => { const key = `${row.lastName}|${row.firstName}|${row.birthDate}|${row.sex}`.toLowerCase(); if (!grouped.has(key)) grouped.set(key, { id: crypto.randomUUID(), lastName: row.lastName, firstName: row.firstName, sex: row.sex, birthDate: row.birthDate, age: row.age, category: row.category, events: [] }); const athlete = grouped.get(key); if (!athlete.events.some(entry => entry.eventIndex === row.eventIndex)) athlete.events.push({ eventIndex: row.eventIndex, label: row.label, time: row.time }) })
+    validRows.forEach(row => {
+      const key = `${row.lastName}|${row.firstName}|${row.birthDate}|${row.sex}`.toLowerCase()
+      if (!grouped.has(key)) grouped.set(key, { id: crypto.randomUUID(), lastName: row.lastName, firstName: row.firstName, sex: row.sex, birthDate: row.birthDate, age: row.age, category: row.category, events: [] })
+      const athlete = grouped.get(key)
+      if (!athlete.events.some(entry => entry.eventIndex === row.eventIndex)) athlete.events.push({ eventIndex: row.eventIndex, label: row.label, time: row.time })
+    })
     const additions = [...grouped.values()].filter(item => !roster.some(old => `${old.firstName} ${old.lastName}`.toLowerCase() === `${item.firstName} ${item.lastName}`.toLowerCase()))
-    onImport(additions); setText(''); setParsed(null)
+    onImport(additions)
+    setText((parsed || []).filter(row => row.errors.length || row.warnings.length).map(row => row.rawLine).join('\n'))
+    setParsed(null)
   }
-  const validCount = parsed?.filter(row => !row.errors.length).length || 0
-  return <div className="rounded-xl border border-dashed p-4"><p className="mb-2 text-sm text-slate-600">Una línea por evento: Apellido | Nombre | F/M | DD/MM/AAAA | Evento | Tiempo</p><textarea className="input min-h-32 font-mono text-sm" value={text} onChange={event => { setText(event.target.value); setParsed(null) }} placeholder={SAMPLE} /><p className="field-help">Separa cada dato con una barra vertical: |</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" className="btn-secondary" onClick={parse} disabled={!text.trim()}>Validar filas</button>{validCount > 0 && <button type="button" className="btn-secondary" onClick={importValid}>Importar {validCount} filas válidas</button>}</div>{parsed && <div className="mt-3 space-y-2 text-sm">{parsed.map(row => <div key={row.rowIndex} className={`rounded-lg px-3 py-2 ${row.errors.length ? 'bg-danger-50 text-danger-700' : 'bg-success-50 text-success-800'}`}><strong>Fila {row.rowIndex}:</strong> {row.errors.length ? row.errors.join(' · ') : 'Lista para importar'}</div>)}</div>}</div>
+
+  const downloadTemplate = () => {
+    const first = events[0]
+    const sample = first ? ['Rodriguez', 'Maria', displaySex(first.sex), sampleBirthDate(first, referenceDate), eventLabel(first), '32.56'] : EXAMPLES[0]
+    const rows = [HEADERS, sample, [], ['# Eventos disponibles para este club'], ...events.map(event => [`# ${eventLabel(event)} | ${categoryLabel(event)} | ${displaySex(event.sex)}`])]
+    downloadCsv(rows, `plantilla_inscripcion_${safeFilename(club?.name || club?.code)}.csv`)
+  }
+
+  const downloadEvents = () => downloadCsv([
+    ['Evento', 'Categoría', 'Sexo'],
+    ...events.map(event => [eventLabel(event), categoryLabel(event), displaySex(event.sex)])
+  ], `eventos_disponibles_${safeFilename(club?.name || club?.code)}.csv`)
+
+  return <div className="rounded-xl border border-brand-600/30 bg-white p-4 sm:p-5">
+    <button type="button" className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setGuideOpen(open => !open)} aria-expanded={guideOpen}>
+      <span><span className="flex items-center gap-2 text-lg font-extrabold text-brand-800"><FileSpreadsheet className="size-5 text-brand-600" />Cómo preparar tu archivo de inscripción</span><span className="mt-1 block text-sm text-slate-600">Prepara un archivo Excel, Google Sheets o CSV con estos datos y pégalos aquí para inscribir a todos tus nadadores de una vez.</span></span>
+      <ChevronDown className={`mt-1 size-5 shrink-0 text-brand-600 transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
+    </button>
+
+    {guideOpen && <div className="mt-5 border-t pt-5">
+      <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-slate-100 text-brand-800"><tr>{HEADERS.map(header => <th key={header} className="border px-3 py-2">{header}</th>)}</tr></thead><tbody>{EXAMPLES.map((row, index) => <tr key={index}>{row.map((value, cell) => <td key={cell} className="border px-3 py-2">{value}</td>)}</tr>)}</tbody></table></div>
+      <div className="space-y-3 sm:hidden">{EXAMPLES.map((row, index) => <div key={index} className="rounded-lg border bg-slate-50 p-3 text-sm">{HEADERS.map((header, cell) => <p key={header} className="grid grid-cols-[92px_1fr] gap-2 py-0.5"><strong className="text-brand-800">{header}</strong><span>{row[cell]}</span></p>)}</div>)}</div>
+      <ul className="mt-4 space-y-1 text-sm text-[#059669]">{NOTES.map(note => <li key={note}>• {note}</li>)}</ul>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row"><button type="button" className="btn-secondary inline-flex items-center justify-center gap-2" onClick={downloadTemplate}><Download className="size-4" />Descargar plantilla</button><button type="button" className="btn-secondary inline-flex items-center justify-center gap-2" onClick={downloadEvents}><Download className="size-4" />Descargar lista de eventos</button></div>
+    </div>}
+
+    <label className="label mt-6" htmlFor="quick-entry">Pega aquí las filas de Excel, Google Sheets o CSV</label>
+    <textarea id="quick-entry" className="input min-h-40 font-mono text-sm" value={text} onChange={event => { setText(event.target.value); setParsed(null) }} placeholder="Apellido | Nombre | F/M | DD/MM/AAAA | Evento | Tiempo" />
+    <p className="field-help">Detectamos automáticamente tabulaciones, comas, punto y coma o barras verticales.</p>
+    <div className="mt-3 flex flex-col gap-2 sm:flex-row"><button type="button" className="btn-secondary" onClick={parse} disabled={!text.trim()}>Validar filas</button>{validRows.length > 0 && <button type="button" className="btn-primary" onClick={importValid}>Importar {validRows.length} {validRows.length === 1 ? 'fila válida' : 'filas válidas'}</button>}</div>
+    {parsed && <div className="mt-4 space-y-2 text-sm">{parsed.map(row => { const warning = row.warnings.length > 0; const invalid = row.errors.length > 0; return <div key={row.rowIndex} className={`rounded-lg px-3 py-2 ${invalid ? 'bg-danger-50 text-danger-700' : warning ? 'bg-amber-50 text-amber-700' : 'bg-success-50 text-success-800'}`}><strong>{invalid ? '❌' : warning ? '⚠️' : '✅'} Fila {row.rowIndex}: {row.lastName || '—'}, {row.firstName || '—'} — {row.label || 'sin evento'} — </strong>{invalid ? row.errors.join(' · ') : warning ? row.warnings.join(' · ') : 'OK'}</div> })}</div>}
+  </div>
+}
+
+function categoryLabel(event) { return event.age_lo === event.age_hi ? `${event.age_lo}-${event.age_hi} años` : `${event.age_lo}-${event.age_hi} años` }
+function displaySex(sex) { return ['X', 'B'].includes(String(sex).toUpperCase()) ? 'F/M' : String(sex || '').toUpperCase() }
+function sampleBirthDate(event, referenceDate) {
+  const referenceYear = Number(String(referenceDate || '').slice(0, 4)) || new Date().getFullYear()
+  return `15/05/${referenceYear - Number(event.age_lo || 10)}`
 }
