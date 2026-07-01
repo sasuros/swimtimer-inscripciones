@@ -30,7 +30,8 @@ CREATE TABLE clubs (
   abbreviation TEXT DEFAULT '',
   contact_name TEXT DEFAULT '',
   contact_whatsapp TEXT DEFAULT '',
-  contact_email TEXT DEFAULT ''
+  contact_email TEXT DEFAULT '',
+  email TEXT DEFAULT ''
 );
 
 CREATE TABLE event_clubs (
@@ -39,6 +40,9 @@ CREATE TABLE event_clubs (
   status TEXT DEFAULT 'invited' CHECK (status IN ('invited', 'not_participating', 'submitted', 'late_pending', 'late_approved')),
   contact_name TEXT DEFAULT '',
   contact_whatsapp TEXT DEFAULT '',
+  email TEXT DEFAULT '',
+  invitation_sent_at TIMESTAMPTZ,
+  invitation_error TEXT DEFAULT '',
   PRIMARY KEY (event_id, club_code)
 );
 
@@ -58,11 +62,12 @@ CREATE TABLE event_events (
 CREATE TABLE tokens (
   id TEXT PRIMARY KEY, -- SHA-256 de token_value; evita indexar URLs de varios KB
   token_value TEXT NOT NULL,
+  token_type TEXT NOT NULL DEFAULT 'v2' CHECK (token_type IN ('v2', 'v3')),
   event_id TEXT REFERENCES events(id) ON DELETE CASCADE,
   club_code INTEGER REFERENCES clubs(code),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   used_at TIMESTAMPTZ,
-  UNIQUE(event_id, club_code)
+  UNIQUE(event_id, club_code, token_type)
 );
 
 CREATE TABLE inscriptions (

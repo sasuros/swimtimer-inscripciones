@@ -39,6 +39,21 @@ export const updateEventStatus = (...args) => Promise.resolve(storage.updateEven
 export const cloneEvent = (...args) => Promise.resolve(storage.cloneEvent(...args))
 export const deleteEvent = (...args) => Promise.resolve(storage.deleteEvent(...args))
 export const setClubParticipation = (...args) => Promise.resolve(storage.setClubParticipation(...args))
+export const generateEmailInvitations = (...args) => DEMO_MODE
+  ? Promise.reject(new Error("El envío de correos requiere el modo producción con Supabase y Resend configurados. Usa 'Copiar enlace' o 'WhatsApp' en modo demo."))
+  : production.generateEmailInvitations(...args)
+export const recordInvitationResults = (...args) => DEMO_MODE ? Promise.resolve({ success: true }) : production.recordInvitationResults(...args)
+export const revokeMagicInvitation = (...args) => DEMO_MODE ? Promise.resolve({ success: true }) : production.revokeMagicInvitation(...args)
+export async function sendInvitationEmails(invitations) {
+  const response = await fetch('/api/send-invitation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: sessionStorage.getItem('swimtimer-admin-password') || '', invitations })
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'No se pudieron enviar las invitaciones')
+  return data.results
+}
 
 // Nombres de contrato de Fase 5 para integraciones futuras.
 export const getEvents = listEvents

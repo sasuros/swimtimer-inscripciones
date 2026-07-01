@@ -3,6 +3,7 @@ import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/
 import { buildConsolidatedExport } from '../utils/mmSchema'
 import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
+import { createMagicToken, decodeMagicToken, verifyMagicToken } from '../utils/magicToken'
 import { supabase as configuredClient } from './supabase'
 
 let client = configuredClient
@@ -26,7 +27,8 @@ const clubPayload = club => ({
   abbreviation: club.abbreviation || '',
   contact_name: club.contact_name || '',
   contact_whatsapp: club.contact_whatsapp || '',
-  contact_email: club.contact_email || ''
+  contact_email: club.contact_email || '',
+  email: club.email || club.contact_email || ''
 })
 
 const tokenKey = async token => {
@@ -76,7 +78,7 @@ const inscriptionFromRow = (row, club = null) => ({
 
 async function eventRelations(eventId) {
   const [clubRelations, events] = await Promise.all([
-    db().from('event_clubs').select('club_code,status,contact_name,contact_whatsapp,clubs(*)').eq('event_id', eventId),
+    db().from('event_clubs').select('club_code,status,contact_name,contact_whatsapp,email,invitation_sent_at,invitation_error,clubs(*)').eq('event_id', eventId),
     db().from('event_events').select('event_ptr,distance,style,age_lo,age_hi,sex,active').eq('event_id', eventId).order('event_ptr')
   ])
   const relations = unwrap(clubRelations)
@@ -86,6 +88,9 @@ async function eventRelations(eventId) {
       code: relation.club_code,
       contact_name: relation.contact_name || relation.clubs?.contact_name || '',
       contact_whatsapp: relation.contact_whatsapp || relation.clubs?.contact_whatsapp || '',
+      email: relation.email || relation.clubs?.email || relation.clubs?.contact_email || '',
+      invitation_sent_at: relation.invitation_sent_at,
+      invitation_error: relation.invitation_error || '',
       participation_status: relation.status
     })),
     events: unwrap(events)
@@ -146,7 +151,8 @@ export async function saveEvent(input, activate = false) {
       club_code: club.code,
       status: club.participation_status || 'invited',
       contact_name: club.contact_name || '',
-      contact_whatsapp: club.contact_whatsapp || ''
+      contact_whatsapp: club.contact_whatsapp || '',
+      email: club.email || club.contact_email || ''
     }))))
   }
 
@@ -193,18 +199,45 @@ export async function generateTokens(eventId) {
     return {
       id: await tokenKey(tokenValue),
       token_value: tokenValue,
+      token_type: 'v2',
       event_id: eventId,
       club_code: club.code,
       created_at: new Date().toISOString(),
       used_at: null
     }
   }))
-  if (tokens.length) unwrap(await db().from('tokens').upsert(tokens, { onConflict: 'event_id,club_code' }))
+  if (tokens.length) unwrap(await db().from('tokens').upsert(tokens, { onConflict: 'event_id,club_code,token_type' }))
   return { success: true, tokens: tokens.map((token, index) => ({ ...token, id: token.token_value, eventId, club: event.clubs[index] })) }
 }
 
 export async function getTokensForEvent(eventId) {
-  return unwrap(await db().from('tokens').select('*').eq('event_id', eventId))
+  return unwrap(await db().from('tokens').select('*').eq('event_id', eventId).eq('token_type', 'v2'))
+}
+
+export async function generateEmailInvitations(eventId, clubCodes = null) {
+  const event = await getEvent(eventId)
+  const selected = clubCodes ? new Set(clubCodes.map(Number)) : null
+  const clubs = event.clubs.filter(club => club.email && club.participation_status !== 'not_participating' && (!selected || selected.has(Number(club.code))))
+  const invitations = await Promise.all(clubs.map(async club => {
+    const tokenValue = await createMagicToken({ eventId, clubCode: club.code, email: club.email }, DEMO_ADMIN_PASSWORD)
+    return { club, tokenValue, row: { id: await tokenKey(tokenValue), token_value: tokenValue, token_type: 'v3', event_id: eventId, club_code: club.code, created_at: new Date().toISOString(), used_at: null } }
+  }))
+  if (invitations.length) unwrap(await db().from('tokens').upsert(invitations.map(item => item.row), { onConflict: 'event_id,club_code,token_type' }))
+  return invitations.map(({ club, tokenValue }) => ({ club, token: tokenValue }))
+}
+
+export async function recordInvitationResults(eventId, results) {
+  await Promise.all(results.map(result => db().from('event_clubs').update({
+    invitation_sent_at: result.success ? new Date().toISOString() : null,
+    invitation_error: result.success ? '' : (result.error || 'No se pudo enviar')
+  }).eq('event_id', eventId).eq('club_code', result.clubCode).then(item => unwrap(item))))
+  return { success: true }
+}
+
+export async function revokeMagicInvitation(eventId, clubCode) {
+  unwrap(await db().from('tokens').delete().eq('event_id', eventId).eq('club_code', clubCode).eq('token_type', 'v3'))
+  unwrap(await db().from('event_clubs').update({ invitation_sent_at: null, invitation_error: '' }).eq('event_id', eventId).eq('club_code', clubCode))
+  return { success: true }
 }
 
 async function latestInscription(eventId, clubCode, isLate) {
@@ -215,6 +248,20 @@ async function latestInscription(eventId, clubCode, isLate) {
 }
 
 export async function validateToken(tokenId) {
+  const magic = decodeMagicToken(tokenId)
+  if (magic) {
+    const verified = await verifyMagicToken(tokenId, DEMO_ADMIN_PASSWORD)
+    if (!verified || !client) return { valid: false }
+    const stored = unwrap(await db().from('tokens').select('*').eq('id', await tokenKey(tokenId)).eq('token_type', 'v3').maybeSingle())
+    if (!stored) return { valid: false }
+    const event = await getEvent(verified.e)
+    if (!['active', 'accepting_late'].includes(event.status)) return { valid: false }
+    const club = event.clubs.find(item => Number(item.code) === Number(verified.c))
+    if (!club || club.participation_status === 'not_participating' || club.email.toLowerCase() !== verified.em) return { valid: false }
+    const [normal, late] = await Promise.all([latestInscription(event.id, club.code, false), latestInscription(event.id, club.code, true)])
+    const current = event.status === 'accepting_late' ? late : normal
+    return { valid: true, backendAvailable: true, eventId: event.id, event: { ...event, date: event.date_start }, club, authorizedEmail: verified.em, whatsapp: event.organizer_whatsapp || DEMO_WHATSAPP, already_submitted: Boolean(current), inscription: current ? inscriptionFromRow(current, club) : null, normal_inscription: normal ? inscriptionFromRow(normal, club) : null }
+  }
   const embedded = decodeDemoToken(tokenId)
   if (!embedded) return { valid: false }
   const fallback = { ...accessFromDemoToken(embedded), backendAvailable: false, already_submitted: false, inscription: null, normal_inscription: null }
