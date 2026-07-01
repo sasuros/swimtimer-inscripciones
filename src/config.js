@@ -1,4 +1,6 @@
-export const DEMO_MODE = !import.meta.env.VITE_SUPABASE_URL
+import { supabase } from './services/supabase'
+
+export const DEMO_MODE = !supabase
 export const DEMO_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'swimtimer2025'
 export const DEMO_WHATSAPP = import.meta.env.VITE_ALBERTO_WHATSAPP || '584120000000'
 

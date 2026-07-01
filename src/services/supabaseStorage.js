@@ -10,7 +10,7 @@ let client = configuredClient
 export const __setSupabaseClient = value => { client = value }
 
 const db = () => {
-  if (!client) throw new Error('Supabase no está configurado')
+  if (!client) throw new Error('Supabase no configurado')
   return client
 }
 
