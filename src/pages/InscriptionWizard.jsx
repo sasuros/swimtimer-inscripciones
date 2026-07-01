@@ -35,21 +35,34 @@ function WizardContent({ token, access }) {
   const [finalData, setFinalData] = useState(null)
   const [lateSubmission, setLateSubmission] = useState(false)
   const [externalSubmission, setExternalSubmission] = useState(false)
+  const [deliveryFailed, setDeliveryFailed] = useState(false)
   const save = athlete => { setRoster(current => editing ? current.map(item => item.id === athlete.id ? athlete : item) : [...current, athlete]); setEditing(null); setHighlightId(athlete.id); setTimeout(() => setHighlightId(null), 2000) }
   const remove = athlete => { if (window.confirm(`¿Eliminar a ${athlete.firstName} ${athlete.lastName} de la lista?`)) { setRoster(current => current.filter(item => item.id !== athlete.id)); if (editing?.id === athlete.id) setEditing(null) } }
   const importPrevious = data => { const incoming = data.roster || data._swimtimer_roster; if (Array.isArray(incoming)) setRoster(incoming); else window.alert('Este JSON no incluye la lista editable. Usa un respaldo generado por esta versión.') }
   const submit = async () => {
     setSending(true)
+    let downloadable = null
     try {
       const output = await buildMMExport({ event: access.event, club: access.club, token, roster })
       const result = await submitInscription({ token, athletes: output.athletes, results: output.results, meta: output.meta, roster })
       if (!result.success) throw new Error(result.error || 'No se pudo enviar')
-      const downloadable = { ...output, _swimtimer_roster: roster }
+      downloadable = { ...output, _swimtimer_roster: roster }
       if (DEMO_MODE) downloadJson(downloadable, `inscripcion-${access.club.code}.json`)
-      setLateSubmission(Boolean(result.late)); setExternalSubmission(Boolean(result.external)); setFinalData(downloadable); localStorage.removeItem(`swimtimer-roster:${token}`); setScreen('done')
-    } catch (error) { window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`) } finally { setSending(false) }
+      setLateSubmission(Boolean(result.late)); setExternalSubmission(Boolean(result.external)); setDeliveryFailed(false); setFinalData(downloadable); localStorage.removeItem(`swimtimer-roster:${token}`); setScreen('done')
+    } catch (error) {
+      if (downloadable || !DEMO_MODE) {
+        if (!downloadable) {
+          const output = await buildMMExport({ event: access.event, club: access.club, token, roster })
+          downloadable = { ...output, _swimtimer_roster: roster }
+        }
+        downloadJson(downloadable, `inscripcion-${access.club.code}.json`)
+        setExternalSubmission(true); setDeliveryFailed(true); setFinalData(downloadable); setScreen('done')
+      } else {
+        window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`)
+      }
+    } finally { setSending(false) }
   }
-  if (screen === 'done') return <ConfirmationScreen data={finalData} club={access.club} whatsapp={access.whatsapp} late={lateSubmission} external={externalSubmission} />
+  if (screen === 'done') return <ConfirmationScreen data={finalData} club={access.club} whatsapp={access.whatsapp} late={lateSubmission} external={externalSubmission} deliveryFailed={deliveryFailed} />
   if (screen === 'preview') return <PreviewPlanilla roster={roster} event={access.event} club={access.club} onBack={() => setScreen('form')} onConfirm={submit} sending={sending} />
   const total = roster.reduce((sum, athlete) => sum + athlete.events.length, 0)
   return <><Header event={access.event} club={access.club} /><main className="mx-auto max-w-[752px] space-y-4 p-4 pb-28"><EventStatusBanner event={access.event} /><RosterPanel roster={roster} onEdit={setEditing} onDelete={remove} highlightId={highlightId} />

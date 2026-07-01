@@ -11,7 +11,9 @@ export default function useToken(token) {
     if (embedded) setState({ loading: false, ...accessFromDemoToken(embedded), localMode: false })
     validateToken(token)
       .then(data => setState({ loading: false, ...data }))
-      .catch(() => setState({ loading: false, valid: false, networkError: true }))
+      .catch(() => setState(embedded
+        ? { loading: false, ...accessFromDemoToken(embedded), backendAvailable: false, networkError: true }
+        : { loading: false, valid: false, networkError: true }))
   }, [token])
   return state
 }
