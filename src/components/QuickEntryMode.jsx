@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
-import { ChevronDown, Download, FileSpreadsheet } from 'lucide-react'
-import { downloadCsv, eventLabel, parseQuickEntry, safeFilename } from '../utils/quickEntry'
+import { useMemo, useRef, useState } from 'react'
+import { ChevronDown, Download, FileSpreadsheet, Upload } from 'lucide-react'
+import { buildTemplateRows, downloadCsv, eventLabel, parseQuickEntry, safeFilename } from '../utils/quickEntry'
 
 const EXAMPLES = [
   ['Rodriguez', 'Maria', 'F', '15/05/2013', '25m Crawl', '32.56'],
@@ -22,9 +22,27 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState(null)
   const [guideOpen, setGuideOpen] = useState(true)
+  const [dragging, setDragging] = useState(false)
+  const [fileInfo, setFileInfo] = useState(null)
+  const fileInput = useRef(null)
   const events = useMemo(() => (eventConfig?.events || []).filter(event => event.active !== false), [eventConfig])
   const parse = () => setParsed(parseQuickEntry(text, { referenceDate, events }))
   const validRows = parsed?.filter(row => !row.errors.length && !row.warnings.length) || []
+
+  const loadFile = file => {
+    if (!file) return
+    if (!/\.(csv|txt|tsv)$/i.test(file.name)) { setFileInfo({ error: 'Elige un archivo .csv, .txt o .tsv' }); return }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const content = String(reader.result || '').replace(/^\uFEFF/, '')
+      const rows = parseQuickEntry(content, { referenceDate, events })
+      setText(content)
+      setParsed(rows)
+      setFileInfo({ name: file.name, count: rows.length })
+    }
+    reader.onerror = () => setFileInfo({ error: 'No se pudo leer el archivo seleccionado' })
+    reader.readAsText(file)
+  }
 
   const importValid = () => {
     const grouped = new Map()
@@ -41,10 +59,7 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
   }
 
   const downloadTemplate = () => {
-    const first = events[0]
-    const sample = first ? ['Rodriguez', 'Maria', displaySex(first.sex), sampleBirthDate(first, referenceDate), eventLabel(first), '32.56'] : EXAMPLES[0]
-    const rows = [HEADERS, sample, [], ['# Eventos disponibles para este club'], ...events.map(event => [`# ${eventLabel(event)} | ${categoryLabel(event)} | ${displaySex(event.sex)}`])]
-    downloadCsv(rows, `plantilla_inscripcion_${safeFilename(club?.name || club?.code)}.csv`)
+    downloadCsv(buildTemplateRows(events, referenceDate), `plantilla_inscripcion_${safeFilename(club?.name || club?.code)}.csv`)
   }
 
   const downloadEvents = () => downloadCsv([
@@ -65,7 +80,17 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
       <div className="mt-4 flex flex-col gap-2 sm:flex-row"><button type="button" className="btn-secondary inline-flex items-center justify-center gap-2" onClick={downloadTemplate}><Download className="size-4" />Descargar plantilla</button><button type="button" className="btn-secondary inline-flex items-center justify-center gap-2" onClick={downloadEvents}><Download className="size-4" />Descargar lista de eventos</button></div>
     </div>}
 
-    <label className="label mt-6" htmlFor="quick-entry">Pega aquí las filas de Excel, Google Sheets o CSV</label>
+    <div className={`mt-6 cursor-pointer rounded-xl border-2 border-dashed p-5 text-center transition ${dragging ? 'border-brand-600 bg-brand-50' : 'border-slate-300 bg-slate-50'}`} onClick={() => fileInput.current?.click()} onDragEnter={event => { event.preventDefault(); setDragging(true) }} onDragOver={event => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); loadFile(event.dataTransfer.files[0]) }}>
+      <Upload className="mx-auto size-8 text-brand-600" />
+      <p className="mt-2 font-bold text-brand-800">Arrastra tu archivo CSV aquí o haz click para seleccionar</p>
+      <p className="mt-1 text-sm text-slate-500">Archivos permitidos: .csv, .txt y .tsv</p>
+      <input ref={fileInput} className="hidden" type="file" accept=".csv,.txt,.tsv,text/csv,text/plain,text/tab-separated-values" onChange={event => { loadFile(event.target.files?.[0]); event.target.value = '' }} />
+      <button type="button" className="btn-secondary mt-3 inline-flex items-center gap-2" onClick={event => { event.stopPropagation(); fileInput.current?.click() }}><Upload className="size-4" />Cargar archivo CSV</button>
+    </div>
+    {fileInfo && <p className={`mt-2 text-sm font-semibold ${fileInfo.error ? 'text-danger-700' : 'text-[#059669]'}`}>{fileInfo.error || `Archivo cargado: ${fileInfo.name} (${fileInfo.count} ${fileInfo.count === 1 ? 'fila detectada' : 'filas detectadas'})`}</p>}
+
+    <div className="my-5 flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-slate-400"><span className="h-px flex-1 bg-slate-200" />O pega manualmente<span className="h-px flex-1 bg-slate-200" /></div>
+    <label className="label" htmlFor="quick-entry">Pega aquí las filas de Excel, Google Sheets o CSV</label>
     <textarea id="quick-entry" className="input min-h-40 font-mono text-sm" value={text} onChange={event => { setText(event.target.value); setParsed(null) }} placeholder="Apellido | Nombre | F/M | DD/MM/AAAA | Evento | Tiempo" />
     <p className="field-help">Detectamos automáticamente tabulaciones, comas, punto y coma o barras verticales.</p>
     <div className="mt-3 flex flex-col gap-2 sm:flex-row"><button type="button" className="btn-secondary" onClick={parse} disabled={!text.trim()}>Validar filas</button>{validRows.length > 0 && <button type="button" className="btn-primary" onClick={importValid}>Importar {validRows.length} {validRows.length === 1 ? 'fila válida' : 'filas válidas'}</button>}</div>
@@ -75,7 +100,3 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
 
 function categoryLabel(event) { return event.age_lo === event.age_hi ? `${event.age_lo}-${event.age_hi} años` : `${event.age_lo}-${event.age_hi} años` }
 function displaySex(sex) { return ['X', 'B'].includes(String(sex).toUpperCase()) ? 'F/M' : String(sex || '').toUpperCase() }
-function sampleBirthDate(event, referenceDate) {
-  const referenceYear = Number(String(referenceDate || '').slice(0, 4)) || new Date().getFullYear()
-  return `15/05/${referenceYear - Number(event.age_lo || 10)}`
-}

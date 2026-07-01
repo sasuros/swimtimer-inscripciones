@@ -1,20 +1,18 @@
 import { useMemo, useState } from 'react'
-import { CircleAlert, ClipboardList } from 'lucide-react'
+import { CircleAlert } from 'lucide-react'
 import { calculateAge, categoryForAge } from '../utils/ageCalculator'
 import { validateAthlete } from '../utils/validation'
 import useEventFilter from '../hooks/useEventFilter'
 import ErrorMessage from './ErrorMessage'
 import EventSelector from './EventSelector'
 import TimeInput from './TimeInput'
-import QuickEntryMode from './QuickEntryMode'
 
 const emptyForm = { lastName: '', firstName: '', sex: '', birthDate: '', selectedEvents: [], times: {} }
 
-export default function AthleteForm({ roster, referenceDate, eventConfig, club, editing, onSave, onCancelEdit, onQuickImport }) {
+export default function AthleteForm({ roster, referenceDate, eventConfig, editing, onSave, onCancelEdit }) {
   const [form, setForm] = useState(() => editing ? toForm(editing) : emptyForm)
   const [attempted, setAttempted] = useState(false)
   const [interacted, setInteracted] = useState(false)
-  const [quick, setQuick] = useState(false)
   const editingKey = editing?.id || 'new'
   const [loadedKey, setLoadedKey] = useState(editingKey)
   if (loadedKey !== editingKey) { setLoadedKey(editingKey); setForm(editing ? toForm(editing) : emptyForm); setAttempted(false); setInteracted(false) }
@@ -36,8 +34,7 @@ export default function AthleteForm({ roster, referenceDate, eventConfig, club, 
   }
   const fieldClass = key => `input ${showErrors && errors[key] ? 'input-error' : ''}`
   return <form onSubmit={submit} className="card p-4 sm:p-6">
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-semibold text-brand-600">{editing ? 'Editando nadador' : `Nuevo registro`}</p><h2 className="text-xl font-bold">{editing ? `${editing.firstName} ${editing.lastName}` : `Inscribir nadador #${roster.length + 1}`}</h2></div><div className="max-w-sm text-right"><button type="button" onClick={() => setQuick(!quick)} className={`btn-secondary inline-flex items-center gap-2 font-bold ${quick ? 'border-brand-600 text-brand-800' : ''}`}><ClipboardList className="size-5" />📋 Importar desde Excel/Sheets</button><p className="field-help mt-1">¿Tienes muchos nadadores? Usa el modo rápido para importarlos desde Excel o Google Sheets.</p></div></div>
-    {quick && <div className="mb-6"><QuickEntryMode referenceDate={referenceDate} eventConfig={eventConfig} club={club} roster={roster} onImport={onQuickImport} /></div>}
+    <div className="mb-6"><p className="text-sm font-semibold text-brand-600">{editing ? 'Editando nadador' : 'Nuevo registro'}</p><h2 className="text-xl font-bold">{editing ? `${editing.firstName} ${editing.lastName}` : `Inscribir nadador #${roster.length + 1}`}</h2></div>
     <section className="space-y-4"><StepTitle number="1" title="Datos del nadador" /><div className="grid gap-4 sm:grid-cols-2">
       <div><label className="label" htmlFor="lastName">Apellido *</label><input id="lastName" className={fieldClass('lastName')} value={form.lastName} onChange={e => set('lastName', e.target.value)} autoComplete="family-name" placeholder="Ejemplo: Pérez" /><p className="field-help">Tal como aparece en el documento de identidad</p><ErrorMessage>{showErrors && errors.lastName}</ErrorMessage></div>
       <div><label className="label" htmlFor="firstName">Nombre *</label><input id="firstName" className={fieldClass('firstName')} value={form.firstName} onChange={e => set('firstName', e.target.value)} autoComplete="given-name" placeholder="Ejemplo: Ana María" /><p className="field-help">Escribe todos los nombres tal como aparecen en el documento</p><ErrorMessage>{showErrors && errors.firstName}</ErrorMessage></div>

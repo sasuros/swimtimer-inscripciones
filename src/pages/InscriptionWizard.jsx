@@ -15,6 +15,8 @@ import { DEMO_MODE } from '../config'
 import BrandFooter from '../components/BrandFooter'
 import EventStatusBanner from '../components/EventStatusBanner'
 import ClosedEvent from './ClosedEvent'
+import QuickEntryMode from '../components/QuickEntryMode'
+import RegistrationMethodSelector from '../components/RegistrationMethodSelector'
 
 export default function InscriptionWizard() {
   const token = new URLSearchParams(window.location.search).get('t') || ''
@@ -36,7 +38,10 @@ function WizardContent({ token, access }) {
   const [lateSubmission, setLateSubmission] = useState(false)
   const [externalSubmission, setExternalSubmission] = useState(false)
   const [deliveryFailed, setDeliveryFailed] = useState(false)
+  const [entryMethod, setEntryMethod] = useState(null)
   const save = athlete => { setRoster(current => editing ? current.map(item => item.id === athlete.id ? athlete : item) : [...current, athlete]); setEditing(null); setHighlightId(athlete.id); setTimeout(() => setHighlightId(null), 2000) }
+  const editAthlete = athlete => { setEditing(athlete); setEntryMethod('manual') }
+  const changeMethod = () => { setEditing(null); setEntryMethod(null) }
   const remove = athlete => { if (window.confirm(`¿Eliminar a ${athlete.firstName} ${athlete.lastName} de la lista?`)) { setRoster(current => current.filter(item => item.id !== athlete.id)); if (editing?.id === athlete.id) setEditing(null) } }
   const importPrevious = data => { const incoming = data.roster || data._swimtimer_roster; if (Array.isArray(incoming)) setRoster(incoming); else window.alert('Este JSON no incluye la lista editable. Usa un respaldo generado por esta versión.') }
   const submit = async () => {
@@ -65,8 +70,12 @@ function WizardContent({ token, access }) {
   if (screen === 'done') return <ConfirmationScreen data={finalData} club={access.club} whatsapp={access.whatsapp} late={lateSubmission} external={externalSubmission} deliveryFailed={deliveryFailed} />
   if (screen === 'preview') return <PreviewPlanilla roster={roster} event={access.event} club={access.club} onBack={() => setScreen('form')} onConfirm={submit} sending={sending} />
   const total = roster.reduce((sum, athlete) => sum + athlete.events.length, 0)
-  return <><Header event={access.event} club={access.club} /><main className="mx-auto max-w-[752px] space-y-4 p-4 pb-28">{access.authorizedEmail && <div className="rounded-lg border border-brand-600/20 bg-brand-50 p-3 text-sm font-semibold text-brand-800">Inscribiendo como: {access.authorizedEmail} para {access.club.name}</div>}<EventStatusBanner event={access.event} /><RosterPanel roster={roster} onEdit={setEditing} onDelete={remove} highlightId={highlightId} />
+  return <><Header event={access.event} club={access.club} /><main className="mx-auto max-w-[752px] space-y-4 p-4 pb-28">{access.authorizedEmail && <div className="rounded-lg border border-brand-600/20 bg-brand-50 p-3 text-sm font-semibold text-brand-800">Inscribiendo como: {access.authorizedEmail} para {access.club.name}</div>}<EventStatusBanner event={access.event} /><RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} />
     {access.already_submitted && <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800"><strong>Este club ya envió una inscripción.</strong> Puedes editarla y enviar una versión actualizada; la anterior será reemplazada.</div>}
-    <div className="flex justify-end"><ImportPrevious onImport={importPrevious} /></div><AthleteForm roster={roster} referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} onQuickImport={items => setRoster(current => [...current, ...items])} />
+    <div className="flex justify-end"><ImportPrevious onImport={importPrevious} /></div>
+    {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
+    {entryMethod && <button type="button" className="text-sm font-bold text-brand-700 hover:underline" onClick={changeMethod}>← Cambiar método</button>}
+    {entryMethod === 'manual' && <AthleteForm roster={roster} referenceDate={access.event.reference_date} eventConfig={access.event} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} />}
+    {entryMethod === 'expert' && <QuickEntryMode referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} roster={roster} onImport={items => setRoster(current => [...current, ...items])} />}
   </main><BrandFooter />{roster.length > 0 && <div className="fixed inset-x-0 bottom-0 border-t bg-white/95 p-3 backdrop-blur"><div className="mx-auto flex max-w-[720px] items-center justify-between gap-3"><p className="hidden text-sm text-slate-600 sm:block">{roster.length} nadadores · {total} inscripciones</p><button className="btn-primary ml-auto px-6 py-3" onClick={() => setScreen('preview')}>Finalizar y enviar inscripción</button></div></div>}</>
 }

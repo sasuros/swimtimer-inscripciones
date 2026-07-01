@@ -9,6 +9,16 @@ export function eventLabel(event) {
   return `${event.distance}m ${event.style}`
 }
 
+export function buildTemplateRows(events = [], referenceDate = '') {
+  const first = events.find(event => event.active !== false)
+  const year = Number(String(referenceDate).slice(0, 4)) || new Date().getFullYear()
+  const sex = ['X', 'B'].includes(String(first?.sex).toUpperCase()) ? 'F' : String(first?.sex || 'F').toUpperCase()
+  const sample = first
+    ? ['Rodriguez', 'Maria', sex, `15/05/${year - Number(first.age_lo || 10)}`, eventLabel(first), '32.56']
+    : ['Rodriguez', 'Maria', 'F', '15/05/2013', '25m Crawl', '32.56']
+  return [['Apellido', 'Nombre', 'Sexo', 'Fecha Nac.', 'Evento', 'Tiempo'], sample]
+}
+
 export function detectSeparator(line = '') {
   return SEPARATORS.map(separator => ({ separator, count: splitDelimitedLine(line, separator).length }))
     .sort((a, b) => b.count - a.count)[0]?.separator || '|'

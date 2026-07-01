@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectSeparator, isHeaderRow, normalizeBirthDate, parseQuickEntry, splitDelimitedLine } from './quickEntry'
+import { buildTemplateRows, detectSeparator, isHeaderRow, normalizeBirthDate, parseQuickEntry, splitDelimitedLine } from './quickEntry'
 
 const events = [
   { event_ptr: 1, distance: 25, style: 'Crawl', age_lo: 12, age_hi: 13, sex: 'F', active: true },
@@ -25,5 +25,12 @@ describe('quick entry parser', () => {
     const [row] = parseQuickEntry('Lopez;Carlos;M;22/03/2012;200m Mariposa;28.9', options)
     expect(row.errors.join(' ')).toContain('Eventos disponibles para M, 13 años: 50m Espalda')
     expect(row.warnings.join(' ')).toContain('centésimas')
+  })
+
+  it('builds a clean two-row template using a real event', () => {
+    expect(buildTemplateRows(events, '2025-12-15')).toEqual([
+      ['Apellido', 'Nombre', 'Sexo', 'Fecha Nac.', 'Evento', 'Tiempo'],
+      ['Rodriguez', 'Maria', 'F', '15/05/2013', '25m Crawl', '32.56']
+    ])
   })
 })
