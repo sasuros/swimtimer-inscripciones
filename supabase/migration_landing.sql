@@ -1,0 +1,4 @@
+-- Campos para la landing page pública.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS drive_url TEXT DEFAULT '';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT FALSE;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS show_on_landing BOOLEAN DEFAULT TRUE;

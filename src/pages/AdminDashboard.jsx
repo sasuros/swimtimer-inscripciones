@@ -8,7 +8,7 @@ import LinkDistributionModal from '../components/LinkDistributionModal'
 import DeleteEventModal from '../components/DeleteEventModal'
 import EmailInvitationsPanel from '../components/EmailInvitationsPanel'
 import { downloadJson } from '../utils/download'
-import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getDashboard, getInscription, recordInvitationResults, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin } from '../services/api'
+import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getDashboard, getInscription, recordInvitationResults, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
 import { DEMO_MODE } from '../config'
 
 export default function AdminDashboard({ eventId }) {
@@ -227,6 +227,7 @@ export default function AdminDashboard({ eventId }) {
           <Timestamp label="Inscripciones cerradas" value={data.timestamps.closed_at} />
         </section>
         {error && <p className="rounded-lg bg-danger-50 p-3 text-danger-700">{error}</p>}
+        <LiveResultsSettings event={data.event} onSaved={load} />
         <EmailInvitationsPanel clubs={data.clubs} sending={emailing} results={invitationResults} onSendAll={() => sendInvitations(null)} />
         <LateReviewPanel submissions={data.late || []} onReview={handleReview} />
         <section className="card overflow-hidden">
@@ -356,6 +357,21 @@ export default function AdminDashboard({ eventId }) {
       {deleteOpen && <DeleteEventModal event={data.event} onClose={() => setDeleteOpen(false)} onConfirm={confirmDelete} />}
     </>
   )
+}
+
+function LiveResultsSettings({ event, onSaved }) {
+  const [driveUrl, setDriveUrl] = useState(event.drive_url || '')
+  const [isLive, setIsLive] = useState(Boolean(event.is_live))
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const save = async () => {
+    if (driveUrl && !/^https:\/\//i.test(driveUrl)) return setMessage('El enlace debe comenzar con https://')
+    setSaving(true); setMessage('')
+    try { await updateLandingSettings(event.id, { drive_url: driveUrl, is_live: isLive, show_on_landing: event.show_on_landing !== false }); setMessage('Cambios guardados'); await onSaved() }
+    catch (error) { setMessage(error.message) }
+    finally { setSaving(false) }
+  }
+  return <section className="card p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-extrabold uppercase tracking-[.18em] text-brand-600">Publicación</p><h2 className="mt-1 text-xl font-extrabold">Resultados en vivo</h2></div>{isLive && <span className="live-badge"><span className="live-dot" />En vivo</span>}</div><div className="mt-5 grid gap-5 lg:grid-cols-[1fr_auto]"><label><span className="label">Link de Google Drive *</span><input type="url" className="input" value={driveUrl} onChange={e => setDriveUrl(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." /><span className="field-help">La carpeta donde subes los HTML de resultados de Hy-Tek</span></label><label className="flex min-w-52 items-center gap-3 rounded-lg border bg-slate-50 p-3"><input type="checkbox" checked={isLive} onChange={e => setIsLive(e.target.checked)} /><span><strong className="block text-sm text-brand-800">Estado público: {isLive ? 'EN VIVO' : 'FINALIZADO'}</strong><span className="field-help">Controla el badge de la landing</span></span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center"><button className="btn-primary" disabled={saving} onClick={save}>{saving ? 'Guardando…' : 'Guardar cambios'}</button><a className="btn-secondary text-center" href="/" target="_blank" rel="noreferrer">Abrir landing pública</a><span className={`text-sm font-semibold ${message === 'Cambios guardados' ? 'text-success-800' : 'text-danger-700'}`}>{message}</span></div><p className="mt-3 text-xs text-slate-500">Vista previa: swimtimer-oficial.vercel.app</p></section>
 }
 
 function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEmail, onRevoke, onToggle, onRegeneratePin }) {

@@ -49,6 +49,9 @@ const eventPayload = (input, status) => ({
   deadline: input.deadline || null,
   course: input.course || 'S',
   notes: input.notes || '',
+  drive_url: input.drive_url || '',
+  is_live: Boolean(input.is_live),
+  show_on_landing: input.show_on_landing !== false,
   status,
   organizer: input.organizer || 'Alberto Surós',
   organizer_whatsapp: input.organizer_whatsapp || DEMO_WHATSAPP,
@@ -201,6 +204,13 @@ export async function saveEvent(input, activate = false) {
 
 export const createEvent = (data) => saveEvent(data, false)
 export const updateEvent = (id, data) => saveEvent({ ...data, id }, false)
+
+export async function updateLandingSettings(id, settings) {
+  const driveUrl = String(settings.drive_url || '').trim()
+  const result = await db().from('events').update({ drive_url: driveUrl, is_live: Boolean(settings.is_live), show_on_landing: settings.show_on_landing !== false }).eq('id', id)
+  unwrap(result)
+  return { success: true }
+}
 
 export async function deleteEvent(id) {
   const event = await getEvent(id)

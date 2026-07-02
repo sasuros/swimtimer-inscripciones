@@ -18,6 +18,7 @@ const storage = DEMO_MODE
       addMasterClub: demo.demoAddMasterClub,
       saveEvent: demo.demoSaveEvent,
       updateEventStatus: demo.demoUpdateEventStatus,
+      updateLandingSettings: demo.demoUpdateLandingSettings,
       cloneEvent: demo.demoCloneEvent,
       deleteEvent: demo.demoDeleteEvent,
       setClubParticipation: demo.demoSetClubParticipation,
@@ -40,6 +41,7 @@ export const getMasterClubs = (...args) => Promise.resolve(storage.getMasterClub
 export const addMasterClub = (...args) => Promise.resolve(storage.addMasterClub(...args))
 export const saveEvent = (...args) => Promise.resolve(storage.saveEvent(...args))
 export const updateEventStatus = (...args) => Promise.resolve(storage.updateEventStatus(...args))
+export const updateLandingSettings = (...args) => Promise.resolve(storage.updateLandingSettings(...args))
 export const cloneEvent = (...args) => Promise.resolve(storage.cloneEvent(...args))
 export const deleteEvent = (...args) => Promise.resolve(storage.deleteEvent(...args))
 export const setClubParticipation = (...args) => Promise.resolve(storage.setClubParticipation(...args))

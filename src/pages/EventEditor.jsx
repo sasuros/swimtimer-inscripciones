@@ -15,6 +15,9 @@ const blank = {
   reference_date: '',
   deadline: '',
   notes: '',
+  drive_url: '',
+  is_live: false,
+  show_on_landing: true,
   organizer_whatsapp: DEMO_WHATSAPP,
   status: 'draft',
   clubs: [],
@@ -165,6 +168,15 @@ export default function EventEditor({ eventId, cloneId }) {
             <Field label="Notas internas">
               <textarea className="input min-h-24" value={form.notes} onChange={(e) => set('notes', e.target.value)} />
             </Field>
+            <label>
+              <span className="label">Link de Google Drive</span>
+              <input type="url" className="input" value={form.drive_url || ''} onChange={(e) => set('drive_url', e.target.value)} placeholder="https://drive.google.com/drive/folders/..." />
+              <span className="field-help">La carpeta de Drive donde subirás los resultados de Hy-Tek durante el evento</span>
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border bg-slate-50 p-3">
+              <input type="checkbox" className="mt-1" checked={form.show_on_landing !== false} onChange={(e) => set('show_on_landing', e.target.checked)} />
+              <span><strong className="text-sm text-brand-800">Mostrar en landing pública</strong><span className="field-help">Solo los eventos con link de Drive y este checkbox activado aparecen en la landing</span></span>
+            </label>
           </div>
         </Step>
         <Step number="2" title="Clubes participantes">

@@ -25,7 +25,11 @@
   .app-header .btn-secondary { border-color: rgba(255,255,255,.55); background: transparent; color: white; }
   .app-header .btn-secondary:hover { background: rgba(255,255,255,.12); }
   .app-header h1, .app-header h2, .app-header h3 { color: white; }
+  .live-badge { @apply inline-flex items-center gap-1.5 rounded-full bg-green-800 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #86efac; animation: live-pulse 1.5s ease-in-out infinite; }
 }
+@keyframes live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.3); } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 @media print {
   body { background: white !important; color: black !important; }
   body * { visibility: hidden; }
