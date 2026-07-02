@@ -30,7 +30,8 @@
   .public-hero { background: linear-gradient(135deg, #0f2a47 0%, #1b3a5c 25%, #163250 50%, #1b3a5c 75%, #0f2a47 100%); background-size: 400% 400%; animation: hero-gradient-move 12s ease infinite; }
   .public-hero::before { content: ''; position: absolute; inset: 0; opacity: .04; background-image: linear-gradient(90deg, transparent 49%, #fff 50%, transparent 51%), linear-gradient(0deg, transparent 49%, #fff 50%, transparent 51%); background-size: 44px 44px; transform: skewY(-3deg) scale(1.1); }
   .public-hero-title { letter-spacing: -.02em; text-shadow: 0 2px 20px rgba(0,0,0,.3); }
-  .hero-title { color: transparent; background: linear-gradient(90deg, #fff 0%, #fff 35%, #fff176 45%, #ffd700 50%, #fff176 55%, #fff 65%, #fff 100%); background-size: 200% 100%; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: hero-shimmer 4s ease-in-out infinite; }
+  .hero-title { color: #fff; -webkit-text-fill-color: #fff; }
+  .hero-title > span { position: relative; }
   .hero-logo { filter: drop-shadow(0 0 20px rgba(255,255,255,.15)); }
   .hero-byline { letter-spacing: 4px; opacity: .6; }
   .hero-stagger { opacity: 0; transform: translateY(15px); animation: hero-stagger-in .5s ease var(--stagger-delay, 0s) forwards; }
@@ -73,6 +74,11 @@
   .steps-section { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='40' viewBox='0 0 200 40'%3E%3Cpath d='M0 20 Q25 5 50 20 T100 20 T150 20 T200 20' fill='none' stroke='%2394A3B8' stroke-opacity='.08' stroke-width='1'/%3E%3C/svg%3E"); background-repeat: repeat; background-size: 200px 40px; }
   .footer-particle { position: absolute; border-radius: 50%; background: rgba(255,255,255,.16); animation: particle-twinkle 3s ease-in-out var(--particle-delay) infinite; }
 }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .hero-title > span::after { position: absolute; inset: 0; color: transparent; background: linear-gradient(90deg, transparent 0%, transparent 35%, rgba(255,241,118,.8) 45%, rgba(255,215,0,.9) 50%, rgba(255,241,118,.8) 55%, transparent 65%, transparent 100%); background-size: 200% 100%; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: hero-shimmer 4s ease-in-out infinite; pointer-events: none; }
+  .hero-title > span:first-child::after { content: 'Resultados oficiales'; }
+  .hero-title > span:last-child::after { content: 'en tiempo real'; }
+}
 @media (min-width: 640px) { .counter-group strong { font-size: 3.5rem; } .counter-group { min-width: 120px; } }
 @keyframes hero-shimmer { 0%, 100% { background-position: 200% 0; } 50% { background-position: -200% 0; } }
 @keyframes hero-gradient-move { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
@@ -87,8 +93,8 @@
 @keyframes particle-twinkle { 0%, 100% { opacity: .08; } 50% { opacity: .22; } }
 @keyframes step-bounce-in { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .public-hero, .live-dot, .hero-wave, .live-event-card, .hero-title, .hero-stagger, .bubble, .footer-particle, .how-step.visible .step-icon, .live-event-card:hover::after, .click-ripple { animation: none; }
-  .hero-title { background: none; -webkit-text-fill-color: #fff; color: #fff; }
+  .public-hero, .live-dot, .hero-wave, .live-event-card, .hero-stagger, .bubble, .footer-particle, .how-step.visible .step-icon, .live-event-card:hover::after, .click-ripple, .hero-title > span::after { animation: none; }
+  .hero-title > span::after { display: none; }
   .fade-section { opacity: 1; transform: none; transition: none; }
   .step-icon { opacity: 1; transform: none; }
   .hero-stagger { opacity: 1; transform: none; }
