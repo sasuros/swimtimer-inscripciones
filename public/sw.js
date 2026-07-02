@@ -1,5 +1,5 @@
-const CACHE_NAME = 'swimtimer-v1'
-const STATIC_ASSETS = ['/', '/index.html', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png']
+const CACHE_NAME = 'swimtimer-v2'
+const STATIC_ASSETS = ['/', '/index.html', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon.svg', '/icons/icon-maskable.svg']
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)))
