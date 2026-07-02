@@ -41,6 +41,7 @@ CREATE TABLE event_clubs (
   contact_name TEXT DEFAULT '',
   contact_whatsapp TEXT DEFAULT '',
   email TEXT DEFAULT '',
+  pin TEXT DEFAULT '',
   invitation_sent_at TIMESTAMPTZ,
   invitation_error TEXT DEFAULT '',
   PRIMARY KEY (event_id, club_code)

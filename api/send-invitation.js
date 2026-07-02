@@ -1,8 +1,17 @@
 import { Resend } from 'resend'
 
-const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, character => ({
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-})[character])
+const escapeHtml = (value) =>
+  String(value ?? '').replace(
+    /[&<>'"]/g,
+    (character) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+      })[character]
+  )
 
 export function generateEmailHTML(invitation) {
   const inv = Object.fromEntries(Object.entries(invitation).map(([key, value]) => [key, escapeHtml(value)]))
@@ -13,6 +22,7 @@ export function generateEmailHTML(invitation) {
 <tr><td style="background:#fff;padding:32px 24px;border-radius:0 0 8px 8px"><h2 style="color:#2C3E50;margin:0 0 8px;font-size:20px">Invitación para inscribir nadadores</h2><p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Ha sido invitado a inscribir los nadadores de <strong style="color:#1B3A5C">${inv.clubName}</strong> en el siguiente evento:</p>
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F9FA;border:1px solid #E5E7EB;border-radius:8px;margin:0 0 24px"><tr><td style="padding:16px 20px"><p style="margin:0 0 4px;font-size:18px;font-weight:bold;color:#2C3E50">${inv.eventName}</p><p style="margin:0 0 2px;font-size:14px;color:#6B7280">Fecha: ${inv.eventDate}</p><p style="margin:0 0 2px;font-size:14px;color:#6B7280">Sede: ${inv.venue || 'Por confirmar'}</p>${inv.deadline ? `<p style="margin:0;font-size:14px;color:#D97706">Fecha límite: ${inv.deadline}</p>` : ''}</td></tr></table>
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;padding:8px 0 24px"><a href="${inv.magicLink}" style="display:inline-block;background:#047857;color:#fff;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 32px;border-radius:8px;letter-spacing:.5px">INSCRIBIR NADADORES</a></td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:8px;margin:0 0 24px"><tr><td style="padding:18px;text-align:center"><p style="margin:0 0 6px;color:#6B7280;font-size:13px">Tu código de acceso</p><p style="margin:0;color:#1B3A5C;font-size:30px;font-weight:bold;letter-spacing:8px">${inv.pin}</p><p style="margin:8px 0 0;color:#374151;font-size:13px">Necesitarás este código para acceder a la inscripción.</p></td></tr></table>
 <p style="color:#6B7280;font-size:13px;line-height:1.5;margin:0 0 8px">Este enlace es exclusivo para <strong>${inv.email}</strong>. No lo comparta con otras personas.</p><p style="color:#6B7280;font-size:13px;line-height:1.5;margin:0">Si tiene problemas para acceder, contacte al organizador del evento.</p><hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0 16px"><p style="color:#9CA3AF;font-size:11px;text-align:center;margin:0">SWIMTIMER · Inscripciones by Scanleads</p></td></tr></table></body></html>`
 }
 
@@ -34,11 +44,31 @@ export default async function handler(req, res) {
         subject: `Inscripciones abiertas — ${invitation.eventName}`,
         html: generateEmailHTML(invitation)
       })
-      results.push(error
-        ? { email: invitation.email, club: invitation.clubName, clubCode: invitation.clubCode, success: false, error: error.message }
-        : { email: invitation.email, club: invitation.clubName, clubCode: invitation.clubCode, success: true, id: data.id })
+      results.push(
+        error
+          ? {
+              email: invitation.email,
+              club: invitation.clubName,
+              clubCode: invitation.clubCode,
+              success: false,
+              error: error.message
+            }
+          : {
+              email: invitation.email,
+              club: invitation.clubName,
+              clubCode: invitation.clubCode,
+              success: true,
+              id: data.id
+            }
+      )
     } catch (error) {
-      results.push({ email: invitation.email, club: invitation.clubName, clubCode: invitation.clubCode, success: false, error: error.message })
+      results.push({
+        email: invitation.email,
+        club: invitation.clubName,
+        clubCode: invitation.clubCode,
+        success: false,
+        error: error.message
+      })
     }
   }
   return res.status(200).json({ results })

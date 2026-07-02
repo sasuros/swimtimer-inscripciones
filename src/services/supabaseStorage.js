@@ -4,11 +4,14 @@ import { buildConsolidatedExport } from '../utils/mmSchema'
 import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
 import { createMagicToken, decodeMagicToken, verifyMagicToken } from '../utils/magicToken'
+import { ensureClubPin, generateClubPin } from '../utils/clubPin'
 import { supabase as configuredClient } from './supabase'
 
 let client = configuredClient
 
-export const __setSupabaseClient = value => { client = value }
+export const __setSupabaseClient = (value) => {
+  client = value
+}
 
 const db = () => {
   if (!client) throw new Error('Supabase no configurado')
@@ -20,7 +23,7 @@ const unwrap = (result, message = 'No se pudo completar la operación') => {
   return result.data
 }
 
-const clubPayload = club => ({
+const clubPayload = (club) => ({
   code: Number(club.code),
   name: club.name,
   short_name: club.short_name || '',
@@ -31,9 +34,9 @@ const clubPayload = club => ({
   email: club.email || club.contact_email || ''
 })
 
-const tokenKey = async token => {
+const tokenKey = async (token) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 const eventPayload = (input, status) => ({
@@ -50,11 +53,11 @@ const eventPayload = (input, status) => ({
   organizer: input.organizer || 'Alberto Surós',
   organizer_whatsapp: input.organizer_whatsapp || DEMO_WHATSAPP,
   imported_from: input.imported_from || {},
-  opened_at: status === 'active' ? (input.opened_at || input.activated_at || new Date().toISOString()) : (input.opened_at || input.activated_at || null),
+  opened_at: status === 'active' ? input.opened_at || input.activated_at || new Date().toISOString() : input.opened_at || input.activated_at || null,
   closed_at: input.closed_at || null
 })
 
-const eventFromRow = row => ({
+const eventFromRow = (row) => ({
   ...row,
   activated_at: row.opened_at,
   created_at: row.created_at,
@@ -77,22 +80,30 @@ const inscriptionFromRow = (row, club = null) => ({
 })
 
 async function eventRelations(eventId) {
-  const [clubRelations, events] = await Promise.all([
-    db().from('event_clubs').select('club_code,status,contact_name,contact_whatsapp,email,invitation_sent_at,invitation_error,clubs(*)').eq('event_id', eventId),
-    db().from('event_events').select('event_ptr,distance,style,age_lo,age_hi,sex,active').eq('event_id', eventId).order('event_ptr')
-  ])
+  const [clubRelations, events] = await Promise.all([db().from('event_clubs').select('club_code,status,contact_name,contact_whatsapp,email,pin,invitation_sent_at,invitation_error,clubs(*)').eq('event_id', eventId), db().from('event_events').select('event_ptr,distance,style,age_lo,age_hi,sex,active').eq('event_id', eventId).order('event_ptr')])
   const relations = unwrap(clubRelations)
+  await Promise.all(
+    relations
+      .filter((relation) => !/^\d{4}$/.test(relation.pin || ''))
+      .map(async (relation) => {
+        relation.pin = generateClubPin()
+        unwrap(await db().from('event_clubs').update({ pin: relation.pin }).eq('event_id', eventId).eq('club_code', relation.club_code))
+      })
+  )
   return {
-    clubs: relations.map(relation => teamIdentity({
-      ...(relation.clubs || {}),
-      code: relation.club_code,
-      contact_name: relation.contact_name || relation.clubs?.contact_name || '',
-      contact_whatsapp: relation.contact_whatsapp || relation.clubs?.contact_whatsapp || '',
-      email: relation.email || relation.clubs?.email || relation.clubs?.contact_email || '',
-      invitation_sent_at: relation.invitation_sent_at,
-      invitation_error: relation.invitation_error || '',
-      participation_status: relation.status
-    })),
+    clubs: relations.map((relation) =>
+      teamIdentity({
+        ...(relation.clubs || {}),
+        code: relation.club_code,
+        contact_name: relation.contact_name || relation.clubs?.contact_name || '',
+        contact_whatsapp: relation.contact_whatsapp || relation.clubs?.contact_whatsapp || '',
+        email: relation.email || relation.clubs?.email || relation.clubs?.contact_email || '',
+        pin: relation.pin || '',
+        invitation_sent_at: relation.invitation_sent_at,
+        invitation_error: relation.invitation_error || '',
+        participation_status: relation.status
+      })
+    ),
     events: unwrap(events)
   }
 }
@@ -105,17 +116,19 @@ export async function getEvent(id) {
 
 export async function getEvents() {
   const rows = unwrap(await db().from('events').select('*').order('created_at', { ascending: false }))
-  return Promise.all(rows.map(async row => {
-    const dashboard = await getDashboard(row.id)
-    return {
-      ...dashboard.event,
-      progress: {
-        received: dashboard.counts.received,
-        clubs: dashboard.counts.total_clubs,
-        athletes: dashboard.counts.athletes
+  return Promise.all(
+    rows.map(async (row) => {
+      const dashboard = await getDashboard(row.id)
+      return {
+        ...dashboard.event,
+        progress: {
+          received: dashboard.counts.received,
+          clubs: dashboard.counts.total_clubs,
+          athletes: dashboard.counts.athletes
+        }
       }
-    }
-  }))
+    })
+  )
 }
 
 export const listEvents = getEvents
@@ -133,47 +146,60 @@ export const addMasterClub = upsertClub
 
 export async function saveEvent(input, activate = false) {
   const id = input.id || `evt_${crypto.randomUUID().slice(0, 8)}`
-  const status = activate ? 'active' : (input.status || 'draft')
+  const status = activate ? 'active' : input.status || 'draft'
   const event = { ...input, id }
   unwrap(await db().from('events').upsert(eventPayload(event, status), { onConflict: 'id' }))
 
-  const clubs = (input.clubs || []).map(teamIdentity)
+  const clubs = (input.clubs || []).map(teamIdentity).map(ensureClubPin)
   if (clubs.length) unwrap(await db().from('clubs').upsert(clubs.map(clubPayload), { onConflict: 'code' }))
   const currentTokens = unwrap(await db().from('tokens').select('club_code').eq('event_id', id))
-  const selectedCodes = new Set(clubs.map(club => Number(club.code)))
-  const removedCodes = currentTokens.map(item => Number(item.club_code)).filter(code => !selectedCodes.has(code))
+  const selectedCodes = new Set(clubs.map((club) => Number(club.code)))
+  const removedCodes = currentTokens.map((item) => Number(item.club_code)).filter((code) => !selectedCodes.has(code))
   if (removedCodes.length) unwrap(await db().from('tokens').delete().eq('event_id', id).in('club_code', removedCodes))
 
   unwrap(await db().from('event_clubs').delete().eq('event_id', id))
   if (clubs.length) {
-    unwrap(await db().from('event_clubs').insert(clubs.map(club => ({
-      event_id: id,
-      club_code: club.code,
-      status: club.participation_status || 'invited',
-      contact_name: club.contact_name || '',
-      contact_whatsapp: club.contact_whatsapp || '',
-      email: club.email || club.contact_email || ''
-    }))))
+    unwrap(
+      await db()
+        .from('event_clubs')
+        .insert(
+          clubs.map((club) => ({
+            event_id: id,
+            club_code: club.code,
+            status: club.participation_status || 'invited',
+            contact_name: club.contact_name || '',
+            contact_whatsapp: club.contact_whatsapp || '',
+            email: club.email || club.contact_email || '',
+            pin: club.pin
+          }))
+        )
+    )
   }
 
   unwrap(await db().from('event_events').delete().eq('event_id', id))
   if (input.events?.length) {
-    unwrap(await db().from('event_events').insert(input.events.map(eventRow => ({
-      event_id: id,
-      event_ptr: Number(eventRow.event_ptr),
-      distance: Number(eventRow.distance),
-      style: eventRow.style,
-      age_lo: Number(eventRow.age_lo),
-      age_hi: Number(eventRow.age_hi),
-      sex: eventRow.sex,
-      active: eventRow.active !== false
-    }))))
+    unwrap(
+      await db()
+        .from('event_events')
+        .insert(
+          input.events.map((eventRow) => ({
+            event_id: id,
+            event_ptr: Number(eventRow.event_ptr),
+            distance: Number(eventRow.distance),
+            style: eventRow.style,
+            age_lo: Number(eventRow.age_lo),
+            age_hi: Number(eventRow.age_hi),
+            sex: eventRow.sex,
+            active: eventRow.active !== false
+          }))
+        )
+    )
   }
   if (activate) await generateTokens(id)
   return getEvent(id)
 }
 
-export const createEvent = data => saveEvent(data, false)
+export const createEvent = (data) => saveEvent(data, false)
 export const updateEvent = (id, data) => saveEvent({ ...data, id }, false)
 
 export async function deleteEvent(id) {
@@ -189,25 +215,50 @@ export async function importFromMeetManager(config) {
 
 export async function cloneEvent(id) {
   const source = await getEvent(id)
-  return { ...source, id: '', name: '', date_start: '', date_end: null, reference_date: '', deadline: null, venue: '', notes: '', status: 'draft', created_at: '', opened_at: null, activated_at: null, closed_at: null }
+  return {
+    ...source,
+    id: '',
+    name: '',
+    date_start: '',
+    date_end: null,
+    reference_date: '',
+    deadline: null,
+    venue: '',
+    notes: '',
+    status: 'draft',
+    created_at: '',
+    opened_at: null,
+    activated_at: null,
+    closed_at: null
+  }
 }
 
 export async function generateTokens(eventId) {
   const event = await getEvent(eventId)
-  const tokens = await Promise.all(event.clubs.map(async club => {
-    const tokenValue = encodeDemoToken(event, club)
-    return {
-      id: await tokenKey(tokenValue),
-      token_value: tokenValue,
-      token_type: 'v2',
-      event_id: eventId,
-      club_code: club.code,
-      created_at: new Date().toISOString(),
-      used_at: null
-    }
-  }))
+  const tokens = await Promise.all(
+    event.clubs.map(async (club) => {
+      const tokenValue = encodeDemoToken(withoutPins(event), withoutPin(club))
+      return {
+        id: await tokenKey(tokenValue),
+        token_value: tokenValue,
+        token_type: 'v2',
+        event_id: eventId,
+        club_code: club.code,
+        created_at: new Date().toISOString(),
+        used_at: null
+      }
+    })
+  )
   if (tokens.length) unwrap(await db().from('tokens').upsert(tokens, { onConflict: 'event_id,club_code,token_type' }))
-  return { success: true, tokens: tokens.map((token, index) => ({ ...token, id: token.token_value, eventId, club: event.clubs[index] })) }
+  return {
+    success: true,
+    tokens: tokens.map((token, index) => ({
+      ...token,
+      id: token.token_value,
+      eventId,
+      club: event.clubs[index]
+    }))
+  }
 }
 
 export async function getTokensForEvent(eventId) {
@@ -217,20 +268,76 @@ export async function getTokensForEvent(eventId) {
 export async function generateEmailInvitations(eventId, clubCodes = null) {
   const event = await getEvent(eventId)
   const selected = clubCodes ? new Set(clubCodes.map(Number)) : null
-  const clubs = event.clubs.filter(club => club.email && club.participation_status !== 'not_participating' && (!selected || selected.has(Number(club.code))))
-  const invitations = await Promise.all(clubs.map(async club => {
-    const tokenValue = await createMagicToken({ eventId, clubCode: club.code, email: club.email }, DEMO_ADMIN_PASSWORD)
-    return { club, tokenValue, row: { id: await tokenKey(tokenValue), token_value: tokenValue, token_type: 'v3', event_id: eventId, club_code: club.code, created_at: new Date().toISOString(), used_at: null } }
+  const clubs = event.clubs.filter((club) => club.email && club.participation_status !== 'not_participating' && (!selected || selected.has(Number(club.code))))
+  const invitations = await Promise.all(
+    clubs.map(async (club) => {
+      const tokenValue = await createMagicToken({ eventId, clubCode: club.code, email: club.email }, DEMO_ADMIN_PASSWORD)
+      return {
+        club,
+        tokenValue,
+        row: {
+          id: await tokenKey(tokenValue),
+          token_value: tokenValue,
+          token_type: 'v3',
+          event_id: eventId,
+          club_code: club.code,
+          created_at: new Date().toISOString(),
+          used_at: null
+        }
+      }
+    })
+  )
+  if (invitations.length)
+    unwrap(
+      await db()
+        .from('tokens')
+        .upsert(
+          invitations.map((item) => item.row),
+          { onConflict: 'event_id,club_code,token_type' }
+        )
+    )
+  return invitations.map(({ club, tokenValue }) => ({
+    club,
+    token: tokenValue
   }))
-  if (invitations.length) unwrap(await db().from('tokens').upsert(invitations.map(item => item.row), { onConflict: 'event_id,club_code,token_type' }))
-  return invitations.map(({ club, tokenValue }) => ({ club, token: tokenValue }))
+}
+
+export async function updateClubPin(eventId, clubCode) {
+  const pin = generateClubPin()
+  unwrap(await db().from('event_clubs').update({ pin }).eq('event_id', eventId).eq('club_code', clubCode))
+  return { pin }
+}
+
+export async function verifyAccessPin(tokenId, pin) {
+  const magic = await verifyMagicToken(tokenId, DEMO_ADMIN_PASSWORD)
+  if (!magic) return { valid: false }
+  const stored = unwrap(
+    await db()
+      .from('tokens')
+      .select('id')
+      .eq('id', await tokenKey(tokenId))
+      .eq('token_type', 'v3')
+      .maybeSingle()
+  )
+  if (!stored) return { valid: false }
+  const relation = unwrap(await db().from('event_clubs').select('pin').eq('event_id', magic.e).eq('club_code', magic.c).maybeSingle())
+  return { valid: Boolean(relation?.pin && relation.pin === String(pin)) }
 }
 
 export async function recordInvitationResults(eventId, results) {
-  await Promise.all(results.map(result => db().from('event_clubs').update({
-    invitation_sent_at: result.success ? new Date().toISOString() : null,
-    invitation_error: result.success ? '' : (result.error || 'No se pudo enviar')
-  }).eq('event_id', eventId).eq('club_code', result.clubCode).then(item => unwrap(item))))
+  await Promise.all(
+    results.map((result) =>
+      db()
+        .from('event_clubs')
+        .update({
+          invitation_sent_at: result.success ? new Date().toISOString() : null,
+          invitation_error: result.success ? '' : result.error || 'No se pudo enviar'
+        })
+        .eq('event_id', eventId)
+        .eq('club_code', result.clubCode)
+        .then((item) => unwrap(item))
+    )
+  )
   return { success: true }
 }
 
@@ -241,9 +348,7 @@ export async function revokeMagicInvitation(eventId, clubCode) {
 }
 
 async function latestInscription(eventId, clubCode, isLate) {
-  const result = await db().from('inscriptions').select('*')
-    .eq('event_id', eventId).eq('club_code', clubCode).eq('is_late', isLate)
-    .order('submitted_at', { ascending: false }).limit(1).maybeSingle()
+  const result = await db().from('inscriptions').select('*').eq('event_id', eventId).eq('club_code', clubCode).eq('is_late', isLate).order('submitted_at', { ascending: false }).limit(1).maybeSingle()
   return unwrap(result)
 }
 
@@ -252,40 +357,76 @@ export async function validateToken(tokenId) {
   if (magic) {
     const verified = await verifyMagicToken(tokenId, DEMO_ADMIN_PASSWORD)
     if (!verified || !client) return { valid: false }
-    const stored = unwrap(await db().from('tokens').select('*').eq('id', await tokenKey(tokenId)).eq('token_type', 'v3').maybeSingle())
+    const stored = unwrap(
+      await db()
+        .from('tokens')
+        .select('*')
+        .eq('id', await tokenKey(tokenId))
+        .eq('token_type', 'v3')
+        .maybeSingle()
+    )
     if (!stored) return { valid: false }
     const event = await getEvent(verified.e)
     if (!['active', 'accepting_late'].includes(event.status)) return { valid: false }
-    const club = event.clubs.find(item => Number(item.code) === Number(verified.c))
+    const club = event.clubs.find((item) => Number(item.code) === Number(verified.c))
     if (!club || club.participation_status === 'not_participating' || club.email.toLowerCase() !== verified.em) return { valid: false }
     const [normal, late] = await Promise.all([latestInscription(event.id, club.code, false), latestInscription(event.id, club.code, true)])
     const current = event.status === 'accepting_late' ? late : normal
-    return { valid: true, backendAvailable: true, eventId: event.id, event: { ...event, date: event.date_start }, club, authorizedEmail: verified.em, whatsapp: event.organizer_whatsapp || DEMO_WHATSAPP, already_submitted: Boolean(current), inscription: current ? inscriptionFromRow(current, club) : null, normal_inscription: normal ? inscriptionFromRow(normal, club) : null }
+    return {
+      valid: true,
+      requiresPin: true,
+      backendAvailable: true,
+      eventId: event.id,
+      event: { ...withoutPins(event), date: event.date_start },
+      club: withoutPin(club),
+      authorizedEmail: verified.em,
+      whatsapp: event.organizer_whatsapp || DEMO_WHATSAPP,
+      already_submitted: Boolean(current),
+      inscription: current ? inscriptionFromRow(current, withoutPin(club)) : null,
+      normal_inscription: normal ? inscriptionFromRow(normal, withoutPin(club)) : null
+    }
   }
   const embedded = decodeDemoToken(tokenId)
   if (!embedded) return { valid: false }
-  const fallback = { ...accessFromDemoToken(embedded), backendAvailable: false, already_submitted: false, inscription: null, normal_inscription: null }
+  const fallback = {
+    ...accessFromDemoToken(embedded),
+    backendAvailable: false,
+    already_submitted: false,
+    inscription: null,
+    normal_inscription: null
+  }
   if (!client) return fallback
-  const token = unwrap(await db().from('tokens').select('*').eq('id', await tokenKey(tokenId)).maybeSingle())
+  const token = unwrap(
+    await db()
+      .from('tokens')
+      .select('*')
+      .eq('id', await tokenKey(tokenId))
+      .maybeSingle()
+  )
   if (!token) return fallback
   const event = await getEvent(token.event_id)
-  const club = event.clubs.find(item => Number(item.code) === Number(token.club_code)) || fallback.club
-  const [normal, late] = await Promise.all([
-    latestInscription(event.id, club.code, false),
-    latestInscription(event.id, club.code, true)
-  ])
+  const club = event.clubs.find((item) => Number(item.code) === Number(token.club_code)) || fallback.club
+  const [normal, late] = await Promise.all([latestInscription(event.id, club.code, false), latestInscription(event.id, club.code, true)])
   const current = event.status === 'accepting_late' ? late : normal
   return {
     valid: true,
     backendAvailable: true,
     eventId: event.id,
-    event: { ...event, date: event.date_start },
-    club,
+    event: { ...withoutPins(event), date: event.date_start },
+    club: withoutPin(club),
     whatsapp: event.organizer_whatsapp || DEMO_WHATSAPP,
     already_submitted: Boolean(current),
     inscription: current ? inscriptionFromRow(current, club) : null,
     normal_inscription: normal ? inscriptionFromRow(normal, club) : null
   }
+}
+
+function withoutPin(club) {
+  const { pin, ...safe } = club
+  return safe
+}
+function withoutPins(event) {
+  return { ...event, clubs: (event.clubs || []).map(withoutPin) }
 }
 
 export async function submitInscription(payload) {
@@ -294,28 +435,46 @@ export async function submitInscription(payload) {
   if (!access.backendAvailable) throw new Error('No se pudo conectar con Supabase')
   if (['draft', 'closed', 'archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
   const isLate = access.event.status === 'accepting_late'
-  unwrap(await db().from('inscriptions').delete()
-    .eq('event_id', access.eventId).eq('club_code', access.club.code).eq('is_late', isLate))
-  const row = unwrap(await db().from('inscriptions').insert({
-    event_id: access.eventId,
-    club_code: access.club.code,
-    token_id: payload.token,
-    is_late: isLate,
-    late_status: isLate ? 'pending' : null,
-    athletes: payload.athletes,
-    results: payload.results,
-    roster: payload.roster || [],
-    meta: payload.meta || {},
-    approved_athletes: [],
-    rejected_athletes: []
-  }).select().single())
+  unwrap(await db().from('inscriptions').delete().eq('event_id', access.eventId).eq('club_code', access.club.code).eq('is_late', isLate))
+  const row = unwrap(
+    await db()
+      .from('inscriptions')
+      .insert({
+        event_id: access.eventId,
+        club_code: access.club.code,
+        token_id: payload.token,
+        is_late: isLate,
+        late_status: isLate ? 'pending' : null,
+        athletes: payload.athletes,
+        results: payload.results,
+        roster: payload.roster || [],
+        meta: payload.meta || {},
+        approved_athletes: [],
+        rejected_athletes: []
+      })
+      .select()
+      .single()
+  )
   const updates = await Promise.all([
-    db().from('tokens').update({ used_at: row.submitted_at }).eq('id', await tokenKey(payload.token)),
-    db().from('event_clubs').update({ status: isLate ? 'late_pending' : 'submitted' })
-      .eq('event_id', access.eventId).eq('club_code', access.club.code)
+    db()
+      .from('tokens')
+      .update({ used_at: row.submitted_at })
+      .eq('id', await tokenKey(payload.token)),
+    db()
+      .from('event_clubs')
+      .update({ status: isLate ? 'late_pending' : 'submitted' })
+      .eq('event_id', access.eventId)
+      .eq('club_code', access.club.code)
   ])
-  updates.forEach(result => unwrap(result))
-  return { success: true, late: isLate, summary: { athletes: payload.athletes.length, inscriptions: payload.results.length } }
+  updates.forEach((result) => unwrap(result))
+  return {
+    success: true,
+    late: isLate,
+    summary: {
+      athletes: payload.athletes.length,
+      inscriptions: payload.results.length
+    }
+  }
 }
 
 export const submitLateInscription = (tokenId, data) => submitInscription({ ...data, token: tokenId })
@@ -333,39 +492,39 @@ export async function getInscriptionForClub(eventId, clubCode) {
 export const getInscription = getInscriptionForClub
 
 export async function getDashboard(eventId) {
-  const [event, tokens, rows] = await Promise.all([
-    getEvent(eventId),
-    getTokensForEvent(eventId),
-    getInscriptionsForEvent(eventId)
-  ])
+  const [event, tokens, rows] = await Promise.all([getEvent(eventId), getTokensForEvent(eventId), getInscriptionsForEvent(eventId)])
   const latestNormal = new Map()
-  rows.filter(row => !row.is_late).forEach(row => latestNormal.set(Number(row.club_code), row))
-  const tokenByClub = new Map(tokens.map(token => [Number(token.club_code), token]))
-  const clubs = event.clubs.map(club => {
+  rows.filter((row) => !row.is_late).forEach((row) => latestNormal.set(Number(row.club_code), row))
+  const tokenByClub = new Map(tokens.map((token) => [Number(token.club_code), token]))
+  const clubs = event.clubs.map((club) => {
     const inscription = latestNormal.get(Number(club.code))
     const token = tokenByClub.get(Number(club.code))
     const excluded = club.participation_status === 'not_participating'
     return {
       ...club,
       status: excluded ? 'not_participating' : inscription ? 'received' : token ? 'sent' : 'missing',
-      athlete_count: excluded ? 0 : (inscription?.athletes?.length || 0),
-      submitted_at: excluded ? null : (inscription?.submitted_at || null),
+      athlete_count: excluded ? 0 : inscription?.athletes?.length || 0,
+      inscription_count: excluded ? 0 : inscription?.results?.length || 0,
+      submitted_at: excluded ? null : inscription?.submitted_at || null,
       token: token?.token_value || null
     }
   })
-  const clubByCode = new Map(event.clubs.map(club => [Number(club.code), club]))
-  const late = rows.filter(row => row.is_late).map(row => inscriptionFromRow(row, clubByCode.get(Number(row.club_code))))
-  const submittedDates = clubs.map(club => club.submitted_at).filter(Boolean).sort()
+  const clubByCode = new Map(event.clubs.map((club) => [Number(club.code), club]))
+  const late = rows.filter((row) => row.is_late).map((row) => inscriptionFromRow(row, clubByCode.get(Number(row.club_code))))
+  const submittedDates = clubs
+    .map((club) => club.submitted_at)
+    .filter(Boolean)
+    .sort()
   return {
     event,
     clubs,
     late,
     counts: {
       total_clubs: clubs.length,
-      received: clubs.filter(club => club.status === 'received').length,
-      pending: clubs.filter(club => !['received', 'not_participating'].includes(club.status)).length,
+      received: clubs.filter((club) => club.status === 'received').length,
+      pending: clubs.filter((club) => !['received', 'not_participating'].includes(club.status)).length,
       athletes: clubs.reduce((sum, club) => sum + club.athlete_count, 0),
-      late_pending: late.filter(item => ['pending', 'partially_approved'].includes(item.status)).length
+      late_pending: late.filter((item) => ['pending', 'partially_approved'].includes(item.status)).length
     },
     timestamps: {
       opened_at: event.opened_at || event.activated_at || event.created_at,
@@ -378,20 +537,34 @@ export async function getDashboard(eventId) {
 export async function reviewLate(eventId, clubCode, action, athleteIds = []) {
   const row = await latestInscription(eventId, clubCode, true)
   if (!row) throw new Error('Inscripción tardía no encontrada')
-  const ids = action === 'approve_all' ? row.athletes.map(athlete => Number(athlete.Ath_no)) : athleteIds.map(Number)
+  const ids = action === 'approve_all' ? row.athletes.map((athlete) => Number(athlete.Ath_no)) : athleteIds.map(Number)
   const approved = new Set((row.approved_athletes || []).map(Number))
   const rejected = new Set((row.rejected_athletes || []).map(Number))
-  ids.forEach(id => {
-    if (action.startsWith('approve')) { approved.add(id); rejected.delete(id) } else { rejected.add(id); approved.delete(id) }
+  ids.forEach((id) => {
+    if (action.startsWith('approve')) {
+      approved.add(id)
+      rejected.delete(id)
+    } else {
+      rejected.add(id)
+      approved.delete(id)
+    }
   })
   const decided = approved.size + rejected.size
   const status = approved.size === row.athletes.length ? 'approved' : rejected.size === row.athletes.length ? 'rejected' : decided ? 'partially_approved' : 'pending'
-  const updated = unwrap(await db().from('inscriptions').update({
-    approved_athletes: [...approved], rejected_athletes: [...rejected], late_status: status
-  }).eq('id', row.id).select().single())
+  const updated = unwrap(
+    await db()
+      .from('inscriptions')
+      .update({
+        approved_athletes: [...approved],
+        rejected_athletes: [...rejected],
+        late_status: status
+      })
+      .eq('id', row.id)
+      .select()
+      .single()
+  )
   if (status === 'approved') {
-    unwrap(await db().from('event_clubs').update({ status: 'late_approved' })
-      .eq('event_id', eventId).eq('club_code', clubCode))
+    unwrap(await db().from('event_clubs').update({ status: 'late_approved' }).eq('event_id', eventId).eq('club_code', clubCode))
   }
   return inscriptionFromRow(updated)
 }
@@ -401,14 +574,19 @@ export const rejectLateAthletes = (eventId, clubCode, athleteIds) => reviewLate(
 
 export async function exportConsolidated(eventId, type = 'principal') {
   const [event, rows] = await Promise.all([getEvent(eventId), getInscriptionsForEvent(eventId)])
-  const excluded = new Set(event.clubs.filter(club => club.participation_status === 'not_participating').map(club => Number(club.code)))
-  const normal = rows.filter(row => !row.is_late && !excluded.has(Number(row.club_code))).map(row => inscriptionFromRow(row))
-  const late = rows.filter(row => row.is_late && !excluded.has(Number(row.club_code))).map(row => inscriptionFromRow(row))
-  return buildConsolidatedExport({ event, inscriptions: normal, lateInscriptions: late, type })
+  const excluded = new Set(event.clubs.filter((club) => club.participation_status === 'not_participating').map((club) => Number(club.code)))
+  const normal = rows.filter((row) => !row.is_late && !excluded.has(Number(row.club_code))).map((row) => inscriptionFromRow(row))
+  const late = rows.filter((row) => row.is_late && !excluded.has(Number(row.club_code))).map((row) => inscriptionFromRow(row))
+  return buildConsolidatedExport({
+    event,
+    inscriptions: normal,
+    lateInscriptions: late,
+    type
+  })
 }
 
 export const exportAll = exportConsolidated
-export const exportSupplement = eventId => exportConsolidated(eventId, 'supplement')
+export const exportSupplement = (eventId) => exportConsolidated(eventId, 'supplement')
 
 export async function updateEventStatus(id, status) {
   const updates = { status }
@@ -419,9 +597,9 @@ export async function updateEventStatus(id, status) {
   return getEvent(id)
 }
 
-export const activateEvent = eventId => updateEventStatus(eventId, 'active')
+export const activateEvent = (eventId) => updateEventStatus(eventId, 'active')
 export const closeEvent = (eventId, acceptLate = false) => updateEventStatus(eventId, acceptLate ? 'accepting_late' : 'closed')
-export const archiveEvent = eventId => updateEventStatus(eventId, 'archived')
+export const archiveEvent = (eventId) => updateEventStatus(eventId, 'archived')
 
 export async function markClubNotParticipating(eventId, clubCode) {
   unwrap(await db().from('event_clubs').update({ status: 'not_participating' }).eq('event_id', eventId).eq('club_code', clubCode))
@@ -433,9 +611,7 @@ export async function reincorporateClub(eventId, clubCode) {
   return { success: true }
 }
 
-export const setClubParticipation = (eventId, clubCode, participates) => participates
-  ? reincorporateClub(eventId, clubCode)
-  : markClubNotParticipating(eventId, clubCode)
+export const setClubParticipation = (eventId, clubCode, participates) => (participates ? reincorporateClub(eventId, clubCode) : markClubNotParticipating(eventId, clubCode))
 
 export function adminLogin(password) {
   if (password !== DEMO_ADMIN_PASSWORD) throw new Error('Contraseña incorrecta')
