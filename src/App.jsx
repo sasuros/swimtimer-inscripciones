@@ -5,6 +5,7 @@ const InscriptionWizard = lazy(() => import('./pages/InscriptionWizard'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const AdminEvents = lazy(() => import('./pages/AdminEvents'))
+const AdminTools = lazy(() => import('./pages/AdminTools'))
 const EventEditor = lazy(() => import('./pages/EventEditor'))
 const ImportMeetManager = lazy(() => import('./pages/ImportMeetManager'))
 
@@ -14,6 +15,7 @@ export default function App() {
   if (path.startsWith('/admin')) {
     if (!sessionStorage.getItem('swimtimer-admin-token')) content = <AdminLogin />
     else if (path === '/admin' || path === '/admin/eventos') content = <AdminEvents />
+    else if (path === '/admin/herramientas') content = <AdminTools />
     else if (path === '/admin/eventos/nuevo') content = <EventEditor />
     else if (path === '/admin/eventos/importar') content = <ImportMeetManager />
     else {
