@@ -27,20 +27,33 @@
   .app-header h1, .app-header h2, .app-header h3 { color: white; }
   .live-badge { @apply inline-flex items-center gap-1.5 rounded-full bg-green-800 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white; }
   .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #86efac; animation: live-pulse 1.5s ease-in-out infinite; }
-  .public-hero { background: linear-gradient(180deg, #0f2a47 0%, #1b3a5c 100%); }
+  .public-hero { background: linear-gradient(135deg, #0f2a47 0%, #1b3a5c 25%, #163250 50%, #1b3a5c 75%, #0f2a47 100%); background-size: 400% 400%; animation: hero-gradient-move 12s ease infinite; }
   .public-hero::before { content: ''; position: absolute; inset: 0; opacity: .04; background-image: linear-gradient(90deg, transparent 49%, #fff 50%, transparent 51%), linear-gradient(0deg, transparent 49%, #fff 50%, transparent 51%); background-size: 44px 44px; transform: skewY(-3deg) scale(1.1); }
   .public-hero-title { letter-spacing: -.02em; text-shadow: 0 2px 20px rgba(0,0,0,.3); }
-  .hero-title { color: transparent; background: linear-gradient(90deg, #fff 0%, #fff 40%, #c9a84c 50%, #fff 60%, #fff 100%); background-size: 200% 100%; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: hero-shimmer 4s ease-in-out infinite; }
+  .hero-title { color: transparent; background: linear-gradient(90deg, #fff 0%, #fff 35%, #fff176 45%, #ffd700 50%, #fff176 55%, #fff 65%, #fff 100%); background-size: 200% 100%; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: hero-shimmer 4s ease-in-out infinite; }
   .hero-logo { filter: drop-shadow(0 0 20px rgba(255,255,255,.15)); }
   .hero-byline { letter-spacing: 4px; opacity: .6; }
+  .hero-stagger { opacity: 0; transform: translateY(15px); animation: hero-stagger-in .5s ease var(--stagger-delay, 0s) forwards; }
+  .hero-counters { font-variant-numeric: tabular-nums; }
+  .counter-group { display: flex; min-width: 78px; flex-direction: column; align-items: center; }
+  .counter-group strong { color: #fff; font-size: 2.5rem; font-weight: 900; line-height: 1; }
+  .counter-group small { margin-top: 6px; color: rgba(255,255,255,.5); font-size: .65rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  .counter-separator { color: rgba(255,255,255,.3); font-size: 2rem; }
   .updated-badge { padding: 8px 20px; border: 1px solid rgba(255,255,255,.18); border-radius: 24px; background: rgba(255,255,255,.12); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 13px; letter-spacing: 1px; }
+  .bubble { position: absolute; bottom: -50px; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; background: rgba(255,255,255,var(--bubble-opacity)); animation: bubble-float var(--bubble-duration) linear var(--bubble-delay) infinite; }
+  .hero-waves::after { content: ''; position: absolute; inset: auto 0 0; height: 40px; background: linear-gradient(180deg, rgba(240,242,245,0), #f0f2f5); }
   .hero-wave { position: absolute; bottom: 8px; left: -10%; width: 120%; height: 90px; }
-  .hero-wave-back { animation: wave-drift-back 12s ease-in-out infinite alternate; }
-  .hero-wave-front { animation: wave-drift-front 8s ease-in-out infinite alternate; }
+  .hero-wave-back { animation: wave-drift-back 14s ease-in-out infinite alternate; }
+  .hero-wave-mid { animation: wave-drift-front 9s ease-in-out infinite alternate-reverse; }
+  .hero-wave-front { animation: wave-drift-front 6s ease-in-out infinite alternate; }
   .event-card { transition: opacity .6s ease, transform .3s ease, box-shadow .3s ease; }
   .event-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,.1); }
   .live-event-card { border: 2px solid #22c55e; background: #fafff5; box-shadow: 0 0 20px rgba(34,197,94,.15); animation: live-card-glow 3s ease-in-out infinite; }
   .live-event-card:hover { animation-play-state: paused; box-shadow: 0 8px 28px rgba(34,197,94,.28); }
+  .live-event-card::after { content: ''; position: absolute; left: 50%; top: 50%; width: 90px; height: 90px; border-radius: 50%; background: rgba(34,197,94,.12); opacity: 0; transform: translate(-50%,-50%) scale(0); pointer-events: none; }
+  .live-event-card:hover::after { animation: water-ripple .75s ease-out; }
+  .click-ripple { position: absolute; z-index: 0; width: 100px; height: 100px; border-radius: 50%; background: rgba(34,197,94,.15); pointer-events: none; transform: translate(-50%,-50%) scale(0); animation: click-ripple .65s ease-out forwards; }
+  .live-event-card > *:not(.click-ripple) { position: relative; z-index: 1; }
   .finished-event-card { border: 1px solid #e5e7eb; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
   .live-results-button { @apply rounded-lg px-8 py-4 text-base font-bold uppercase text-white transition; background: #047857; letter-spacing: .5px; }
   .live-results-button:hover { background: #065f46; box-shadow: 0 8px 20px rgba(4,120,87,.2); }
@@ -57,18 +70,29 @@
   .steps-section.visible .connector-line { stroke-dashoffset: 0; }
   .steps-grid > svg { clip-path: inset(0 100% 0 0); transition: clip-path 1s ease .3s; }
   .steps-section.visible .steps-grid > svg { clip-path: inset(0 0 0 0); }
+  .steps-section { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='40' viewBox='0 0 200 40'%3E%3Cpath d='M0 20 Q25 5 50 20 T100 20 T150 20 T200 20' fill='none' stroke='%2394A3B8' stroke-opacity='.08' stroke-width='1'/%3E%3C/svg%3E"); background-repeat: repeat; background-size: 200px 40px; }
+  .footer-particle { position: absolute; border-radius: 50%; background: rgba(255,255,255,.16); animation: particle-twinkle 3s ease-in-out var(--particle-delay) infinite; }
 }
+@media (min-width: 640px) { .counter-group strong { font-size: 3.5rem; } .counter-group { min-width: 120px; } }
 @keyframes hero-shimmer { 0%, 100% { background-position: 200% 0; } 50% { background-position: -200% 0; } }
+@keyframes hero-gradient-move { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes hero-stagger-in { to { opacity: 1; transform: translateY(0); } }
+@keyframes bubble-float { 0% { transform: translateY(100%) scale(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-100vh) scale(1); opacity: 0; } }
 @keyframes live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.3); } }
 @keyframes wave-drift-front { from { transform: translateX(-2%); } to { transform: translateX(2%); } }
 @keyframes wave-drift-back { from { transform: translateX(2%); } to { transform: translateX(-2%); } }
 @keyframes live-card-glow { 0%, 100% { box-shadow: 0 0 20px rgba(34,197,94,.10); } 50% { box-shadow: 0 0 24px rgba(34,197,94,.25); } }
+@keyframes water-ripple { from { opacity: .8; transform: translate(-50%,-50%) scale(0); } to { opacity: 0; transform: translate(-50%,-50%) scale(7); } }
+@keyframes click-ripple { to { opacity: 0; transform: translate(-50%,-50%) scale(6); } }
+@keyframes particle-twinkle { 0%, 100% { opacity: .08; } 50% { opacity: .22; } }
 @keyframes step-bounce-in { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .live-dot, .hero-wave, .live-event-card, .hero-title, .how-step.visible .step-icon { animation: none; }
+  .public-hero, .live-dot, .hero-wave, .live-event-card, .hero-title, .hero-stagger, .bubble, .footer-particle, .how-step.visible .step-icon, .live-event-card:hover::after, .click-ripple { animation: none; }
   .hero-title { background: none; -webkit-text-fill-color: #fff; color: #fff; }
   .fade-section { opacity: 1; transform: none; transition: none; }
   .step-icon { opacity: 1; transform: none; }
+  .hero-stagger { opacity: 1; transform: none; }
+  .bubble, .footer-particle, .click-ripple, .live-event-card::after { display: none; }
   .connector-line { stroke-dashoffset: 0; transition: none; }
   .steps-grid > svg { clip-path: none; transition: none; }
   .event-card, .how-step, .btn-results .arrow { transition: none; }
