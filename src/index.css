@@ -27,9 +27,30 @@
   .app-header h1, .app-header h2, .app-header h3 { color: white; }
   .live-badge { @apply inline-flex items-center gap-1.5 rounded-full bg-green-800 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white; }
   .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #86efac; animation: live-pulse 1.5s ease-in-out infinite; }
+  .public-hero { background: linear-gradient(180deg, #0f2a47 0%, #1b3a5c 100%); }
+  .public-hero::before { content: ''; position: absolute; inset: 0; opacity: .04; background-image: linear-gradient(90deg, transparent 49%, #fff 50%, transparent 51%), linear-gradient(0deg, transparent 49%, #fff 50%, transparent 51%); background-size: 44px 44px; transform: skewY(-3deg) scale(1.1); }
+  .public-hero-title { letter-spacing: -.02em; text-shadow: 0 2px 20px rgba(0,0,0,.3); }
+  .hero-wave { position: absolute; bottom: 8px; left: -10%; width: 120%; height: 90px; }
+  .hero-wave-back { animation: wave-drift-back 12s ease-in-out infinite alternate; }
+  .hero-wave-front { animation: wave-drift-front 8s ease-in-out infinite alternate; }
+  .live-event-card { border: 2px solid #22c55e; background: #fafff5; box-shadow: 0 0 20px rgba(34,197,94,.15); animation: live-card-glow 3s ease-in-out infinite; }
+  .finished-event-card { border: 1px solid #e5e7eb; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .live-results-button { @apply rounded-lg px-8 py-4 text-base font-bold uppercase text-white transition; background: #047857; letter-spacing: .5px; }
+  .live-results-button:hover { background: #065f46; box-shadow: 0 8px 20px rgba(4,120,87,.2); }
+  .finished-results-button { @apply rounded-lg border border-slate-300 bg-slate-100 px-8 py-3.5 font-semibold text-slate-500 transition hover:bg-slate-200; }
+  .how-step { z-index: 1; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+  .how-step:hover { transform: translateY(-4px); border-color: #a7f3d0; box-shadow: 0 10px 24px rgba(15,42,71,.09); }
 }
 @keyframes live-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.3); } }
-@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+@keyframes wave-drift-front { from { transform: translateX(-2%); } to { transform: translateX(2%); } }
+@keyframes wave-drift-back { from { transform: translateX(2%); } to { transform: translateX(-2%); } }
+@keyframes live-card-glow { 0%, 100% { box-shadow: 0 0 20px rgba(34,197,94,.10); } 50% { box-shadow: 0 0 24px rgba(34,197,94,.25); } }
+@media (min-width: 768px) { .steps-grid::before { content: ''; position: absolute; left: 16%; right: 16%; top: 42px; border-top: 2px dashed #d1d5db; } }
+@media (prefers-reduced-motion: reduce) {
+  .live-dot, .hero-wave, .live-event-card { animation: none; }
+  .how-step { transition: none; }
+  .how-step:hover { transform: none; }
+}
 @media print {
   body { background: white !important; color: black !important; }
   body * { visibility: hidden; }
