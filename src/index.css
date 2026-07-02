@@ -66,6 +66,7 @@
   .countdown-unit small { margin-top: 6px; color: #6b7280; font-size: .7rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
   .countdown-value { animation: countdown-flip .3s ease; }
   .confetti-particle { position: absolute; top: -8px; width: 6px; height: 10px; border-radius: 2px; opacity: 0; animation: confetti-fall 1.8s ease-out infinite; }
+  .pwa-install-banner { animation: pwa-slide-up .4s ease-out; }
   .finished-results-button { @apply rounded-lg border border-slate-300 bg-slate-100 px-8 py-3.5 font-semibold text-slate-500 transition hover:bg-slate-200; }
   .btn-results .arrow { transition: transform .2s ease; }
   .btn-results:hover .arrow { transform: translateX(4px); }
@@ -103,6 +104,7 @@
 @keyframes step-bounce-in { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
 @keyframes countdown-flip { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0); } }
 @keyframes confetti-fall { 0% { opacity: 0; transform: translateY(0) rotate(0); } 20% { opacity: .8; } 100% { opacity: 0; transform: translateY(52px) rotate(180deg); } }
+@keyframes pwa-slide-up { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) {
   .public-hero, .live-dot, .hero-wave, .live-event-card, .hero-stagger, .bubble, .footer-particle, .how-step.visible .step-icon, .live-event-card:hover::after, .click-ripple, .hero-title > span::after { animation: none; }
   .hero-title > span::after { display: none; }
@@ -115,7 +117,7 @@
   .event-card, .how-step, .btn-results .arrow { transition: none; }
   .event-card:hover, .how-step:hover { transform: none; }
   .btn-results:hover .arrow { transform: none; }
-  .countdown-value, .confetti-particle { animation: none; }
+  .countdown-value, .confetti-particle, .pwa-install-banner { animation: none; }
   .confetti-particle { display: none; }
 }
 @media print {

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, CalendarDays, ExternalLink, MapPin, ScanLine, Waves } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { BarChart3, CalendarDays, Download, ExternalLink, MapPin, ScanLine, Share, Smartphone, Waves, X } from 'lucide-react'
 import Logo from '../components/Logo'
 import { getPublicEvents } from '../services/publicEvents'
 import { calculateCountdown } from '../utils/countdown'
+import { dismissPwaBanner, hasActivePwaDismissal } from '../utils/pwaInstall'
 import { formatPublicEventDate } from '../utils/publicEventDate'
 
 export default function PublicLanding() {
@@ -20,17 +21,6 @@ export default function PublicLanding() {
     elements.forEach(element => observer.observe(element))
     return () => observer.disconnect()
   }, [loading, events])
-  const activeEvent = useMemo(() => events.find(event => event.is_live === 'live'), [events])
-  useEffect(() => {
-    if (!activeEvent) return
-    const title = document.querySelector('meta[property="og:title"]')
-    const description = document.querySelector('meta[property="og:description"]')
-    const image = document.querySelector('meta[property="og:image"]')
-    title?.setAttribute('content', activeEvent.name)
-    description?.setAttribute('content', `Series, carriles y resultados - ${activeEvent.venue || 'Sede por confirmar'}`)
-    const params = new URLSearchParams({ title: activeEvent.name, date: activeEvent.date_start || '', venue: activeEvent.venue || '', status: activeEvent.is_live })
-    image?.setAttribute('content', `https://swimtimer-oficial.vercel.app/api/og-image?${params}`)
-  }, [activeEvent])
   const totals = useMemo(() => events.filter(event => event.is_live === 'live').reduce((sum, event) => ({ athletes: sum.athletes + Number(event.athletes || 0), events: sum.events + Number(event.events || 0), teams: sum.teams + Number(event.teams || 0) }), { athletes: 0, events: 0, teams: 0 }), [events])
   const hasTotals = totals.athletes > 0 || totals.events > 0 || totals.teams > 0
 
@@ -42,7 +32,49 @@ export default function PublicLanding() {
       <section className="fade-section steps-section bg-white px-4 py-14 sm:py-20"><div className="mx-auto max-w-5xl"><p className="text-center text-sm font-extrabold uppercase tracking-[.24em] text-brand-600">Simple y rápido</p><h2 className="mt-2 text-center text-3xl font-extrabold">¿Cómo funciona?</h2><div className="steps-grid relative mt-12 grid gap-7 md:grid-cols-3"><svg className="pointer-events-none absolute left-[16%] right-[16%] top-[42px] z-0 hidden h-2 w-[68%] md:block" viewBox="0 0 200 4" preserveAspectRatio="none" aria-hidden="true"><line className="connector-line" x1="0" y1="2" x2="200" y2="2" stroke="#D1D5DB" strokeWidth="2" strokeDasharray="5 5" /></svg><HowStep number="1" icon={ScanLine} title="Escanea el QR">Encuentra el código en la cartelera del evento y ábrelo con tu teléfono.</HowStep><HowStep number="2" icon={Waves} title="Consulta tu serie">Antes de nadar, revisa en qué serie y carril te toca. Todo publicado por la mesa técnica.</HowStep><HowStep number="3" icon={BarChart3} title="Ve tus resultados">Al terminar cada serie, los resultados oficiales aparecen en segundos. Series, carriles, tiempos y posiciones.</HowStep></div></div></section></main>
 
     <footer className="fade-section public-footer relative bg-[#1B3A5C] px-4 pb-10 pt-24 text-center text-white"><FooterWave /><Logo className="h-14 w-14" /><p className="mt-2 text-xs tracking-[.25em] text-slate-300">BY SCANLEADS</p><p className="mt-5 text-sm text-slate-200">Sistema oficial de cronometraje y resultados</p><p className="mt-2 text-xs text-slate-400">© 2026 Scanleads</p></footer>
+    <PwaInstallBanner />
   </div>
+}
+
+function PwaInstallBanner() {
+  const [mode, setMode] = useState(null)
+  const promptRef = useRef(null)
+  useEffect(() => {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+    if (standalone || hasActivePwaDismissal(window.localStorage)) return undefined
+    let timer
+    const showLater = nextMode => { window.clearTimeout(timer); timer = window.setTimeout(() => setMode(nextMode), 3000) }
+    const handlePrompt = event => { event.preventDefault(); promptRef.current = event; showLater('native') }
+    const handleInstalled = () => { promptRef.current = null; setMode(null) }
+    window.addEventListener('beforeinstallprompt', handlePrompt)
+    window.addEventListener('appinstalled', handleInstalled)
+    const isIOS = /iPad|iPhone|iPod/.test(window.navigator.userAgent) || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1)
+    if (isIOS) showLater('ios')
+    return () => { window.clearTimeout(timer); window.removeEventListener('beforeinstallprompt', handlePrompt); window.removeEventListener('appinstalled', handleInstalled) }
+  }, [])
+
+  const close = () => { dismissPwaBanner(window.localStorage); setMode(null) }
+  const install = async () => {
+    const prompt = promptRef.current
+    if (!prompt) return
+    await prompt.prompt()
+    await prompt.userChoice.catch(() => null)
+    promptRef.current = null
+    setMode(null)
+  }
+  if (!mode) return null
+
+  return <aside className="pwa-install-banner fixed inset-x-0 bottom-0 z-[100] rounded-t-xl bg-[#1B3A5C] px-4 py-4 text-white shadow-[0_-4px_12px_rgba(0,0,0,.15)]" aria-label="Instalar SWIMTIMER">
+    <div className="mx-auto flex max-w-4xl items-center gap-3 sm:gap-4">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10" aria-hidden="true">{mode === 'ios' ? <Share className="size-5" /> : <Smartphone className="size-5" />}</span>
+      <div className="min-w-0 flex-1">
+        <p className="font-extrabold text-white">{mode === 'ios' ? 'Agrega SWIMTIMER a tu inicio' : 'Instala SWIMTIMER'}</p>
+        <p className="mt-0.5 text-xs text-slate-300 sm:text-sm">{mode === 'ios' ? <>Toca <Share className="inline size-4" /> Compartir y luego &ldquo;Agregar a pantalla de inicio&rdquo; <span aria-hidden="true">↓</span></> : 'Acceso rápido desde tu pantalla de inicio'}</p>
+      </div>
+      {mode === 'native' && <button className="btn-primary inline-flex shrink-0 items-center gap-2 px-3 py-2 text-xs sm:px-4 sm:text-sm" onClick={install}><Download className="size-4" />Instalar</button>}
+      <button className="rounded-lg p-2 text-white/70 transition hover:bg-white/10 hover:text-white" onClick={close} aria-label="Cerrar invitación de instalación"><X className="size-5" /></button>
+    </div>
+  </aside>
 }
 
 function EventCard({ event, index }) {
