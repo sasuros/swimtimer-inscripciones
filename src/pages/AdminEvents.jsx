@@ -24,7 +24,7 @@ export default function AdminEvents() {
   const remove = async id => { await deleteEvent(id); setDeletingEvent(null); await load() }
   const downloadQr = event => downloadEventQr(event).catch(error => setError(error.message))
   const deleteButton = event => <button className="rounded-lg border border-danger-700 p-2.5 text-danger-700 transition hover:bg-danger-50" onClick={() => setDeletingEvent(event)} aria-label={`Eliminar ${event.name}`} title="Eliminar evento"><Trash2 className="size-4" /></button>
-  const qrButton = event => <button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={() => downloadQr(event)} title="Descargar QR" aria-label={`Descargar QR de ${event.name}`}><QrCode className="size-4" /><span className="hidden sm:inline">QR</span></button>
+  const qrButton = event => <button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={() => downloadQr(event)} title="Descargar QR" aria-label={`Descargar QR de ${event.name}`}><QrCode className="size-4" /><span>QR</span></button>
   const active = events.filter(event => ['active', 'accepting_late'].includes(event.status))
   const upcoming = events.filter(event => event.status === 'draft')
   const past = events.filter(event => ['closed', 'archived'].includes(event.status))
@@ -38,5 +38,21 @@ export default function AdminEvents() {
 }
 
 function EventSection({ title, empty, children }) { return <section><h2 className="mb-3 text-xl font-bold">{title}</h2><div className="grid gap-4 lg:grid-cols-2">{children.length ? children : <div className="card p-6 text-slate-500">{empty}</div>}</div></section> }
-function EventCard({ event, action, qrAction }) { const progress = event.progress.clubs ? Math.round(event.progress.received / event.progress.clubs * 100) : 0; return <article className="card p-5"><div className="flex items-start justify-between gap-3"><div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusInfo[event.status][1]}`}>{statusInfo[event.status][0]}</span><h3 className="mt-3 text-lg font-bold text-brand-800"><a href={`/admin/eventos/${event.id}`}>{event.name}</a></h3></div><div className="flex gap-2">{qrAction}{action}</div></div><p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><CalendarDays className="size-4" />{formatDate(event.date_start)}</p><p className="mt-1 flex items-center gap-2 text-sm text-slate-500"><MapPin className="size-4" />{event.venue || 'Sede por definir'}</p><div className="mt-5 flex items-center justify-between text-xs"><span>{event.progress.received} de {event.progress.clubs} clubes</span><span>{progress}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-brand-600" style={{ width: `${progress}%` }} /></div></article> }
+function EventCard({ event, action, qrAction }) {
+  const progress = event.progress.clubs ? Math.round(event.progress.received / event.progress.clubs * 100) : 0
+  return <article className="card p-5">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <span className={`inline-flex max-w-full whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${statusInfo[event.status][1]}`}>{statusInfo[event.status][0]}</span>
+        <h3 className="mt-3 text-lg font-bold text-brand-800"><a href={`/admin/eventos/${event.id}`}>{event.name}</a></h3>
+      </div>
+      <div className="hidden shrink-0 gap-2 sm:flex">{qrAction}{action}</div>
+    </div>
+    <p className="mt-3 flex items-center gap-2 text-sm text-slate-500"><CalendarDays className="size-4 shrink-0" />{formatDate(event.date_start)}</p>
+    <p className="mt-1 flex items-center gap-2 text-sm text-slate-500"><MapPin className="size-4 shrink-0" />{event.venue || 'Sede por definir'}</p>
+    <div className="mt-5 flex items-center justify-between text-xs"><span>{event.progress.received} de {event.progress.clubs} clubes</span><span>{progress}%</span></div>
+    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-brand-600" style={{ width: `${progress}%` }} /></div>
+    <div className="mt-4 flex gap-2 sm:hidden">{qrAction}{action}</div>
+  </article>
+}
 function formatDate(value) { return value ? new Date(`${value}T12:00:00`).toLocaleDateString('es-VE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Fecha pendiente' }
