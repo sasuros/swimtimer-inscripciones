@@ -4,6 +4,7 @@ import {
   __setSupabaseClient,
   adminLogin,
   getMasterClubs,
+  updateLandingSettings,
   upsertClub,
   validateToken
 } from './supabaseStorage'
@@ -31,6 +32,15 @@ describe('adaptador Supabase', () => {
     __setSupabaseClient({ from: vi.fn(() => ({ select })) })
     await expect(getMasterClubs()).resolves.toEqual([{ code: 2, name: 'AKP' }])
     expect(order).toHaveBeenCalledWith('name')
+  })
+
+  it('guarda el estado público como texto', async () => {
+    const eq = vi.fn().mockResolvedValue({ data: null, error: null })
+    const update = vi.fn(() => ({ eq }))
+    __setSupabaseClient({ from: vi.fn(() => ({ update })) })
+
+    await expect(updateLandingSettings('evt-1', { drive_url: '', is_live: 'upcoming' })).resolves.toEqual({ success: true })
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ is_live: 'upcoming' }))
   })
 
   it('usa el token autocontenido si Supabase no está disponible', async () => {

@@ -148,7 +148,8 @@ export function demoUpdateEventStatus(id, status) {
 export function demoUpdateLandingSettings(id, settings) {
   const event = demoGetEvent(id)
   if (!event) throw new Error('Evento no encontrado')
-  demoSaveEvent({ ...event, drive_url: String(settings.drive_url || '').trim(), is_live: Boolean(settings.is_live), show_on_landing: settings.show_on_landing !== false }, false)
+  const publicState = ['upcoming', 'live', 'finished'].includes(settings.is_live) ? settings.is_live : 'upcoming'
+  demoSaveEvent({ ...event, drive_url: String(settings.drive_url || '').trim(), is_live: publicState, show_on_landing: settings.show_on_landing !== false }, false)
   return { success: true }
 }
 

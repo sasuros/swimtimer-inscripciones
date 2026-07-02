@@ -14,7 +14,7 @@ CREATE TABLE events (
   course TEXT DEFAULT 'S',
   notes TEXT DEFAULT '',
   drive_url TEXT DEFAULT '',
-  is_live BOOLEAN DEFAULT FALSE,
+  is_live TEXT DEFAULT 'upcoming' CHECK (is_live IN ('upcoming', 'live', 'finished')),
   show_on_landing BOOLEAN DEFAULT TRUE,
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'accepting_late', 'closed', 'archived')),
   organizer TEXT DEFAULT '',

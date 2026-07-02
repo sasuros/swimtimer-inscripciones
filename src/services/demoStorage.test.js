@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { demoCloneEvent, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoValidateToken } from './demoStorage'
+import { demoCloneEvent, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoUpdateLandingSettings, demoValidateToken } from './demoStorage'
 
 const memory = new Map()
 globalThis.localStorage = {
@@ -83,6 +83,12 @@ describe('storage local de la demo', () => {
   it('no elimina eventos con inscripciones abiertas', () => {
     const event = demoListEvents()[0]
     expect(() => demoDeleteEvent(event.id)).toThrow('Cierra las inscripciones antes de eliminar el evento.')
+  })
+
+  it('conserva el estado público textual', () => {
+    const event = demoListEvents()[0]
+    demoUpdateLandingSettings(event.id, { drive_url: '', is_live: 'upcoming' })
+    expect(demoListEvents().find(item => item.id === event.id).is_live).toBe('upcoming')
   })
 
   it('procesa tardías y genera los tres consolidados v2', async () => {

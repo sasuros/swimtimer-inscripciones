@@ -50,7 +50,7 @@ const eventPayload = (input, status) => ({
   course: input.course || 'S',
   notes: input.notes || '',
   drive_url: input.drive_url || '',
-  is_live: Boolean(input.is_live),
+  is_live: ['upcoming', 'live', 'finished'].includes(input.is_live) ? input.is_live : input.is_live === true ? 'live' : input.is_live === false ? 'finished' : 'upcoming',
   show_on_landing: input.show_on_landing !== false,
   status,
   organizer: input.organizer || 'Alberto Surós',
@@ -207,7 +207,8 @@ export const updateEvent = (id, data) => saveEvent({ ...data, id }, false)
 
 export async function updateLandingSettings(id, settings) {
   const driveUrl = String(settings.drive_url || '').trim()
-  const result = await db().from('events').update({ drive_url: driveUrl, is_live: Boolean(settings.is_live), show_on_landing: settings.show_on_landing !== false }).eq('id', id)
+  const publicState = ['upcoming', 'live', 'finished'].includes(settings.is_live) ? settings.is_live : 'upcoming'
+  const result = await db().from('events').update({ drive_url: driveUrl, is_live: publicState, show_on_landing: settings.show_on_landing !== false }).eq('id', id)
   unwrap(result)
   return { success: true }
 }

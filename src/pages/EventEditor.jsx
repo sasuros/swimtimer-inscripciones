@@ -16,7 +16,7 @@ const blank = {
   deadline: '',
   notes: '',
   drive_url: '',
-  is_live: false,
+  is_live: 'upcoming',
   show_on_landing: true,
   organizer_whatsapp: DEMO_WHATSAPP,
   status: 'draft',

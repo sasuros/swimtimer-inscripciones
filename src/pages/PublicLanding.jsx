@@ -19,7 +19,7 @@ export default function PublicLanding() {
     elements.forEach(element => observer.observe(element))
     return () => observer.disconnect()
   }, [loading, events])
-  const totals = useMemo(() => events.filter(event => event.is_live || event.status === 'active').reduce((sum, event) => ({ athletes: sum.athletes + Number(event.athletes || 0), events: sum.events + Number(event.events || 0), teams: sum.teams + Number(event.teams || 0) }), { athletes: 0, events: 0, teams: 0 }), [events])
+  const totals = useMemo(() => events.filter(event => event.is_live === 'live').reduce((sum, event) => ({ athletes: sum.athletes + Number(event.athletes || 0), events: sum.events + Number(event.events || 0), teams: sum.teams + Number(event.teams || 0) }), { athletes: 0, events: 0, teams: 0 }), [events])
   const hasTotals = totals.athletes > 0 || totals.events > 0 || totals.teams > 0
 
   return <div className="min-h-screen bg-[#F0F2F5]">
@@ -35,8 +35,20 @@ export default function PublicLanding() {
 
 function EventCard({ event, index }) {
   const [ripple, setRipple] = useState(null)
-  const startRipple = pointer => { if (!event.is_live) return; const rect = pointer.currentTarget.getBoundingClientRect(); setRipple({ key: Date.now(), x: pointer.clientX - rect.left, y: pointer.clientY - rect.top }) }
-  return <article className={`fade-section event-card ${event.is_live ? 'live-event-card' : 'finished-event-card'} relative overflow-hidden rounded-lg p-5 sm:p-7`} style={{ transitionDelay: `${index * .1}s` }} onPointerDown={startRipple}>{ripple && <span key={ripple.key} className="click-ripple" style={{ left: ripple.x, top: ripple.y }} aria-hidden="true" />}{event.is_live ? <span className="live-badge"><span className="live-dot" aria-hidden="true" />En vivo</span> : <span className="inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-wider text-slate-600">✓ Finalizado</span>}<h3 className="mt-4 text-xl font-extrabold sm:text-2xl">{event.name}</h3><div className="mt-4 space-y-2 text-sm text-slate-600"><p className="flex items-start gap-2"><CalendarDays className="mt-0.5 size-4 shrink-0 text-brand-600" />{formatPublicEventDate(event.date_start, event.date_end)}</p><p className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-600" />{event.venue || 'Sede por confirmar'}</p></div><a className={`btn-results ${event.is_live ? 'live-results-button' : 'finished-results-button'} mt-6 inline-flex w-full items-center justify-center gap-2 text-center`} href={event.drive_url} target="_blank" rel="noopener noreferrer">{event.is_live ? 'Ver resultados oficiales' : 'Ver resultados'}<ExternalLink className="arrow size-4" /></a></article>
+  const isLive = event.is_live === 'live'
+  const isUpcoming = event.is_live === 'upcoming'
+  const startRipple = pointer => { if (!isLive) return; const rect = pointer.currentTarget.getBoundingClientRect(); setRipple({ key: Date.now(), x: pointer.clientX - rect.left, y: pointer.clientY - rect.top }) }
+  const buttonClass = isLive ? 'live-results-button' : isUpcoming ? 'upcoming-results-button' : 'finished-results-button'
+  const buttonText = isLive ? 'Ver resultados oficiales' : isUpcoming ? 'Resultados disponibles pronto' : 'Ver resultados'
+  const buttonContent = <>{buttonText}{event.drive_url && <ExternalLink className="arrow size-4" />}</>
+
+  return <article className={`fade-section event-card ${isLive ? 'live-event-card' : isUpcoming ? 'upcoming-event-card' : 'finished-event-card'} relative overflow-hidden rounded-lg p-5 sm:p-7`} style={{ transitionDelay: `${index * .1}s` }} onPointerDown={startRipple}>
+    {ripple && <span key={ripple.key} className="click-ripple" style={{ left: ripple.x, top: ripple.y }} aria-hidden="true" />}
+    {isLive ? <span className="live-badge"><span className="live-dot" aria-hidden="true" />En vivo</span> : isUpcoming ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1B3A5C] px-3 py-1 text-xs font-bold uppercase tracking-wider text-white"><CalendarDays className="size-3.5" />Próximamente</span> : <span className="inline-flex rounded-full bg-[#6B7280] px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">✓ Finalizado</span>}
+    <h3 className="mt-4 text-xl font-extrabold sm:text-2xl">{event.name}</h3>
+    <div className="mt-4 space-y-2 text-sm text-slate-600"><p className="flex items-start gap-2"><CalendarDays className="mt-0.5 size-4 shrink-0 text-brand-600" />{formatPublicEventDate(event.date_start, event.date_end)}</p><p className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-600" />{event.venue || 'Sede por confirmar'}</p></div>
+    {event.drive_url ? <a className={`btn-results ${buttonClass} mt-6 inline-flex w-full items-center justify-center gap-2 text-center`} href={event.drive_url} target="_blank" rel="noopener noreferrer">{buttonContent}</a> : <span className={`btn-results ${buttonClass} mt-6 inline-flex w-full cursor-not-allowed items-center justify-center gap-2 text-center opacity-75`} aria-disabled="true">{buttonContent}</span>}
+  </article>
 }
 
 function HowStep({ number, icon: Icon, title, children }) { return <article className="fade-section how-step relative rounded-xl border border-slate-200 bg-slate-50 p-6 pt-9 text-center" style={{ '--step-delay': `${(Number(number) - 1) * .15}s` }}><span className="absolute -top-3 left-1/2 flex size-7 -translate-x-1/2 items-center justify-center rounded-full bg-brand-600 text-xs font-extrabold text-white">{number}</span><span className="step-icon mx-auto flex size-20 items-center justify-center rounded-full bg-[#ECFDF5] text-brand-600"><Icon className="size-12" /></span><h3 className="mt-5 text-lg font-extrabold">{title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{children}</p></article> }
