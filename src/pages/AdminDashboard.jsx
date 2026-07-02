@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, Clipboard, ExternalLink, KeyRound, Mail, Pencil, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { Archive, Clipboard, ExternalLink, KeyRound, Mail, Pencil, QrCode, RefreshCw, Send, Trash2 } from 'lucide-react'
 import AdminHeader from '../components/AdminHeader'
 import CloseRegistrationModal from '../components/CloseRegistrationModal'
 import ExportMenu from '../components/ExportMenu'
@@ -8,6 +8,7 @@ import LinkDistributionModal from '../components/LinkDistributionModal'
 import DeleteEventModal from '../components/DeleteEventModal'
 import EmailInvitationsPanel from '../components/EmailInvitationsPanel'
 import { downloadJson } from '../utils/download'
+import { downloadEventQr } from '../utils/eventQr'
 import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getDashboard, getInscription, recordInvitationResults, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
 import { DEMO_MODE } from '../config'
 
@@ -364,6 +365,7 @@ function LiveResultsSettings({ event, onSaved }) {
   const initialState = ['upcoming', 'live', 'finished'].includes(event.is_live) ? event.is_live : event.is_live === true ? 'live' : event.is_live === false ? 'finished' : 'upcoming'
   const [isLive, setIsLive] = useState(initialState)
   const [saving, setSaving] = useState(false)
+  const [generatingQr, setGeneratingQr] = useState(false)
   const [message, setMessage] = useState('')
   const save = async () => {
     if (driveUrl && !/^https:\/\//i.test(driveUrl)) return setMessage('El enlace debe comenzar con https://')
@@ -373,7 +375,8 @@ function LiveResultsSettings({ event, onSaved }) {
     finally { setSaving(false) }
   }
   const stateLabel = { upcoming: 'Próximamente', live: 'En vivo', finished: 'Finalizado' }[isLive]
-  return <section className="card p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-extrabold uppercase tracking-[.18em] text-brand-600">Publicación</p><h2 className="mt-1 text-xl font-extrabold">Resultados en vivo</h2></div><span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider text-white ${isLive === 'live' ? 'live-badge' : isLive === 'upcoming' ? 'bg-[#1B3A5C]' : 'bg-slate-500'}`}>{isLive === 'live' && <span className="live-dot" />}{stateLabel}</span></div><div className="mt-5 grid gap-5 lg:grid-cols-[1fr_18rem]"><label><span className="label">Link de Google Drive *</span><input type="url" className="input" value={driveUrl} onChange={e => setDriveUrl(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." /><span className="field-help">La carpeta donde subes los HTML de resultados de Hy-Tek</span></label><label><span className="label">Estado público</span><select className="input" value={isLive} onChange={e => setIsLive(e.target.value)}><option value="upcoming">PRÓXIMAMENTE</option><option value="live">EN VIVO</option><option value="finished">FINALIZADO</option></select><span className="field-help">Controla el badge que se muestra en la landing pública</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center"><button className="btn-primary" disabled={saving} onClick={save}>{saving ? 'Guardando…' : 'Guardar cambios'}</button><a className="btn-secondary text-center" href="/" target="_blank" rel="noreferrer">Abrir landing pública</a><span className={`text-sm font-semibold ${message === 'Cambios guardados' ? 'text-success-800' : 'text-danger-700'}`}>{message}</span></div><p className="mt-3 text-xs text-slate-500">Vista previa: swimtimer-oficial.vercel.app</p></section>
+  const downloadQr = async () => { setGeneratingQr(true); setMessage(''); try { await downloadEventQr(event) } catch (error) { setMessage(error.message) } finally { setGeneratingQr(false) } }
+  return <section className="card p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-extrabold uppercase tracking-[.18em] text-brand-600">Publicación</p><h2 className="mt-1 text-xl font-extrabold">Resultados en vivo</h2></div><span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider text-white ${isLive === 'live' ? 'live-badge' : isLive === 'upcoming' ? 'bg-[#1B3A5C]' : 'bg-slate-500'}`}>{isLive === 'live' && <span className="live-dot" />}{stateLabel}</span></div><div className="mt-5 grid gap-5 lg:grid-cols-[1fr_18rem]"><label><span className="label">Link de Google Drive *</span><input type="url" className="input" value={driveUrl} onChange={e => setDriveUrl(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." /><span className="field-help">La carpeta donde subes los HTML de resultados de Hy-Tek</span></label><label><span className="label">Estado público</span><select className="input" value={isLive} onChange={e => setIsLive(e.target.value)}><option value="upcoming">PRÓXIMAMENTE</option><option value="live">EN VIVO</option><option value="finished">FINALIZADO</option></select><span className="field-help">Controla el badge que se muestra en la landing pública</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center"><button className="btn-primary" disabled={saving} onClick={save}>{saving ? 'Guardando…' : 'Guardar cambios'}</button><a className="btn-secondary text-center" href="/" target="_blank" rel="noreferrer">Abrir landing pública</a><button className="btn-secondary inline-flex items-center justify-center gap-2" disabled={generatingQr} onClick={downloadQr}><QrCode className="size-4" />{generatingQr ? 'Generando QR…' : 'Descargar QR'}</button><span className={`text-sm font-semibold ${message === 'Cambios guardados' ? 'text-success-800' : 'text-danger-700'}`}>{message}</span></div><p className="mt-3 text-xs text-slate-500">Vista previa: swimtimer-oficial.vercel.app</p></section>
 }
 
 function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEmail, onRevoke, onToggle, onRegeneratePin }) {
