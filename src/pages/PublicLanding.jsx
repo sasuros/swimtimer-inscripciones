@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, CalendarDays, ExternalLink, MapPin, ScanLine, Waves } from 'lucide-react'
 import Logo from '../components/Logo'
 import { getPublicEvents } from '../services/publicEvents'
+import { calculateCountdown } from '../utils/countdown'
 import { formatPublicEventDate } from '../utils/publicEventDate'
 
 export default function PublicLanding() {
@@ -19,6 +20,17 @@ export default function PublicLanding() {
     elements.forEach(element => observer.observe(element))
     return () => observer.disconnect()
   }, [loading, events])
+  const activeEvent = useMemo(() => events.find(event => event.is_live === 'live'), [events])
+  useEffect(() => {
+    if (!activeEvent) return
+    const title = document.querySelector('meta[property="og:title"]')
+    const description = document.querySelector('meta[property="og:description"]')
+    const image = document.querySelector('meta[property="og:image"]')
+    title?.setAttribute('content', activeEvent.name)
+    description?.setAttribute('content', `Series, carriles y resultados - ${activeEvent.venue || 'Sede por confirmar'}`)
+    const params = new URLSearchParams({ title: activeEvent.name, date: activeEvent.date_start || '', venue: activeEvent.venue || '', status: activeEvent.is_live })
+    image?.setAttribute('content', `https://swimtimer-oficial.vercel.app/api/og-image?${params}`)
+  }, [activeEvent])
   const totals = useMemo(() => events.filter(event => event.is_live === 'live').reduce((sum, event) => ({ athletes: sum.athletes + Number(event.athletes || 0), events: sum.events + Number(event.events || 0), teams: sum.teams + Number(event.teams || 0) }), { athletes: 0, events: 0, teams: 0 }), [events])
   const hasTotals = totals.athletes > 0 || totals.events > 0 || totals.teams > 0
 
@@ -37,19 +49,46 @@ function EventCard({ event, index }) {
   const [ripple, setRipple] = useState(null)
   const isLive = event.is_live === 'live'
   const isUpcoming = event.is_live === 'upcoming'
-  const startRipple = pointer => { if (!isLive) return; const rect = pointer.currentTarget.getBoundingClientRect(); setRipple({ key: Date.now(), x: pointer.clientX - rect.left, y: pointer.clientY - rect.top }) }
-  const buttonClass = isLive ? 'live-results-button' : isUpcoming ? 'upcoming-results-button' : 'finished-results-button'
-  const buttonText = isLive ? 'Ver resultados oficiales' : isUpcoming ? 'Resultados disponibles pronto' : 'Ver resultados'
+  const countdown = useCountdown(event.date_start, isUpcoming)
+  const hasStarted = isUpcoming && countdown.started
+  const displayedLive = isLive || hasStarted
+  const startRipple = pointer => { if (!displayedLive) return; const rect = pointer.currentTarget.getBoundingClientRect(); setRipple({ key: Date.now(), x: pointer.clientX - rect.left, y: pointer.clientY - rect.top }) }
+  const buttonClass = displayedLive ? 'live-results-button' : isUpcoming ? 'upcoming-results-button' : 'finished-results-button'
+  const buttonText = displayedLive ? 'Ver resultados oficiales' : isUpcoming ? 'Resultados disponibles pronto' : 'Ver resultados'
   const buttonContent = <>{buttonText}{event.drive_url && <ExternalLink className="arrow size-4" />}</>
 
-  return <article className={`fade-section event-card ${isLive ? 'live-event-card' : isUpcoming ? 'upcoming-event-card' : 'finished-event-card'} relative overflow-hidden rounded-lg p-5 sm:p-7`} style={{ transitionDelay: `${index * .1}s` }} onPointerDown={startRipple}>
+  return <article className={`fade-section event-card ${displayedLive ? 'live-event-card' : isUpcoming ? 'upcoming-event-card' : 'finished-event-card'} relative overflow-hidden rounded-lg p-5 sm:p-7`} style={{ transitionDelay: `${index * .1}s` }} onPointerDown={startRipple}>
     {ripple && <span key={ripple.key} className="click-ripple" style={{ left: ripple.x, top: ripple.y }} aria-hidden="true" />}
-    {isLive ? <span className="live-badge"><span className="live-dot" aria-hidden="true" />En vivo</span> : isUpcoming ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1B3A5C] px-3 py-1 text-xs font-bold uppercase tracking-wider text-white"><CalendarDays className="size-3.5" />Próximamente</span> : <span className="inline-flex rounded-full bg-[#6B7280] px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">✓ Finalizado</span>}
+    {displayedLive ? <span className="live-badge"><span className="live-dot" aria-hidden="true" />En vivo</span> : isUpcoming ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1B3A5C] px-3 py-1 text-xs font-bold uppercase tracking-wider text-white"><CalendarDays className="size-3.5" />Próximamente</span> : <span className="inline-flex rounded-full bg-[#6B7280] px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">✓ Finalizado</span>}
     <h3 className="mt-4 text-xl font-extrabold sm:text-2xl">{event.name}</h3>
+    {isUpcoming && !hasStarted && <Countdown values={countdown} />}
+    {hasStarted && <EventStarted />}
     <div className="mt-4 space-y-2 text-sm text-slate-600"><p className="flex items-start gap-2"><CalendarDays className="mt-0.5 size-4 shrink-0 text-brand-600" />{formatPublicEventDate(event.date_start, event.date_end)}</p><p className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-600" />{event.venue || 'Sede por confirmar'}</p></div>
     {event.drive_url ? <a className={`btn-results ${buttonClass} mt-6 inline-flex w-full items-center justify-center gap-2 text-center`} href={event.drive_url} target="_blank" rel="noopener noreferrer">{buttonContent}</a> : <span className={`btn-results ${buttonClass} mt-6 inline-flex w-full cursor-not-allowed items-center justify-center gap-2 text-center opacity-75`} aria-disabled="true">{buttonContent}</span>}
   </article>
 }
+
+function useCountdown(dateStart, enabled) {
+  const [values, setValues] = useState(() => calculateCountdown(dateStart))
+  useEffect(() => {
+    if (!enabled) return undefined
+    const update = () => setValues(calculateCountdown(dateStart))
+    update()
+    const timer = window.setInterval(update, 1000)
+    return () => window.clearInterval(timer)
+  }, [dateStart, enabled])
+  return values
+}
+
+function Countdown({ values }) {
+  const units = [['días', values.days], ['hrs', values.hours], ['min', values.minutes], ['seg', values.seconds]]
+  return <div className="countdown mt-5 flex justify-center gap-2" aria-label={`${values.days} días, ${values.hours} horas, ${values.minutes} minutos y ${values.seconds} segundos`}>
+    {units.map(([label, value]) => <span className="countdown-unit" key={label}><strong className="countdown-value" key={`${label}-${value}`}>{String(value).padStart(2, '0')}</strong><small>{label}</small></span>)}
+  </div>
+}
+
+const CONFETTI = [[8,'#22c55e',0],[24,'#1B3A5C',.2],[40,'#C9A84C',.45],[58,'#22c55e',.1],[74,'#1B3A5C',.35],[90,'#C9A84C',.55]]
+function EventStarted() { return <div className="event-started relative mt-5 overflow-hidden rounded-lg bg-[#ECFDF5] px-4 py-3 text-center font-bold text-brand-700"><span className="relative z-10">El evento ha comenzado</span>{CONFETTI.map(([left, color, delay], index) => <i key={index} className="confetti-particle" style={{ left: `${left}%`, backgroundColor: color, animationDelay: `${delay}s` }} />)}</div> }
 
 function HowStep({ number, icon: Icon, title, children }) { return <article className="fade-section how-step relative rounded-xl border border-slate-200 bg-slate-50 p-6 pt-9 text-center" style={{ '--step-delay': `${(Number(number) - 1) * .15}s` }}><span className="absolute -top-3 left-1/2 flex size-7 -translate-x-1/2 items-center justify-center rounded-full bg-brand-600 text-xs font-extrabold text-white">{number}</span><span className="step-icon mx-auto flex size-20 items-center justify-center rounded-full bg-[#ECFDF5] text-brand-600"><Icon className="size-12" /></span><h3 className="mt-5 text-lg font-extrabold">{title}</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{children}</p></article> }
 function Counter({ value, label }) { const current = useCountUp(value); return <span className="counter-group"><strong>{current}</strong><small>{label}</small></span> }

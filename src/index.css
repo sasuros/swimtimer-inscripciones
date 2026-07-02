@@ -61,6 +61,11 @@
   .live-results-button:hover { background: #065f46; box-shadow: 0 8px 20px rgba(4,120,87,.2); }
   .upcoming-results-button { @apply rounded-lg px-8 py-4 text-base font-bold uppercase text-white transition; background: #1b3a5c; letter-spacing: .5px; }
   a.upcoming-results-button:hover { background: #0f2a47; }
+  .countdown-unit { display: flex; width: 60px; flex-direction: column; align-items: center; border: 1px solid #e5e7eb; border-radius: 8px; background: #f8f9fa; padding: 8px 4px; }
+  .countdown-unit strong { color: #2c3e50; font-size: 2rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .countdown-unit small { margin-top: 6px; color: #6b7280; font-size: .7rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .countdown-value { animation: countdown-flip .3s ease; }
+  .confetti-particle { position: absolute; top: -8px; width: 6px; height: 10px; border-radius: 2px; opacity: 0; animation: confetti-fall 1.8s ease-out infinite; }
   .finished-results-button { @apply rounded-lg border border-slate-300 bg-slate-100 px-8 py-3.5 font-semibold text-slate-500 transition hover:bg-slate-200; }
   .btn-results .arrow { transition: transform .2s ease; }
   .btn-results:hover .arrow { transform: translateX(4px); }
@@ -83,6 +88,7 @@
   .hero-title > span:last-child::after { content: 'en tiempo real'; }
 }
 @media (min-width: 640px) { .counter-group strong { font-size: 3.5rem; } .counter-group { min-width: 120px; } }
+@media (min-width: 640px) { .countdown-unit { width: 70px; } }
 @keyframes hero-shimmer { 0%, 100% { background-position: 200% 0; } 50% { background-position: -200% 0; } }
 @keyframes hero-gradient-move { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 @keyframes hero-stagger-in { to { opacity: 1; transform: translateY(0); } }
@@ -95,6 +101,8 @@
 @keyframes click-ripple { to { opacity: 0; transform: translate(-50%,-50%) scale(6); } }
 @keyframes particle-twinkle { 0%, 100% { opacity: .08; } 50% { opacity: .22; } }
 @keyframes step-bounce-in { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes countdown-flip { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0); } }
+@keyframes confetti-fall { 0% { opacity: 0; transform: translateY(0) rotate(0); } 20% { opacity: .8; } 100% { opacity: 0; transform: translateY(52px) rotate(180deg); } }
 @media (prefers-reduced-motion: reduce) {
   .public-hero, .live-dot, .hero-wave, .live-event-card, .hero-stagger, .bubble, .footer-particle, .how-step.visible .step-icon, .live-event-card:hover::after, .click-ripple, .hero-title > span::after { animation: none; }
   .hero-title > span::after { display: none; }
@@ -107,6 +115,8 @@
   .event-card, .how-step, .btn-results .arrow { transition: none; }
   .event-card:hover, .how-step:hover { transform: none; }
   .btn-results:hover .arrow { transform: none; }
+  .countdown-value, .confetti-particle { animation: none; }
+  .confetti-particle { display: none; }
 }
 @media print {
   body { background: white !important; color: black !important; }
