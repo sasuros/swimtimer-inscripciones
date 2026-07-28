@@ -1,11 +1,12 @@
 import { DEMO_ADMIN_PASSWORD, DEMO_WHATSAPP } from '../config'
-import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/demoToken'
+import { encodeDemoToken } from '../utils/demoToken'
 import { buildConsolidatedExport } from '../utils/mmSchema'
 import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
-import { createMagicToken, decodeMagicToken, verifyMagicToken } from '../utils/magicToken'
+import { createMagicToken } from '../utils/magicToken'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
 import { supabase as configuredClient } from './supabase'
+import { createSupabaseWizardStorage } from './wizardSupabase.js'
 
 let client = configuredClient
 
@@ -320,19 +321,7 @@ export async function updateClubPin(eventId, clubCode) {
 }
 
 export async function verifyAccessPin(tokenId, pin) {
-  const magic = await verifyMagicToken(tokenId, DEMO_ADMIN_PASSWORD)
-  if (!magic) return { valid: false }
-  const stored = unwrap(
-    await db()
-      .from('tokens')
-      .select('id')
-      .eq('id', await tokenKey(tokenId))
-      .eq('token_type', 'v3')
-      .maybeSingle()
-  )
-  if (!stored) return { valid: false }
-  const relation = unwrap(await db().from('event_clubs').select('pin').eq('event_id', magic.e).eq('club_code', magic.c).maybeSingle())
-  return { valid: Boolean(relation?.pin && relation.pin === String(pin)) }
+  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).verifyAccessPin(tokenId, pin)
 }
 
 export async function recordInvitationResults(eventId, results) {
@@ -364,72 +353,7 @@ async function latestInscription(eventId, clubCode, isLate) {
 }
 
 export async function validateToken(tokenId) {
-  const magic = decodeMagicToken(tokenId)
-  if (magic) {
-    const verified = await verifyMagicToken(tokenId, DEMO_ADMIN_PASSWORD)
-    if (!verified || !client) return { valid: false }
-    const stored = unwrap(
-      await db()
-        .from('tokens')
-        .select('*')
-        .eq('id', await tokenKey(tokenId))
-        .eq('token_type', 'v3')
-        .maybeSingle()
-    )
-    if (!stored) return { valid: false }
-    const event = await getEvent(verified.e)
-    if (!['active', 'accepting_late'].includes(event.status)) return { valid: false }
-    const club = event.clubs.find((item) => Number(item.code) === Number(verified.c))
-    if (!club || club.participation_status === 'not_participating' || club.email.toLowerCase() !== verified.em) return { valid: false }
-    const [normal, late] = await Promise.all([latestInscription(event.id, club.code, false), latestInscription(event.id, club.code, true)])
-    const current = event.status === 'accepting_late' ? late : normal
-    return {
-      valid: true,
-      requiresPin: true,
-      backendAvailable: true,
-      eventId: event.id,
-      event: { ...withoutPins(event), date: event.date_start },
-      club: withoutPin(club),
-      authorizedEmail: verified.em,
-      whatsapp: event.organizer_whatsapp || DEMO_WHATSAPP,
-      already_submitted: Boolean(current),
-      inscription: current ? inscriptionFromRow(current, withoutPin(club)) : null,
-      normal_inscription: normal ? inscriptionFromRow(normal, withoutPin(club)) : null
-    }
-  }
-  const embedded = decodeDemoToken(tokenId)
-  if (!embedded) return { valid: false }
-  const fallback = {
-    ...accessFromDemoToken(embedded),
-    backendAvailable: false,
-    already_submitted: false,
-    inscription: null,
-    normal_inscription: null
-  }
-  if (!client) return fallback
-  const token = unwrap(
-    await db()
-      .from('tokens')
-      .select('*')
-      .eq('id', await tokenKey(tokenId))
-      .maybeSingle()
-  )
-  if (!token) return fallback
-  const event = await getEvent(token.event_id)
-  const club = event.clubs.find((item) => Number(item.code) === Number(token.club_code)) || fallback.club
-  const [normal, late] = await Promise.all([latestInscription(event.id, club.code, false), latestInscription(event.id, club.code, true)])
-  const current = event.status === 'accepting_late' ? late : normal
-  return {
-    valid: true,
-    backendAvailable: true,
-    eventId: event.id,
-    event: { ...withoutPins(event), date: event.date_start },
-    club: withoutPin(club),
-    whatsapp: event.organizer_whatsapp || DEMO_WHATSAPP,
-    already_submitted: Boolean(current),
-    inscription: current ? inscriptionFromRow(current, club) : null,
-    normal_inscription: normal ? inscriptionFromRow(normal, club) : null
-  }
+  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).validateToken(tokenId)
 }
 
 function withoutPin(club) {
@@ -441,51 +365,7 @@ function withoutPins(event) {
 }
 
 export async function submitInscription(payload) {
-  const access = await validateToken(payload.token)
-  if (!access.valid) throw new Error('El enlace no es válido')
-  if (!access.backendAvailable) throw new Error('No se pudo conectar con Supabase')
-  if (['draft', 'closed', 'archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
-  const isLate = access.event.status === 'accepting_late'
-  unwrap(await db().from('inscriptions').delete().eq('event_id', access.eventId).eq('club_code', access.club.code).eq('is_late', isLate))
-  const row = unwrap(
-    await db()
-      .from('inscriptions')
-      .insert({
-        event_id: access.eventId,
-        club_code: access.club.code,
-        token_id: payload.token,
-        is_late: isLate,
-        late_status: isLate ? 'pending' : null,
-        athletes: payload.athletes,
-        results: payload.results,
-        roster: payload.roster || [],
-        meta: payload.meta || {},
-        approved_athletes: [],
-        rejected_athletes: []
-      })
-      .select()
-      .single()
-  )
-  const updates = await Promise.all([
-    db()
-      .from('tokens')
-      .update({ used_at: row.submitted_at })
-      .eq('id', await tokenKey(payload.token)),
-    db()
-      .from('event_clubs')
-      .update({ status: isLate ? 'late_pending' : 'submitted' })
-      .eq('event_id', access.eventId)
-      .eq('club_code', access.club.code)
-  ])
-  updates.forEach((result) => unwrap(result))
-  return {
-    success: true,
-    late: isLate,
-    summary: {
-      athletes: payload.athletes.length,
-      inscriptions: payload.results.length
-    }
-  }
+  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).submitInscription(payload)
 }
 
 export const submitLateInscription = (tokenId, data) => submitInscription({ ...data, token: tokenId })

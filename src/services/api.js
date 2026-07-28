@@ -27,8 +27,26 @@ const storage = DEMO_MODE
     }
   : production
 
-export const validateToken = (...args) => Promise.resolve(storage.validateToken(...args))
-export const submitInscription = (...args) => Promise.resolve(storage.submitInscription(...args))
+async function postPublicWizard(path, body, fallbackMessage) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || fallbackMessage)
+  return data
+}
+
+export const validateToken = (token) =>
+  DEMO_MODE
+    ? Promise.resolve(storage.validateToken(token))
+    : postPublicWizard('/api/validate-token', { token }, 'No se pudo validar el enlace')
+
+export const submitInscription = (payload) =>
+  DEMO_MODE
+    ? Promise.resolve(storage.submitInscription(payload))
+    : postPublicWizard('/api/submit-inscription', payload, 'No se pudo enviar la inscripcion')
 export const adminLogin = (...args) => Promise.resolve(storage.adminLogin(...args))
 export const getDashboard = (...args) => Promise.resolve(storage.getDashboard(...args))
 export const generateTokens = (...args) => Promise.resolve(storage.generateTokens(...args))
@@ -46,7 +64,10 @@ export const cloneEvent = (...args) => Promise.resolve(storage.cloneEvent(...arg
 export const deleteEvent = (...args) => Promise.resolve(storage.deleteEvent(...args))
 export const setClubParticipation = (...args) => Promise.resolve(storage.setClubParticipation(...args))
 export const updateClubPin = (...args) => Promise.resolve(storage.updateClubPin(...args))
-export const verifyAccessPin = (...args) => Promise.resolve(storage.verifyAccessPin(...args))
+export const verifyAccessPin = (token, pin) =>
+  DEMO_MODE
+    ? Promise.resolve(storage.verifyAccessPin(token, pin))
+    : postPublicWizard('/api/verify-pin', { token, pin }, 'No se pudo verificar el PIN')
 export const generateEmailInvitations = (...args) => (DEMO_MODE ? Promise.reject(new Error("El envío de correos requiere el modo producción con Supabase y Resend configurados. Usa 'Copiar enlace' o 'WhatsApp' en modo demo.")) : production.generateEmailInvitations(...args))
 export const recordInvitationResults = (...args) => (DEMO_MODE ? Promise.resolve({ success: true }) : production.recordInvitationResults(...args))
 export const revokeMagicInvitation = (...args) => (DEMO_MODE ? Promise.resolve({ success: true }) : production.revokeMagicInvitation(...args))

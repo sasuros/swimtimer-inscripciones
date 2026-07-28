@@ -20,6 +20,7 @@ La app queda disponible normalmente en `http://localhost:5173`. Sin `VITE_SUPABA
 5. Agregar en **Vercel → Project → Settings → Environment Variables**:
    - `VITE_SUPABASE_URL`: URL del proyecto.
    - `VITE_SUPABASE_ANON_KEY`: clave pública anon.
+   - `SUPABASE_SERVICE_ROLE_KEY`: service role key privada, sin prefijo `VITE_`. Cargarla en **Production** y **Preview**; la usan solo las funciones serverless del wizard público.
    - `VITE_ADMIN_PASSWORD`: contraseña del panel.
    - `VITE_ALBERTO_WHATSAPP`: número con código de país, sin `+`.
    - `RESEND_API_KEY`: clave privada de Resend, sin prefijo `VITE_`.
@@ -29,7 +30,7 @@ Sin las variables de Supabase, la app funciona en modo demo con `localStorage`. 
 
 ### Seguridad de esta fase
 
-El schema deshabilita RLS y usa la anon key para persistencia, tal como requiere la Fase 5. La contraseña del administrador es una barrera de interfaz, no autenticación de base de datos. No usar esta configuración para información sensible; una fase posterior debe incorporar Supabase Auth y políticas RLS.
+El schema mantiene RLS deshabilitado en este sprint. El wizard público valida tokens, verifica PIN y envía inscripciones mediante funciones serverless de Vercel con `SUPABASE_SERVICE_ROLE_KEY`; el flujo del administrador sigue usando el adaptador Supabase existente. La contraseña del administrador es una barrera de interfaz, no autenticación de base de datos. No usar esta configuración para información sensible; una fase posterior debe incorporar Supabase Auth y políticas RLS.
 
 ## Tokens y contingencia
 
