@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Plus, Save, Users, Waves } from 'lucide-react'
+import { Check, ChevronDown, Plus, Save, Users, Waves } from 'lucide-react'
 import AdminHeader from '../components/AdminHeader'
 import { addMasterClub, cloneEvent, getEvent, getMasterClubs, saveEvent } from '../services/api'
 import { standardEventTemplate } from '../utils/eventTemplate'
@@ -23,21 +23,23 @@ const blank = {
   clubs: [],
   events: []
 }
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function EventEditor({ eventId, cloneId }) {
   const imported = new URLSearchParams(window.location.search).get('imported') === '1'
   const [form, setForm] = useState(null)
+  const [eventMode, setEventMode] = useState('inscriptions')
   const [masterClubs, setMasterClubs] = useState([])
-  const [filters, setFilters] = useState({
-    distance: '',
-    style: '',
-    category: ''
-  })
+  const [filters, setFilters] = useState({ distance: '', style: '', category: '' })
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
+  const [showClubsSection, setShowClubsSection] = useState(false)
+  const [showEventsSection, setShowEventsSection] = useState(false)
   const [showClubModal, setShowClubModal] = useState(false)
   const [newClub, setNewClub] = useState({ name: '', code: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
   useEffect(() => {
     Promise.all([getMasterClubs(), eventId ? getEvent(eventId) : cloneId ? cloneEvent(cloneId) : Promise.resolve(null)])
       .then(([clubs, source]) => {
@@ -47,6 +49,7 @@ export default function EventEditor({ eventId, cloneId }) {
           clubs: clubs.map((club) => ({ ...club })),
           events: standardEventTemplate()
         }
+        setEventMode(source && !(source.clubs?.length || source.events?.length) ? 'results' : 'inscriptions')
         setForm({ ...initial, clubs: initial.clubs.map(ensureClubPin) })
         setNewClub((current) => ({
           ...current,
@@ -55,8 +58,21 @@ export default function EventEditor({ eventId, cloneId }) {
       })
       .catch((error) => setError(error.message))
   }, [eventId, cloneId])
-  const visibleEvents = useMemo(() => (form?.events || []).filter((event) => (!filters.distance || String(event.distance) === filters.distance) && (!filters.style || event.style === filters.style) && (!filters.category || `${event.age_lo}-${event.age_hi}` === filters.category)), [form, filters])
-  if (!form) return <div className="flex min-h-screen items-center justify-center">{error || 'Cargando evento…'}</div>
+
+  const visibleEvents = useMemo(
+    () =>
+      (form?.events || []).filter(
+        (event) =>
+          (!filters.distance || String(event.distance) === filters.distance) &&
+          (!filters.style || event.style === filters.style) &&
+          (!filters.category || `${event.age_lo}-${event.age_hi}` === filters.category)
+      ),
+    [form, filters]
+  )
+
+  if (!form) return <div className="flex min-h-screen items-center justify-center">{error || 'Cargando evento...'}</div>
+
+  const resultsOnly = eventMode === 'results'
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const selected = (code) => form.clubs.some((club) => Number(club.code) === Number(code))
   const toggleClub = (club) => set('clubs', selected(club.code) ? form.clubs.filter((item) => Number(item.code) !== Number(club.code)) : [...form.clubs, ensureClubPin(club)])
@@ -65,18 +81,11 @@ export default function EventEditor({ eventId, cloneId }) {
       'clubs',
       form.clubs.map((club) => (Number(club.code) === Number(code) ? { ...club, [key]: value } : club))
     )
-  const toggleEvents = (predicate) =>
-    set(
-      'events',
-      form.events.map((event) => ({ ...event, active: predicate(event) }))
-    )
-  const updateEvent = (eventPtr, patch) =>
-    set(
-      'events',
-      form.events.map((event) => (event.event_ptr === eventPtr ? { ...event, ...patch } : event))
-    )
+  const toggleEvents = (predicate) => set('events', form.events.map((event) => ({ ...event, active: predicate(event) })))
+  const updateEvent = (eventPtr, patch) => set('events', form.events.map((event) => (event.event_ptr === eventPtr ? { ...event, ...patch } : event)))
+
   const addClub = async () => {
-    if (!newClub.name.trim() || !newClub.code || masterClubs.some((item) => Number(item.code) === Number(newClub.code))) return setError('Escribe un nombre y un código numérico único')
+    if (!newClub.name.trim() || !newClub.code || masterClubs.some((item) => Number(item.code) === Number(newClub.code))) return setError('Escribe un nombre y un codigo numerico unico')
     const club = ensureClubPin({
       name: newClub.name.trim(),
       code: Number(newClub.code),
@@ -95,14 +104,31 @@ export default function EventEditor({ eventId, cloneId }) {
       setError(error.message)
     }
   }
+
   const invalidEmails = form.clubs.filter((club) => club.email && !EMAIL_RE.test(club.email))
-  const valid = form.name.trim() && form.date_start && form.venue.trim() && form.reference_date && form.clubs.length && form.events.some((event) => event.active) && !invalidEmails.length
+  const baseValid = form.name.trim() && form.date_start && form.venue.trim()
+  const valid = resultsOnly ? baseValid : baseValid && form.reference_date && form.clubs.length && form.events.some((event) => event.active) && !invalidEmails.length
+  const activeCount = form.events.filter((event) => event.active).length
+
+  const validationMessage = () => {
+    const missing = []
+    if (!form.name.trim()) missing.push('nombre')
+    if (!form.date_start) missing.push('fecha de inicio')
+    if (!form.venue.trim()) missing.push('sede')
+    if (!resultsOnly) {
+      if (!form.reference_date) missing.push('fecha de referencia')
+      if (!form.clubs.length) missing.push('al menos un club')
+      if (!form.events.some((event) => event.active)) missing.push('al menos una prueba activa')
+      if (invalidEmails.length) return 'Corrige los correos invalidos antes de guardar'
+    }
+    return missing.length ? `Completa: ${missing.join(', ')}` : 'Revisa los datos antes de guardar'
+  }
+
   const save = async (activate) => {
-    if (invalidEmails.length) return setError('Corrige los correos inválidos antes de guardar')
-    if (!valid) return setError('Completa nombre, fecha, sede y referencia; selecciona al menos un club y una prueba')
+    if (!valid) return setError(validationMessage())
     setSaving(true)
     try {
-      const saved = await saveEvent(form, activate)
+      const saved = await saveEvent(resultsOnly ? { ...form, clubs: [], events: [] } : form, activate)
       window.location.href = `/admin/eventos/${saved.id}`
     } catch (error) {
       setError(error.message)
@@ -110,7 +136,7 @@ export default function EventEditor({ eventId, cloneId }) {
       setSaving(false)
     }
   }
-  const activeCount = form.events.filter((event) => event.active).length
+
   return (
     <>
       <AdminHeader>
@@ -120,17 +146,21 @@ export default function EventEditor({ eventId, cloneId }) {
       </AdminHeader>
       <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[.2em] text-brand-800">Configuración</p>
+          <p className="text-sm font-bold uppercase tracking-[.2em] text-brand-800">Configuracion</p>
           <h1 className="mt-1 text-3xl font-extrabold">{eventId ? 'Editar evento' : cloneId ? 'Clonar evento' : 'Crear evento nuevo'}</h1>
-          <p className="mt-1 text-slate-500">Completa las cuatro secciones y revisa el resumen antes de guardar.</p>
+          <p className="mt-1 text-slate-500">Elige si este evento recibira inscripciones o solo publicara resultados desde Drive.</p>
         </div>
+
+        <ModeSelector value={eventMode} onChange={setEventMode} />
+
         {imported && (
           <div className="rounded-lg border border-warning-800/30 bg-warning-50 p-4 text-warning-800">
-            <strong>Evento importado desde Meet Manager.</strong> Revisa los datos y actívalo cuando estés listo.
+            <strong>Evento importado desde Meet Manager.</strong> Revisa los datos y activalo cuando estes listo.
           </div>
         )}
         {error && <p className="rounded-lg bg-danger-50 p-3 text-danger-700">{error}</p>}
-        <Step number="1" title="Datos básicos">
+
+        <Step number="1" title="Datos basicos">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Nombre del evento *">
               <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="V Copa Navidad Mantarrayas 2026" />
@@ -156,229 +186,70 @@ export default function EventEditor({ eventId, cloneId }) {
             <Field label="Fecha de fin">
               <input type="date" className="input" value={form.date_end || ''} onChange={(e) => set('date_end', e.target.value)} />
             </Field>
-            <Field label="Fecha de referencia *">
-              <input type="date" className="input" value={form.reference_date} onChange={(e) => set('reference_date', e.target.value)} />
-            </Field>
-            <Field label="Límite de inscripción">
-              <input type="date" className="input" value={form.deadline || ''} onChange={(e) => set('deadline', e.target.value)} />
-            </Field>
-            <Field label="WhatsApp del organizador">
-              <input className="input" value={form.organizer_whatsapp || ''} onChange={(e) => set('organizer_whatsapp', e.target.value.replace(/\D/g, ''))} placeholder="584121234567" />
-            </Field>
-            <Field label="Notas internas">
-              <textarea className="input min-h-24" value={form.notes} onChange={(e) => set('notes', e.target.value)} />
-            </Field>
+            {!resultsOnly && (
+              <Field label="Fecha de referencia *">
+                <input type="date" className="input" value={form.reference_date} onChange={(e) => set('reference_date', e.target.value)} />
+              </Field>
+            )}
             <label>
               <span className="label">Link de Google Drive</span>
               <input type="url" className="input" value={form.drive_url || ''} onChange={(e) => set('drive_url', e.target.value)} placeholder="https://drive.google.com/drive/folders/..." />
-              <span className="field-help">La carpeta de Drive donde subirás los resultados de Hy-Tek durante el evento</span>
+              <span className="field-help">La carpeta de Drive donde subiras los resultados de Hy-Tek durante el evento</span>
             </label>
             <label className="flex items-start gap-3 rounded-lg border bg-slate-50 p-3">
               <input type="checkbox" className="mt-1" checked={form.show_on_landing !== false} onChange={(e) => set('show_on_landing', e.target.checked)} />
-              <span><strong className="text-sm text-brand-800">Mostrar en landing pública</strong><span className="field-help">Solo los eventos con link de Drive y este checkbox activado aparecen en la landing</span></span>
+              <span>
+                <strong className="text-sm text-brand-800">Mostrar en landing publica</strong>
+                <span className="field-help">Solo los eventos con link de Drive y este checkbox activado aparecen en la landing</span>
+              </span>
             </label>
           </div>
         </Step>
-        <Step number="2" title="Clubes participantes">
-          <div className="mb-4 flex flex-wrap gap-2">
-            <button className="btn-secondary text-sm" onClick={() => set('clubs', masterClubs.map(ensureClubPin))}>
-              Seleccionar todos
-            </button>
-            <button className="btn-secondary text-sm" onClick={() => set('clubs', [])}>
-              Deseleccionar todos
-            </button>
-            <button className="btn-primary ml-auto inline-flex items-center gap-2 text-sm" onClick={() => setShowClubModal(true)}>
-              <Plus className="size-4" />
-              Agregar club nuevo
-            </button>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {masterClubs.map((club) => {
-              const current = form.clubs.find((item) => Number(item.code) === Number(club.code))
-              const invalidEmail = current?.email && !EMAIL_RE.test(current.email)
-              return (
-                <div key={club.code} className={`rounded-xl border p-3 ${selected(club.code) ? 'bg-slate-100' : 'opacity-60'}`}>
-                  <label className="flex cursor-pointer items-center gap-3 font-bold">
-                    <input type="checkbox" checked={selected(club.code)} onChange={() => toggleClub(club)} />
-                    {club.name}
-                    {selected(club.code) && !current?.email && (
-                      <span title="Sin correo — no se podrá enviar invitación" className="text-warning-800">
-                        ⚠️
-                      </span>
-                    )}
-                    <span className="ml-auto font-mono text-xs text-slate-500">#{club.code}</span>
-                  </label>
-                  {selected(club.code) && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <input className="input text-sm" placeholder="Contacto" value={current?.contact_name || ''} onChange={(e) => updateClub(club.code, 'contact_name', e.target.value)} />
-                      <input className="input text-sm" placeholder="WhatsApp" value={current?.contact_whatsapp || ''} onChange={(e) => updateClub(club.code, 'contact_whatsapp', e.target.value.replace(/\D/g, ''))} />
-                      <label>
-                        <input type="email" className={`input text-sm ${invalidEmail ? 'input-error' : ''}`} placeholder="entrenador@ejemplo.com" value={current?.email || ''} onChange={(e) => updateClub(club.code, 'email', e.target.value.trim())} />
-                        <span className="field-help">Correo donde se enviará la invitación</span>
-                        {invalidEmail && <span className="block text-xs text-danger-700">Escribe un correo válido</span>}
-                      </label>
-                      <label>
-                        <span className="label">PIN de acceso</span>
-                        <input className="input font-mono text-lg tracking-[.35em]" inputMode="numeric" maxLength="4" value={current?.pin || ''} onChange={(e) => updateClub(club.code, 'pin', normalizeClubPin(e.target.value))} />
-                        <span className="field-help">4 dígitos para verificar al entrenador</span>
-                      </label>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </Step>
-        <Step number="3" title="Pruebas de natación">
-          <div className="mb-4 flex flex-wrap gap-2">
-            <button className="btn-secondary text-sm" onClick={() => toggleEvents(() => true)}>
-              Activar todas
-            </button>
-            <button className="btn-secondary text-sm" onClick={() => toggleEvents(() => false)}>
-              Desactivar todas
-            </button>
-            <button className="btn-secondary text-sm" onClick={() => toggleEvents((event) => event.distance === 25)}>
-              Solo 25m
-            </button>
-            <button className="btn-secondary text-sm" onClick={() => toggleEvents((event) => [50, 100].includes(Number(event.distance)))}>
-              Solo 50m y 100m
-            </button>
-            <button
-              className="btn-primary ml-auto text-sm"
-              onClick={() => {
-                const next = Math.max(...form.events.map((item) => item.event_ptr), 0) + 1
-                set('events', [
-                  ...form.events,
-                  {
-                    event_ptr: next,
-                    distance: 25,
-                    style: 'Crawl',
-                    age_lo: 19,
-                    age_hi: 99,
-                    sex: 'F',
-                    active: true
-                  }
-                ])
-              }}
-            >
-              Agregar prueba
-            </button>
-          </div>
-          <div className="mb-4 grid gap-2 md:grid-cols-3">
-            <select className="input" value={filters.distance} onChange={(e) => setFilters({ ...filters, distance: e.target.value })}>
-              <option value="">Todas las distancias</option>
-              {[25, 50, 100].map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-            <select className="input" value={filters.style} onChange={(e) => setFilters({ ...filters, style: e.target.value })}>
-              <option value="">Todos los estilos</option>
-              {[...new Set(form.events.map((item) => item.style))].map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-            <select className="input" value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
-              <option value="">Todas las categorías</option>
-              {[...new Set(form.events.map((item) => `${item.age_lo}-${item.age_hi}`))].map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </div>
-          <div className="max-h-[520px] overflow-auto rounded-xl border">
-            <table className="w-full min-w-[700px] text-left text-sm">
-              <thead className="sticky top-0 bg-slate-50">
-                <tr>
-                  <th className="p-3">Activa</th>
-                  <th className="p-3">Distancia</th>
-                  <th className="p-3">Estilo</th>
-                  <th className="p-3">Edad</th>
-                  <th className="p-3">Sexo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleEvents.map((event) => (
-                  <tr key={event.event_ptr} className="border-t hover:bg-slate-100">
-                    <td className="p-3">
-                      <input
-                        type="checkbox"
-                        checked={event.active}
-                        onChange={(e) =>
-                          updateEvent(event.event_ptr, {
-                            active: e.target.checked
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        type="number"
-                        className="input w-24"
-                        value={event.distance}
-                        onChange={(e) =>
-                          updateEvent(event.event_ptr, {
-                            distance: Number(e.target.value)
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="p-2">
-                      <input
-                        className="input"
-                        value={event.style}
-                        onChange={(e) =>
-                          updateEvent(event.event_ptr, {
-                            style: e.target.value
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="p-2">
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          className="input w-20"
-                          value={event.age_lo}
-                          onChange={(e) =>
-                            updateEvent(event.event_ptr, {
-                              age_lo: Number(e.target.value)
-                            })
-                          }
-                        />
-                        –
-                        <input
-                          type="number"
-                          className="input w-20"
-                          value={event.age_hi}
-                          onChange={(e) =>
-                            updateEvent(event.event_ptr, {
-                              age_hi: Number(e.target.value)
-                            })
-                          }
-                        />
-                      </div>
-                    </td>
-                    <td className="p-2">
-                      <select className="input w-20" value={event.sex} onChange={(e) => updateEvent(event.event_ptr, { sex: e.target.value })}>
-                        <option>F</option>
-                        <option>M</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Step>
-        <Step number="4" title="Resumen y confirmar">
+
+        {!resultsOnly && (
+          <CollapsibleStep number="2" title="Opciones adicionales" open={showAdvancedOptions} onToggle={() => setShowAdvancedOptions((value) => !value)}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Limite de inscripcion">
+                <input type="date" className="input" value={form.deadline || ''} onChange={(e) => set('deadline', e.target.value)} />
+              </Field>
+              <Field label="WhatsApp del organizador">
+                <input className="input" value={form.organizer_whatsapp || ''} onChange={(e) => set('organizer_whatsapp', e.target.value.replace(/\D/g, ''))} placeholder="584121234567" />
+              </Field>
+            </div>
+          </CollapsibleStep>
+        )}
+
+        {!resultsOnly && (
+          <CollapsibleStep number="3" title="Clubes participantes" open={showClubsSection} onToggle={() => setShowClubsSection((value) => !value)}>
+            <ClubSelector
+              masterClubs={masterClubs}
+              formClubs={form.clubs}
+              invalidEmails={invalidEmails}
+              selected={selected}
+              toggleClub={toggleClub}
+              updateClub={updateClub}
+              set={set}
+              onAddClub={() => setShowClubModal(true)}
+            />
+          </CollapsibleStep>
+        )}
+
+        {!resultsOnly && (
+          <CollapsibleStep number="4" title="Pruebas de natacion" open={showEventsSection} onToggle={() => setShowEventsSection((value) => !value)}>
+            <EventSelector form={form} filters={filters} setFilters={setFilters} visibleEvents={visibleEvents} set={set} toggleEvents={toggleEvents} updateEvent={updateEvent} />
+          </CollapsibleStep>
+        )}
+
+        <Step number={resultsOnly ? '2' : '5'} title="Resumen y confirmar">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Summary icon={<Users />} label="Clubes" value={form.clubs.length} />
-            <Summary icon={<Waves />} label="Pruebas activas" value={activeCount} />
+            <Summary icon={<Users />} label="Clubes" value={resultsOnly ? 0 : form.clubs.length} />
+            <Summary icon={<Waves />} label="Pruebas activas" value={resultsOnly ? 0 : activeCount} />
             <Summary icon={<Check />} label="Estado" value={form.status === 'active' ? 'Activo' : 'Borrador'} />
           </div>
           <div className="mt-5 rounded-xl border p-4">
             <h3 className="text-xl font-bold text-brand-800">{form.name || 'Evento sin nombre'}</h3>
             <p className="mt-1 text-slate-500">
-              {form.date_start || 'Sin fecha'} · {form.venue || 'Sin sede'}
+              {form.date_start || 'Sin fecha'} - {form.venue || 'Sin sede'}
             </p>
           </div>
           <div className="mt-5 flex flex-wrap justify-end gap-2">
@@ -393,45 +264,212 @@ export default function EventEditor({ eventId, cloneId }) {
           </div>
         </Step>
       </main>
-      {showClubModal && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="card w-full max-w-md p-5">
-            <h2 className="text-xl font-bold">Agregar club</h2>
-            <div className="mt-4 space-y-3">
-              <Field label="Nombre">
-                <input className="input" value={newClub.name} onChange={(e) => setNewClub({ ...newClub, name: e.target.value })} />
-              </Field>
-              <Field label="Código">
-                <input type="number" className="input" value={newClub.code} onChange={(e) => setNewClub({ ...newClub, code: e.target.value })} />
-              </Field>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button className="btn-secondary" onClick={() => setShowClubModal(false)}>
-                Cancelar
-              </button>
-              <button className="btn-primary" onClick={addClub}>
-                Agregar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
+      {showClubModal && <NewClubModal newClub={newClub} setNewClub={setNewClub} addClub={addClub} close={() => setShowClubModal(false)} />}
     </>
+  )
+}
+
+function ModeSelector({ value, onChange }) {
+  return (
+    <section className="card p-4 sm:p-5">
+      <p className="text-sm font-bold uppercase tracking-[.16em] text-brand-800">Modo del evento</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <ModeButton active={value === 'results'} title="Solo resultados (Drive)" onClick={() => onChange('results')}>
+          Crea una tarjeta publica para publicar series, carriles y resultados desde Google Drive.
+        </ModeButton>
+        <ModeButton active={value === 'inscriptions'} title="Con inscripciones" onClick={() => onChange('inscriptions')}>
+          Configura clubes, pruebas, tokens e inscripcion de nadadores.
+        </ModeButton>
+      </div>
+    </section>
+  )
+}
+
+function ModeButton({ active, title, children, onClick }) {
+  return (
+    <button type="button" className={`rounded-xl border p-4 text-left transition hover:border-brand-600 ${active ? 'border-brand-600 bg-success-50' : 'border-slate-200 bg-white'}`} onClick={onClick}>
+      <span className="block text-lg font-extrabold text-brand-800">{title}</span>
+      <span className="mt-1 block text-sm text-slate-600">{children}</span>
+    </button>
+  )
+}
+
+function ClubSelector({ masterClubs, formClubs, invalidEmails, selected, toggleClub, updateClub, set, onAddClub }) {
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button className="btn-secondary text-sm" onClick={() => set('clubs', masterClubs.map(ensureClubPin))}>
+          Seleccionar todos
+        </button>
+        <button className="btn-secondary text-sm" onClick={() => set('clubs', [])}>
+          Deseleccionar todos
+        </button>
+        <button className="btn-primary ml-auto inline-flex items-center gap-2 text-sm" onClick={onAddClub}>
+          <Plus className="size-4" />
+          Agregar club nuevo
+        </button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {masterClubs.map((club) => {
+          const current = formClubs.find((item) => Number(item.code) === Number(club.code))
+          const invalidEmail = invalidEmails.some((item) => Number(item.code) === Number(club.code))
+          return (
+            <div key={club.code} className={`rounded-xl border p-3 ${selected(club.code) ? 'bg-slate-100' : 'opacity-60'}`}>
+              <label className="flex cursor-pointer items-center gap-3 font-bold">
+                <input type="checkbox" checked={selected(club.code)} onChange={() => toggleClub(club)} />
+                {club.name}
+                {selected(club.code) && !current?.email && <span title="Sin correo - no se podra enviar invitacion" className="text-warning-800">!</span>}
+                <span className="ml-auto font-mono text-xs text-slate-500">#{club.code}</span>
+              </label>
+              {selected(club.code) && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <input className="input text-sm" placeholder="Contacto" value={current?.contact_name || ''} onChange={(e) => updateClub(club.code, 'contact_name', e.target.value)} />
+                  <input className="input text-sm" placeholder="WhatsApp" value={current?.contact_whatsapp || ''} onChange={(e) => updateClub(club.code, 'contact_whatsapp', e.target.value.replace(/\D/g, ''))} />
+                  <label>
+                    <input type="email" className={`input text-sm ${invalidEmail ? 'input-error' : ''}`} placeholder="entrenador@ejemplo.com" value={current?.email || ''} onChange={(e) => updateClub(club.code, 'email', e.target.value.trim())} />
+                    <span className="field-help">Correo donde se enviara la invitacion</span>
+                    {invalidEmail && <span className="block text-xs text-danger-700">Escribe un correo valido</span>}
+                  </label>
+                  <label>
+                    <span className="label">PIN de acceso</span>
+                    <input className="input font-mono text-lg tracking-[.35em]" inputMode="numeric" maxLength="4" value={current?.pin || ''} onChange={(e) => updateClub(club.code, 'pin', normalizeClubPin(e.target.value))} />
+                    <span className="field-help">4 digitos para verificar al entrenador</span>
+                  </label>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+function EventSelector({ form, filters, setFilters, visibleEvents, set, toggleEvents, updateEvent }) {
+  return (
+    <>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button className="btn-secondary text-sm" onClick={() => toggleEvents(() => true)}>Activar todas</button>
+        <button className="btn-secondary text-sm" onClick={() => toggleEvents(() => false)}>Desactivar todas</button>
+        <button className="btn-secondary text-sm" onClick={() => toggleEvents((event) => event.distance === 25)}>Solo 25m</button>
+        <button className="btn-secondary text-sm" onClick={() => toggleEvents((event) => [50, 100].includes(Number(event.distance)))}>Solo 50m y 100m</button>
+        <button
+          className="btn-primary ml-auto text-sm"
+          onClick={() => {
+            const next = Math.max(...form.events.map((item) => item.event_ptr), 0) + 1
+            set('events', [...form.events, { event_ptr: next, distance: 25, style: 'Crawl', age_lo: 19, age_hi: 99, sex: 'F', active: true }])
+          }}
+        >
+          Agregar prueba
+        </button>
+      </div>
+      <div className="mb-4 grid gap-2 md:grid-cols-3">
+        <select className="input" value={filters.distance} onChange={(e) => setFilters({ ...filters, distance: e.target.value })}>
+          <option value="">Todas las distancias</option>
+          {[25, 50, 100].map((value) => <option key={value}>{value}</option>)}
+        </select>
+        <select className="input" value={filters.style} onChange={(e) => setFilters({ ...filters, style: e.target.value })}>
+          <option value="">Todos los estilos</option>
+          {[...new Set(form.events.map((item) => item.style))].map((value) => <option key={value}>{value}</option>)}
+        </select>
+        <select className="input" value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
+          <option value="">Todas las categorias</option>
+          {[...new Set(form.events.map((item) => `${item.age_lo}-${item.age_hi}`))].map((value) => <option key={value}>{value}</option>)}
+        </select>
+      </div>
+      <div className="max-h-[520px] overflow-auto rounded-xl border">
+        <table className="w-full min-w-[700px] text-left text-sm">
+          <thead className="sticky top-0 bg-slate-50">
+            <tr>
+              <th className="p-3">Activa</th>
+              <th className="p-3">Distancia</th>
+              <th className="p-3">Estilo</th>
+              <th className="p-3">Edad</th>
+              <th className="p-3">Sexo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleEvents.map((event) => (
+              <tr key={event.event_ptr} className="border-t hover:bg-slate-100">
+                <td className="p-3"><input type="checkbox" checked={event.active} onChange={(e) => updateEvent(event.event_ptr, { active: e.target.checked })} /></td>
+                <td className="p-2"><input type="number" className="input w-24" value={event.distance} onChange={(e) => updateEvent(event.event_ptr, { distance: Number(e.target.value) })} /></td>
+                <td className="p-2"><input className="input" value={event.style} onChange={(e) => updateEvent(event.event_ptr, { style: e.target.value })} /></td>
+                <td className="p-2">
+                  <div className="flex items-center gap-1">
+                    <input type="number" className="input w-20" value={event.age_lo} onChange={(e) => updateEvent(event.event_ptr, { age_lo: Number(e.target.value) })} />
+                    -
+                    <input type="number" className="input w-20" value={event.age_hi} onChange={(e) => updateEvent(event.event_ptr, { age_hi: Number(e.target.value) })} />
+                  </div>
+                </td>
+                <td className="p-2">
+                  <select className="input w-20" value={event.sex} onChange={(e) => updateEvent(event.event_ptr, { sex: e.target.value })}>
+                    <option>F</option>
+                    <option>M</option>
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function NewClubModal({ newClub, setNewClub, addClub, close }) {
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/70 p-4">
+      <div className="card w-full max-w-md p-5">
+        <h2 className="text-xl font-bold">Agregar club</h2>
+        <div className="mt-4 space-y-3">
+          <Field label="Nombre">
+            <input className="input" value={newClub.name} onChange={(e) => setNewClub({ ...newClub, name: e.target.value })} />
+          </Field>
+          <Field label="Codigo">
+            <input type="number" className="input" value={newClub.code} onChange={(e) => setNewClub({ ...newClub, code: e.target.value })} />
+          </Field>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="btn-secondary" onClick={close}>Cancelar</button>
+          <button className="btn-primary" onClick={addClub}>Agregar</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
 function Step({ number, title, children }) {
   return (
     <section className="card p-4 sm:p-6">
-      <div className="mb-5 flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-full bg-brand-600 font-bold text-white">{number}</span>
-        <h2 className="text-xl font-bold">{title}</h2>
-        <div className="gold-divider ml-2 flex-1" />
-      </div>
+      <StepHeader number={number} title={title} className="mb-5" />
       {children}
     </section>
   )
 }
+
+function CollapsibleStep({ number, title, open, onToggle, children }) {
+  return (
+    <section className="card p-4 sm:p-6">
+      <button type="button" className="mb-0 flex w-full items-center gap-3 text-left" onClick={onToggle} aria-expanded={open}>
+        <StepHeader number={number} title={title} className="flex-1" />
+        <ChevronDown className={`size-5 text-brand-800 transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="mt-5">{children}</div>}
+    </section>
+  )
+}
+
+function StepHeader({ number, title, className = '' }) {
+  return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span className="flex size-9 items-center justify-center rounded-full bg-brand-600 font-bold text-white">{number}</span>
+      <h2 className="text-xl font-bold">{title}</h2>
+      <div className="gold-divider ml-2 flex-1" />
+    </div>
+  )
+}
+
 function Field({ label, children }) {
   return (
     <label>
@@ -441,6 +479,7 @@ function Field({ label, children }) {
     </label>
   )
 }
+
 function Summary({ icon, label, value }) {
   return (
     <div className="rounded-lg border bg-slate-50 p-4">
