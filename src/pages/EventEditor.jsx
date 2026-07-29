@@ -29,7 +29,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export default function EventEditor({ eventId, cloneId }) {
   const imported = new URLSearchParams(window.location.search).get('imported') === '1'
   const [form, setForm] = useState(null)
-  const [eventMode, setEventMode] = useState('inscriptions')
+  const [eventMode, setEventMode] = useState('results')
   const [masterClubs, setMasterClubs] = useState([])
   const [filters, setFilters] = useState({ distance: '', style: '', category: '' })
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
