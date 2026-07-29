@@ -1,9 +1,15 @@
 import { CalendarDays, LogOut, Wrench } from 'lucide-react'
 import { DEMO_MODE } from '../config'
+import { supabase } from '../services/supabase'
 import Logo from './Logo'
 
 export default function AdminHeader({ children }) {
-  const logout = () => { sessionStorage.removeItem('swimtimer-admin-token'); sessionStorage.removeItem('swimtimer-admin-password'); window.location.href = '/admin' }
+  const logout = async () => {
+    sessionStorage.removeItem('swimtimer-admin-token')
+    sessionStorage.removeItem('swimtimer-admin-password')
+    if (!DEMO_MODE && supabase) await supabase.auth.signOut()
+    window.location.href = '/admin'
+  }
   const path = window.location.pathname
   const navClass = active => `btn-secondary inline-flex items-center gap-2 text-sm ${active ? 'bg-white/15' : ''}`
   const eventsActive = path === '/admin' || path.startsWith('/admin/eventos')

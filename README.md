@@ -21,10 +21,11 @@ La app queda disponible normalmente en `http://localhost:5173`. Sin `VITE_SUPABA
    - `VITE_SUPABASE_URL`: URL del proyecto.
    - `VITE_SUPABASE_ANON_KEY`: clave pública anon.
    - `SUPABASE_SERVICE_ROLE_KEY`: service role key privada, sin prefijo `VITE_`. Cargarla en **Production** y **Preview**; la usan solo las funciones serverless del wizard público.
-   - `VITE_ADMIN_PASSWORD`: contraseña del panel.
+   - `VITE_ADMIN_PASSWORD`: secreto de firma para enlaces mágicos; no es el login del admin en producción.
    - `VITE_ALBERTO_WHATSAPP`: número con código de país, sin `+`.
    - `RESEND_API_KEY`: clave privada de Resend, sin prefijo `VITE_`.
-6. Hacer redeploy en Vercel para que Vite compile con esas variables.
+6. Crear o invitar el usuario administrador en **Supabase → Authentication → Users**. El panel usa Supabase Auth con correo y contraseña.
+7. Hacer redeploy en Vercel para que Vite compile con esas variables.
 
 Sin las variables de Supabase, la app funciona en modo demo con `localStorage`. Con ellas, eventos, clubes, tokens e inscripciones se guardan en Supabase y aparecen en el dashboard al pulsar **Actualizar** o recargar la página.
 

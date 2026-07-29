@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { encodeDemoToken } from '../utils/demoToken'
 import {
   __setSupabaseClient,
-  adminLogin,
   getMasterClubs,
   updateLandingSettings,
   upsertClub,
@@ -49,10 +48,5 @@ describe('adaptador Supabase', () => {
       status: 'active', events: [{ event_ptr: 1, distance: 50, style: 'Crawl', age_lo: 10, age_hi: 11, sex: 'F', active: true }]
     }, { code: 2, name: 'AKP' })
     await expect(validateToken(token)).resolves.toMatchObject({ valid: true, backendAvailable: false, eventId: 'evt-1' })
-  })
-
-  it('mantiene la contraseña simple del administrador', () => {
-    expect(() => adminLogin('incorrecta')).toThrow('Contraseña incorrecta')
-    expect(adminLogin('swimtimer2025').token).toMatch(/^supabase-admin-/)
   })
 })

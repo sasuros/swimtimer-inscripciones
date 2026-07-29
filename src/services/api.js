@@ -1,6 +1,7 @@
 import { DEMO_MODE } from '../config'
 import * as demo from './demoStorage'
 import * as production from './supabaseStorage'
+import { supabase } from './supabase'
 
 const storage = DEMO_MODE
   ? {
@@ -47,7 +48,10 @@ export const submitInscription = (payload) =>
   DEMO_MODE
     ? Promise.resolve(storage.submitInscription(payload))
     : postPublicWizard('/api/submit-inscription', payload, 'No se pudo enviar la inscripcion')
-export const adminLogin = (...args) => Promise.resolve(storage.adminLogin(...args))
+export const adminLogin = (...args) =>
+  DEMO_MODE
+    ? Promise.resolve(storage.adminLogin(...args))
+    : Promise.reject(new Error('El panel usa Supabase Auth en produccion'))
 export const getDashboard = (...args) => Promise.resolve(storage.getDashboard(...args))
 export const generateTokens = (...args) => Promise.resolve(storage.generateTokens(...args))
 export const getInscription = (...args) => Promise.resolve(storage.getInscription(...args))
@@ -72,13 +76,16 @@ export const generateEmailInvitations = (...args) => (DEMO_MODE ? Promise.reject
 export const recordInvitationResults = (...args) => (DEMO_MODE ? Promise.resolve({ success: true }) : production.recordInvitationResults(...args))
 export const revokeMagicInvitation = (...args) => (DEMO_MODE ? Promise.resolve({ success: true }) : production.revokeMagicInvitation(...args))
 export async function sendInvitationEmails(invitations) {
+  const { data: sessionData } = supabase ? await supabase.auth.getSession() : { data: { session: null } }
+  const accessToken = sessionData.session?.access_token
+  if (!accessToken) throw new Error('Sesion de administrador no disponible')
   const response = await fetch('/api/send-invitation', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      password: sessionStorage.getItem('swimtimer-admin-password') || '',
-      invitations
-    })
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({ invitations })
   })
   const data = await response.json()
   if (!response.ok) throw new Error(data.error || 'No se pudieron enviar las invitaciones')

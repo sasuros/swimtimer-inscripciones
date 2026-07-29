@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
 const escapeHtml = (value) =>
@@ -19,19 +20,45 @@ export function generateEmailHTML(invitation) {
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#F0F2F5;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;padding:20px"><tr><td style="background:#1B3A5C;padding:24px;text-align:center;border-radius:8px 8px 0 0"><h1 style="color:#fff;margin:0;font-size:24px;letter-spacing:2px">SWIMTIMER</h1><p style="color:#8BAAC4;margin:4px 0 0;font-size:13px">Inscripciones by Scanleads</p></td></tr>
-<tr><td style="background:#fff;padding:32px 24px;border-radius:0 0 8px 8px"><h2 style="color:#2C3E50;margin:0 0 8px;font-size:20px">Invitación para inscribir nadadores</h2><p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Ha sido invitado a inscribir los nadadores de <strong style="color:#1B3A5C">${inv.clubName}</strong> en el siguiente evento:</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F9FA;border:1px solid #E5E7EB;border-radius:8px;margin:0 0 24px"><tr><td style="padding:16px 20px"><p style="margin:0 0 4px;font-size:18px;font-weight:bold;color:#2C3E50">${inv.eventName}</p><p style="margin:0 0 2px;font-size:14px;color:#6B7280">Fecha: ${inv.eventDate}</p><p style="margin:0 0 2px;font-size:14px;color:#6B7280">Sede: ${inv.venue || 'Por confirmar'}</p>${inv.deadline ? `<p style="margin:0;font-size:14px;color:#D97706">Fecha límite: ${inv.deadline}</p>` : ''}</td></tr></table>
+<tr><td style="background:#fff;padding:32px 24px;border-radius:0 0 8px 8px"><h2 style="color:#2C3E50;margin:0 0 8px;font-size:20px">Invitacion para inscribir nadadores</h2><p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 20px">Ha sido invitado a inscribir los nadadores de <strong style="color:#1B3A5C">${inv.clubName}</strong> en el siguiente evento:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F9FA;border:1px solid #E5E7EB;border-radius:8px;margin:0 0 24px"><tr><td style="padding:16px 20px"><p style="margin:0 0 4px;font-size:18px;font-weight:bold;color:#2C3E50">${inv.eventName}</p><p style="margin:0 0 2px;font-size:14px;color:#6B7280">Fecha: ${inv.eventDate}</p><p style="margin:0 0 2px;font-size:14px;color:#6B7280">Sede: ${inv.venue || 'Por confirmar'}</p>${inv.deadline ? `<p style="margin:0;font-size:14px;color:#D97706">Fecha limite: ${inv.deadline}</p>` : ''}</td></tr></table>
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;padding:8px 0 24px"><a href="${inv.magicLink}" style="display:inline-block;background:#047857;color:#fff;font-size:16px;font-weight:bold;text-decoration:none;padding:14px 32px;border-radius:8px;letter-spacing:.5px">INSCRIBIR NADADORES</a></td></tr></table>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:8px;margin:0 0 24px"><tr><td style="padding:18px;text-align:center"><p style="margin:0 0 6px;color:#6B7280;font-size:13px">Tu código de acceso</p><p style="margin:0;color:#1B3A5C;font-size:30px;font-weight:bold;letter-spacing:8px">${inv.pin}</p><p style="margin:8px 0 0;color:#374151;font-size:13px">Necesitarás este código para acceder a la inscripción.</p></td></tr></table>
-<p style="color:#6B7280;font-size:13px;line-height:1.5;margin:0 0 8px">Este enlace es exclusivo para <strong>${inv.email}</strong>. No lo comparta con otras personas.</p><p style="color:#6B7280;font-size:13px;line-height:1.5;margin:0">Si tiene problemas para acceder, contacte al organizador del evento.</p><hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0 16px"><p style="color:#9CA3AF;font-size:11px;text-align:center;margin:0">SWIMTIMER · Inscripciones by Scanleads</p></td></tr></table></body></html>`
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:8px;margin:0 0 24px"><tr><td style="padding:18px;text-align:center"><p style="margin:0 0 6px;color:#6B7280;font-size:13px">Tu codigo de acceso</p><p style="margin:0;color:#1B3A5C;font-size:30px;font-weight:bold;letter-spacing:8px">${inv.pin}</p><p style="margin:8px 0 0;color:#374151;font-size:13px">Necesitaras este codigo para acceder a la inscripcion.</p></td></tr></table>
+<p style="color:#6B7280;font-size:13px;line-height:1.5;margin:0 0 8px">Este enlace es exclusivo para <strong>${inv.email}</strong>. No lo comparta con otras personas.</p><p style="color:#6B7280;font-size:13px;line-height:1.5;margin:0">Si tiene problemas para acceder, contacte al organizador del evento.</p><hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0 16px"><p style="color:#9CA3AF;font-size:11px;text-align:center;margin:0">SWIMTIMER - Inscripciones by Scanleads</p></td></tr></table></body></html>`
+}
+
+function getAccessToken(req) {
+  const authorization = req.headers?.authorization || req.headers?.Authorization || ''
+  return authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length).trim() : ''
+}
+
+function createServerSupabaseClient() {
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL || '').trim()
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
+  if (!supabaseUrl || !serviceRoleKey) return null
+  return createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
+}
+
+async function verifyAdminRequest(req) {
+  const accessToken = getAccessToken(req)
+  if (!accessToken) return false
+  const supabase = createServerSupabaseClient()
+  if (!supabase) throw new Error('Supabase no esta configurado')
+  const { data, error } = await supabase.auth.getUser(accessToken)
+  return Boolean(!error && data?.user)
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' })
-  const { password, invitations } = req.body || {}
-  const adminPassword = process.env.VITE_ADMIN_PASSWORD || 'swimtimer2025'
-  if (password !== adminPassword) return res.status(401).json({ error: 'No autorizado' })
-  if (!process.env.RESEND_API_KEY) return res.status(503).json({ error: 'Resend no está configurado' })
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Metodo no permitido' })
+  let authorized = false
+  try {
+    authorized = await verifyAdminRequest(req)
+  } catch (error) {
+    return res.status(503).json({ error: error.message })
+  }
+  if (!authorized) return res.status(401).json({ error: 'No autorizado' })
+  const { invitations } = req.body || {}
+  if (!process.env.RESEND_API_KEY) return res.status(503).json({ error: 'Resend no esta configurado' })
   if (!Array.isArray(invitations) || !invitations.length) return res.status(400).json({ error: 'No hay invitaciones para enviar' })
 
   const resend = new Resend(process.env.RESEND_API_KEY)
@@ -41,7 +68,7 @@ export default async function handler(req, res) {
       const { data, error } = await resend.emails.send({
         from: 'SWIMTIMER Inscripciones <onboarding@resend.dev>',
         to: invitation.email,
-        subject: `Inscripciones abiertas — ${invitation.eventName}`,
+        subject: `Inscripciones abiertas - ${invitation.eventName}`,
         html: generateEmailHTML(invitation)
       })
       results.push(
