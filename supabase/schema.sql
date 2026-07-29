@@ -108,10 +108,29 @@ CREATE TRIGGER events_updated_at
   BEFORE UPDATE ON events
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- Fase 5: persistencia con anon key, sin Supabase Auth.
-ALTER TABLE events DISABLE ROW LEVEL SECURITY;
-ALTER TABLE clubs DISABLE ROW LEVEL SECURITY;
-ALTER TABLE event_clubs DISABLE ROW LEVEL SECURITY;
-ALTER TABLE event_events DISABLE ROW LEVEL SECURITY;
-ALTER TABLE tokens DISABLE ROW LEVEL SECURITY;
-ALTER TABLE inscriptions DISABLE ROW LEVEL SECURITY;
+-- Seguridad: RLS activo. Admin via Supabase Auth (authenticated), wizard via service_role
+-- (bypassa RLS desde las funciones /api), y anon solo lee eventos publicables del landing.
+ALTER TABLE events        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clubs         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE event_clubs   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE event_events  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tokens        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inscriptions  ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS auth_all_events       ON events;
+DROP POLICY IF EXISTS auth_all_clubs        ON clubs;
+DROP POLICY IF EXISTS auth_all_event_clubs  ON event_clubs;
+DROP POLICY IF EXISTS auth_all_event_events ON event_events;
+DROP POLICY IF EXISTS auth_all_tokens       ON tokens;
+DROP POLICY IF EXISTS auth_all_inscriptions ON inscriptions;
+
+CREATE POLICY auth_all_events       ON events        FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY auth_all_clubs        ON clubs         FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY auth_all_event_clubs  ON event_clubs   FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY auth_all_event_events ON event_events  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY auth_all_tokens       ON tokens        FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY auth_all_inscriptions ON inscriptions  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS anon_public_events ON events;
+CREATE POLICY anon_public_events ON events FOR SELECT TO anon
+  USING (show_on_landing = true AND status IN ('active','closed','archived'));

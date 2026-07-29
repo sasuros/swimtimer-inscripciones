@@ -31,7 +31,7 @@ Sin las variables de Supabase, la app funciona en modo demo con `localStorage`. 
 
 ### Seguridad de esta fase
 
-El schema mantiene RLS deshabilitado en este sprint. El wizard público valida tokens, verifica PIN y envía inscripciones mediante funciones serverless de Vercel con `SUPABASE_SERVICE_ROLE_KEY`; el flujo del administrador sigue usando el adaptador Supabase existente. La contraseña del administrador es una barrera de interfaz, no autenticación de base de datos. No usar esta configuración para información sensible; una fase posterior debe incorporar Supabase Auth y políticas RLS.
+El schema deja RLS activo. El panel administrador opera como rol `authenticated` mediante Supabase Auth; el wizard público valida tokens, verifica PIN y envía inscripciones mediante funciones serverless `/api` que usan `SUPABASE_SERVICE_ROLE_KEY`; y el rol `anon` solo puede leer eventos publicables del landing. `SUPABASE_SERVICE_ROLE_KEY` es un secreto de servidor, sin prefijo `VITE_`, y nunca debe exponerse al frontend.
 
 ## Tokens y contingencia
 
