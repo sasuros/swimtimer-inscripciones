@@ -49,7 +49,7 @@ export default function EventEditor({ eventId, cloneId }) {
           clubs: clubs.map((club) => ({ ...club })),
           events: standardEventTemplate()
         }
-        setEventMode(source && !(source.clubs?.length || source.events?.length) ? 'results' : 'inscriptions')
+        setEventMode(!source ? 'results' : (source.clubs?.length || source.events?.length) ? 'inscriptions' : 'results')
         setForm({ ...initial, clubs: initial.clubs.map(ensureClubPin) })
         setNewClub((current) => ({
           ...current,
