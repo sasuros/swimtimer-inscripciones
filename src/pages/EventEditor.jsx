@@ -242,8 +242,8 @@ export default function EventEditor({ eventId, cloneId }) {
 
         <Step number={resultsOnly ? '2' : '5'} title="Resumen y confirmar">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Summary icon={<Users />} label="Clubes" value={resultsOnly ? 0 : form.clubs.length} />
-            <Summary icon={<Waves />} label="Pruebas activas" value={resultsOnly ? 0 : activeCount} />
+            {!resultsOnly && <Summary icon={<Users />} label="Clubes" value={form.clubs.length} />}
+            {!resultsOnly && <Summary icon={<Waves />} label="Pruebas activas" value={activeCount} />}
             <Summary icon={<Check />} label="Estado" value={form.status === 'active' ? 'Activo' : 'Borrador'} />
           </div>
           <div className="mt-5 rounded-xl border p-4">
