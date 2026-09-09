@@ -4,17 +4,17 @@ import AdminHeader from '../components/AdminHeader'
 const tools = [
   {
     name: 'SWIMTIMER Herramientas',
-    version: 'v1.1',
+    version: 'v1.2',
     description: 'Conecta Meet Manager con la web de inscripciones.',
     features: [
       'Exporta eventos desde tu .mdb',
-      'Importa inscripciones al Meet Manager',
+      'Genera archivo SD3 para importar en Meet Manager',
       'Backup automático de tus archivos',
     ],
     requirement: 'Windows 10/11 + driver Microsoft Access',
     size: '~25 MB',
     button: 'Descargar herramientas',
-    url: 'https://github.com/sasuros/swimtimer-herramientas/releases/download/v1.1/SWIMTIMER.Herramientasv1.1.exe',
+    url: 'https://github.com/sasuros/swimtimer-herramientas/releases/download/v1.2/SWIMTIMER.Herramientas.exe',
     Icon: Wrench,
   },
   {
