@@ -66,7 +66,7 @@ export default async function handler(req, res) {
   for (const invitation of invitations) {
     try {
       const { data, error } = await resend.emails.send({
-        from: 'SWIMTIMER Inscripciones <onboarding@resend.dev>',
+        from: 'SWIMTIMER Inscripciones <inscripciones@swimtimer.app>',
         to: invitation.email,
         subject: `Inscripciones abiertas - ${invitation.eventName}`,
         html: generateEmailHTML(invitation)
