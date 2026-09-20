@@ -381,7 +381,7 @@ export function demoDashboard(eventId = LEGACY_EVENT_ID) {
     clubs: clubRows,
     late,
     counts: {
-      total_clubs: clubRows.length,
+      total_clubs: clubRows.filter((item) => item.status !== 'not_participating').length,
       received: clubRows.filter((item) => item.status === 'received').length,
       pending: clubRows.filter((item) => !['received', 'not_participating'].includes(item.status)).length,
       athletes: clubRows.reduce((sum, item) => sum + item.athlete_count, 0),

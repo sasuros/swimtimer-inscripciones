@@ -419,7 +419,7 @@ export async function getDashboard(eventId) {
     clubs,
     late,
     counts: {
-      total_clubs: clubs.length,
+      total_clubs: clubs.filter((club) => club.status !== 'not_participating').length,
       received: clubs.filter((club) => club.status === 'received').length,
       pending: clubs.filter((club) => !['received', 'not_participating'].includes(club.status)).length,
       athletes: clubs.reduce((sum, club) => sum + club.athlete_count, 0),
