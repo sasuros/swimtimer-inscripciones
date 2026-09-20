@@ -211,6 +211,26 @@ export function demoGenerateTokens(eventId = LEGACY_EVENT_ID) {
   return { success: true, tokens: eventTokens }
 }
 
+export function demoRegenerateClubToken(eventId = LEGACY_EVENT_ID, clubCode) {
+  const event = demoGetEvent(eventId) || legacyEvent()
+  const club = (event.clubs || []).find((item) => Number(item.code) === Number(clubCode))
+  const current = read(STORAGE_KEYS.tokens, [])
+  const others = current.filter((item) => !((item.eventId || LEGACY_EVENT_ID) === event.id && Number(item.club.code) === Number(clubCode)))
+  const expires = new Date()
+  expires.setDate(expires.getDate() + 60)
+  const newToken = {
+    id: encodeDemoToken(withoutPins(event), withoutPin(club)),
+    eventId: event.id,
+    club: withoutPin(club),
+    event: withoutPins(event),
+    used: false,
+    created_at: new Date().toISOString(),
+    expires_at: expires.toISOString()
+  }
+  write(STORAGE_KEYS.tokens, [...others, newToken])
+  return { success: true, token: newToken.id }
+}
+
 function withoutPin(club) {
   const { pin, ...safe } = club
   return safe

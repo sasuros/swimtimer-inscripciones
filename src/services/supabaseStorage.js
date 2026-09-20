@@ -245,22 +245,22 @@ export async function cloneEvent(id) {
   }
 }
 
+async function buildTokenRow(event, club) {
+  const tokenValue = encodeDemoToken(withoutPins(event), withoutPin(club))
+  return {
+    id: await tokenKey(tokenValue),
+    token_value: tokenValue,
+    token_type: 'v2',
+    event_id: event.id,
+    club_code: club.code,
+    created_at: new Date().toISOString(),
+    used_at: null
+  }
+}
+
 export async function generateTokens(eventId) {
   const event = await getEvent(eventId)
-  const tokens = await Promise.all(
-    event.clubs.map(async (club) => {
-      const tokenValue = encodeDemoToken(withoutPins(event), withoutPin(club))
-      return {
-        id: await tokenKey(tokenValue),
-        token_value: tokenValue,
-        token_type: 'v2',
-        event_id: eventId,
-        club_code: club.code,
-        created_at: new Date().toISOString(),
-        used_at: null
-      }
-    })
-  )
+  const tokens = await Promise.all(event.clubs.map((club) => buildTokenRow(event, club)))
   if (tokens.length) unwrap(await db().from('tokens').upsert(tokens, { onConflict: 'event_id,club_code,token_type' }))
   return {
     success: true,
@@ -271,6 +271,14 @@ export async function generateTokens(eventId) {
       club: event.clubs[index]
     }))
   }
+}
+
+export async function regenerateClubToken(eventId, clubCode) {
+  const event = await getEvent(eventId)
+  const club = event.clubs.find((item) => Number(item.code) === Number(clubCode))
+  const row = await buildTokenRow(event, club)
+  unwrap(await db().from('tokens').upsert([row], { onConflict: 'event_id,club_code,token_type' }))
+  return { success: true, token: row.token_value }
 }
 
 export async function getTokensForEvent(eventId) {

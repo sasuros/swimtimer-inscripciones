@@ -10,6 +10,7 @@ const storage = DEMO_MODE
       adminLogin: demo.demoLogin,
       getDashboard: demo.demoDashboard,
       generateTokens: demo.demoGenerateTokens,
+      regenerateClubToken: demo.demoRegenerateClubToken,
       getInscription: demo.demoGetInscription,
       exportAll: demo.demoExportAll,
       reviewLate: demo.demoReviewLate,
@@ -54,6 +55,7 @@ export const adminLogin = (...args) =>
     : Promise.reject(new Error('El panel usa Supabase Auth en produccion'))
 export const getDashboard = (...args) => Promise.resolve(storage.getDashboard(...args))
 export const generateTokens = (...args) => Promise.resolve(storage.generateTokens(...args))
+export const regenerateClubToken = (...args) => Promise.resolve(storage.regenerateClubToken(...args))
 export const getInscription = (...args) => Promise.resolve(storage.getInscription(...args))
 export const exportAll = (...args) => Promise.resolve(storage.exportAll(...args))
 export const reviewLate = (...args) => Promise.resolve(storage.reviewLate(...args))
