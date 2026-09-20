@@ -26,6 +26,14 @@ const blank = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+const STATUS_LABELS = {
+  draft: 'Borrador',
+  active: 'Activo',
+  accepting_late: 'Aceptando tardías',
+  closed: 'Cerrado',
+  archived: 'Archivado'
+}
+
 export default function EventEditor({ eventId, cloneId }) {
   const imported = new URLSearchParams(window.location.search).get('imported') === '1'
   const [form, setForm] = useState(null)
@@ -244,7 +252,7 @@ export default function EventEditor({ eventId, cloneId }) {
           <div className="grid gap-4 sm:grid-cols-3">
             {!resultsOnly && <Summary icon={<Users />} label="Clubes" value={form.clubs.length} />}
             {!resultsOnly && <Summary icon={<Waves />} label="Pruebas activas" value={activeCount} />}
-            <Summary icon={<Check />} label="Estado" value={form.status === 'active' ? 'Activo' : 'Borrador'} />
+            <Summary icon={<Check />} label="Estado" value={STATUS_LABELS[form.status] || 'Borrador'} />
           </div>
           <div className="mt-5 rounded-xl border p-4">
             <h3 className="text-xl font-bold text-brand-800">{form.name || 'Evento sin nombre'}</h3>
@@ -253,14 +261,39 @@ export default function EventEditor({ eventId, cloneId }) {
             </p>
           </div>
           <div className="mt-5 flex flex-wrap justify-end gap-2">
-            <button className="btn-secondary inline-flex items-center gap-2" disabled={saving} onClick={() => save(false)}>
-              <Save className="size-4" />
-              Guardar como borrador
-            </button>
-            <button className="btn-primary inline-flex items-center gap-2" disabled={saving} onClick={() => save(true)}>
-              <Check className="size-4" />
-              Guardar y activar
-            </button>
+            {form.status === 'draft' ? (
+              <>
+                <button className="btn-secondary inline-flex items-center gap-2" disabled={saving} onClick={() => save(false)}>
+                  <Save className="size-4" />
+                  Guardar como borrador
+                </button>
+                <button className="btn-primary inline-flex items-center gap-2" disabled={saving} onClick={() => save(true)}>
+                  <Check className="size-4" />
+                  Guardar y activar
+                </button>
+              </>
+            ) : ['active', 'accepting_late'].includes(form.status) ? (
+              <button className="btn-primary inline-flex items-center gap-2" disabled={saving} onClick={() => save(false)}>
+                <Save className="size-4" />
+                Guardar cambios
+              </button>
+            ) : (
+              <>
+                <button className="btn-primary inline-flex items-center gap-2" disabled={saving} onClick={() => save(false)}>
+                  <Save className="size-4" />
+                  Guardar cambios
+                </button>
+                <button
+                  className="rounded-lg border border-danger-700 px-4 py-2.5 font-bold text-danger-700 transition hover:bg-danger-50"
+                  disabled={saving}
+                  onClick={() => {
+                    if (window.confirm('Este evento está cerrado. Activarlo REABRIRÁ las inscripciones. ¿Continuar?')) save(true)
+                  }}
+                >
+                  Reabrir inscripciones
+                </button>
+              </>
+            )}
           </div>
         </Step>
       </main>
