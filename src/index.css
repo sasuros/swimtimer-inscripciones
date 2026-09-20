@@ -125,5 +125,7 @@
   body * { visibility: hidden; }
   #print-plan, #print-plan * { visibility: visible; }
   #print-plan { position: absolute; inset: 0; }
+  #print-roster, #print-roster * { visibility: visible; }
+  #print-roster { position: absolute; inset: 0; }
   .no-print { display: none !important; }
 }

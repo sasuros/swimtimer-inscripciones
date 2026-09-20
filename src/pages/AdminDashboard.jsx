@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, Clipboard, ExternalLink, KeyRound, Mail, Pencil, QrCode, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { Archive, Clipboard, ExternalLink, KeyRound, Mail, Pencil, Printer, QrCode, RefreshCw, Send, Trash2 } from 'lucide-react'
 import AdminHeader from '../components/AdminHeader'
 import CloseRegistrationModal from '../components/CloseRegistrationModal'
 import ExportMenu from '../components/ExportMenu'
@@ -7,6 +7,7 @@ import LateReviewPanel from '../components/LateReviewPanel'
 import LinkDistributionModal from '../components/LinkDistributionModal'
 import DeleteEventModal from '../components/DeleteEventModal'
 import EmailInvitationsPanel from '../components/EmailInvitationsPanel'
+import PrintRoster from '../components/PrintRoster'
 import { downloadJson } from '../utils/download'
 import { downloadEventQr } from '../utils/eventQr'
 import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getDashboard, getInscription, recordInvitationResults, regenerateClubToken, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
@@ -490,7 +491,7 @@ function ClubStatus({ status }) {
 function Detail({ inscription, onClose }) {
   return (
     <div className="fixed inset-0 z-20 overflow-y-auto bg-slate-950/70 p-4">
-      <section className="card mx-auto max-w-4xl p-5 sm:p-6">
+      <section className="card no-print mx-auto max-w-4xl p-5 sm:p-6">
         <div className="flex justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold">{inscription.meta.club_name}</h2>
@@ -512,10 +513,17 @@ function Detail({ inscription, onClose }) {
             </div>
           ))}
         </div>
-        <button className="btn-primary mt-5" onClick={() => downloadJson(inscription, `inscripcion-${inscription.meta.club_code}.json`)}>
-          Descargar JSON del club
-        </button>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button className="btn-primary inline-flex items-center gap-2" onClick={() => downloadJson(inscription, `inscripcion-${inscription.meta.club_code}.json`)}>
+            Descargar JSON del club
+          </button>
+          <button className="btn-secondary inline-flex items-center gap-2" onClick={() => window.print()}>
+            <Printer className="size-4" />
+            Imprimir / Descargar PDF
+          </button>
+        </div>
       </section>
+      <PrintRoster inscription={inscription} />
     </div>
   )
 }
