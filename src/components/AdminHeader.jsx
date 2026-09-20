@@ -3,6 +3,8 @@ import { DEMO_MODE } from '../config'
 import { supabase } from '../services/supabase'
 import Logo from './Logo'
 
+/* global __APP_VERSION__ */
+
 export default function AdminHeader({ children }) {
   const logout = async () => {
     sessionStorage.removeItem('swimtimer-admin-token')
@@ -20,6 +22,7 @@ export default function AdminHeader({ children }) {
       <div className="mr-auto">
         <p className="font-extrabold tracking-wider text-white">SWIMTIMER</p>
         <p className="text-xs text-slate-300">Gestión de inscripciones{DEMO_MODE ? ' · Demo local' : ''}</p>
+        <p className="text-[10px] text-slate-400">v{__APP_VERSION__}</p>
       </div>
       <nav className="order-3 flex w-full gap-2 sm:order-none sm:w-auto" aria-label="Navegación administrativa">
         <a className={navClass(eventsActive)} href="/admin/eventos" aria-current={eventsActive ? 'page' : undefined}><CalendarDays className="size-4" />Inicio</a>
