@@ -22,7 +22,7 @@ export default function AdminHeader({ children }) {
         <p className="text-xs text-slate-300">Gestión de inscripciones{DEMO_MODE ? ' · Demo local' : ''}</p>
       </div>
       <nav className="order-3 flex w-full gap-2 sm:order-none sm:w-auto" aria-label="Navegación administrativa">
-        <a className={navClass(eventsActive)} href="/admin/eventos" aria-current={eventsActive ? 'page' : undefined}><CalendarDays className="size-4" />Mis eventos</a>
+        <a className={navClass(eventsActive)} href="/admin/eventos" aria-current={eventsActive ? 'page' : undefined}><CalendarDays className="size-4" />Inicio</a>
         <a className={navClass(path === '/admin/herramientas')} href="/admin/herramientas" aria-current={path === '/admin/herramientas' ? 'page' : undefined}><Wrench className="size-4" />Herramientas</a>
       </nav>
       {children}

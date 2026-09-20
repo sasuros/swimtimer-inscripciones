@@ -168,7 +168,7 @@ export default function AdminDashboard({ eventId }) {
     <>
       <AdminHeader>
         <a href="/admin/eventos" className="btn-secondary hidden text-sm sm:inline-flex">
-          ← Mis eventos
+          ← Inicio
         </a>
       </AdminHeader>
       <main className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6">
@@ -176,7 +176,7 @@ export default function AdminDashboard({ eventId }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <a href="/admin/eventos" className="text-sm font-bold text-brand-800">
-              ← Volver a mis eventos
+              ← Volver al inicio
             </a>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <StatusBadge status={data.event.status} />
@@ -308,7 +308,7 @@ export default function AdminDashboard({ eventId }) {
                           <>
                             <button className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" onClick={() => copyText(registrationUrl(club.token))}>
                               <Clipboard className="size-3" />
-                              Copiar
+                              Copiar enlace
                             </button>
                             <a className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" href={registrationUrl(club.token)} target="_blank" rel="noreferrer">
                               <ExternalLink className="size-3" />
@@ -319,7 +319,7 @@ export default function AdminDashboard({ eventId }) {
                         {club.status !== 'not_participating' && club.email && (
                           <button className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" disabled={emailing} onClick={() => sendInvitations(club)}>
                             <Mail className="size-3" />
-                            Correo
+                            Enviar invitación
                           </button>
                         )}
                         {club.status !== 'not_participating' && club.email && club.invitation_sent_at && (
@@ -432,7 +432,7 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
           <>
             <button className="btn-secondary inline-flex items-center justify-center gap-1 text-xs" onClick={() => onCopy(url)}>
               <Clipboard className="size-3" />
-              Copiar
+              Copiar enlace
             </button>
             <a className="btn-secondary inline-flex items-center justify-center gap-1 text-xs" href={url} target="_blank" rel="noreferrer">
               <ExternalLink className="size-3" />
@@ -443,7 +443,7 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
         {club.email && (
           <button className="btn-secondary inline-flex items-center justify-center gap-1 text-xs" disabled={emailing} onClick={() => onEmail(club)}>
             <Mail className="size-3" />
-            {club.invitation_sent_at ? 'Reenviar' : 'Correo'}
+            {club.invitation_sent_at ? 'Reenviar invitación' : 'Enviar invitación'}
           </button>
         )}
         {club.status === 'received' && (
