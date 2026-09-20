@@ -241,10 +241,6 @@ export default function AdminDashboard({ eventId }) {
             </div>
             <div className="flex flex-wrap gap-2">
               <ExportMenu onExport={download} />
-              <button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={load}>
-                <RefreshCw className="size-4" />
-                Actualizar
-              </button>
               <button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={openDistribution}>
                 <Send className="size-4" />
                 Distribuir enlaces a todos
