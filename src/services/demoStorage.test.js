@@ -112,6 +112,17 @@ describe('storage local de la demo', () => {
     expect(complete.meta.sha256).toMatch(/^[a-f0-9]{64}$/)
   })
 
+  it('tras abrir tardías sin envío tardío aún, expone la inscripción normal por separado (no mezclada en `inscription`)', () => {
+    const token = demoGenerateTokens().tokens[0].id
+    demoSubmitInscription({ token, meta: { club_code: 2 }, athletes: [{ Ath_no: 2001 }], results: [], roster: [{ id: 'atleta-normal' }] })
+    demoUpdateEventStatus('evt_demo_2025', 'accepting_late')
+
+    const access = demoValidateToken(token)
+    expect(access.normal_inscription?.roster).toEqual([{ id: 'atleta-normal' }])
+    expect(access.already_submitted).toBe(false)
+    expect(access.inscription).toBeNull()
+  })
+
   it('excluye clubes que no participan de pendientes y consolidado', async () => {
     const token = demoGenerateTokens().tokens[0].id
     const access = demoValidateToken(token)

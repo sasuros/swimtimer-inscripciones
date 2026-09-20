@@ -15,6 +15,7 @@ import ClosedEvent from './ClosedEvent'
 import QuickEntryMode from '../components/QuickEntryMode'
 import RegistrationMethodSelector from '../components/RegistrationMethodSelector'
 import PinVerification from '../components/PinVerification'
+import { deriveRosterView } from '../utils/wizardRosterView'
 
 export default function InscriptionWizard() {
   const token = new URLSearchParams(window.location.search).get('t') || ''
@@ -33,8 +34,10 @@ function VerifiedWizard({ token, access }) {
 }
 
 function WizardContent({ token, access }) {
-  const previousRoster = access.inscription?.roster || []
-  const [roster, setRoster] = useRoster(token, previousRoster)
+  const { isLate, locked, editableInitial } = deriveRosterView(access)
+  const rosterKey = isLate ? `${token}:late` : token
+  const [roster, setRoster] = useRoster(rosterKey, editableInitial)
+  const validationRoster = isLate ? [...locked, ...roster] : roster
   const [editing, setEditing] = useState(null)
   const [highlightId, setHighlightId] = useState(null)
   const [screen, setScreen] = useState('form')
@@ -79,7 +82,7 @@ function WizardContent({ token, access }) {
       })
       if (!result.success) throw new Error(result.error || 'No se pudo enviar')
       setFinalData({ ...output, _swimtimer_roster: roster })
-      localStorage.removeItem(`swimtimer-roster:${token}`)
+      localStorage.removeItem(`swimtimer-roster:${rosterKey}`)
       setScreen('done')
     } catch (error) {
       window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`)
@@ -100,8 +103,18 @@ function WizardContent({ token, access }) {
           </div>
         )}
         <EventStatusBanner event={access.event} />
-        <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} />
-        {access.already_submitted && (roster.length > 0 ? (
+        {isLate && locked.length > 0 && (
+          <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
+            <strong>Ya enviaste tu inscripción regular con {locked.length} {locked.length === 1 ? 'nadador' : 'nadadores'}.</strong> Está abajo, solo para consultar. Agrega abajo a quienes quieras inscribir por la vía tardía.
+          </div>
+        )}
+        {isLate && locked.length > 0 && <RosterPanel roster={locked} readOnly title="Ya inscritos (inscripción regular)" />}
+        {isLate && access.already_submitted && (
+          <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
+            <strong>Ya enviaste una inscripción tardía.</strong> Puedes agregar más, corregir algo, y volver a enviar cuando quieras.
+          </div>
+        )}
+        {!isLate && access.already_submitted && (roster.length > 0 ? (
           <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
             <strong>Tus nadadores ya están cargados abajo.</strong> Puedes agregar los que falten, corregir algo, y volver a enviar cuando quieras. ¿Necesitas agregar más después? Vuelve a abrir este mismo enlace.
           </div>
@@ -110,14 +123,15 @@ function WizardContent({ token, access }) {
             <strong>Ya enviaste una inscripción para este club.</strong> Si no ves tus nadadores abajo, agrégalos y vuelve a enviar.
           </div>
         ))}
+        <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
         {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
         {entryMethod && (
           <button type="button" className="text-sm font-bold text-brand-700 hover:underline" onClick={changeMethod}>
             ← Cambiar método
           </button>
         )}
-        {entryMethod === 'manual' && <AthleteForm roster={roster} referenceDate={access.event.reference_date} eventConfig={access.event} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} />}
-        {entryMethod === 'expert' && <QuickEntryMode referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} roster={roster} onImport={(items) => setRoster((current) => [...current, ...items])} />}
+        {entryMethod === 'manual' && <AthleteForm roster={validationRoster} referenceDate={access.event.reference_date} eventConfig={access.event} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} />}
+        {entryMethod === 'expert' && <QuickEntryMode referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} roster={validationRoster} onImport={(items) => setRoster((current) => [...current, ...items])} />}
       </main>
       <BrandFooter />
       {roster.length > 0 && (
