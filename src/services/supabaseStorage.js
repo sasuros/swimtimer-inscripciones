@@ -156,17 +156,20 @@ export async function saveEvent(input, activate = false) {
 
   const clubs = (input.clubs || []).map(teamIdentity).map(ensureClubPin)
   if (clubs.length) unwrap(await db().from('clubs').upsert(clubs.map(clubPayload), { onConflict: 'code' }))
-  const currentTokens = unwrap(await db().from('tokens').select('club_code').eq('event_id', id))
-  const selectedCodes = new Set(clubs.map((club) => Number(club.code)))
-  const removedCodes = currentTokens.map((item) => Number(item.club_code)).filter((code) => !selectedCodes.has(code))
-  if (removedCodes.length) unwrap(await db().from('tokens').delete().eq('event_id', id).in('club_code', removedCodes))
 
-  unwrap(await db().from('event_clubs').delete().eq('event_id', id))
+  const currentClubRows = unwrap(await db().from('event_clubs').select('club_code').eq('event_id', id))
+  const selectedCodes = new Set(clubs.map((club) => Number(club.code)))
+  const removedCodes = currentClubRows.map((row) => Number(row.club_code)).filter((code) => !selectedCodes.has(code))
+  if (removedCodes.length) {
+    unwrap(await db().from('tokens').delete().eq('event_id', id).in('club_code', removedCodes))
+    unwrap(await db().from('event_clubs').delete().eq('event_id', id).in('club_code', removedCodes))
+  }
+
   if (clubs.length) {
     unwrap(
       await db()
         .from('event_clubs')
-        .insert(
+        .upsert(
           clubs.map((club) => ({
             event_id: id,
             club_code: club.code,
@@ -175,7 +178,8 @@ export async function saveEvent(input, activate = false) {
             contact_whatsapp: club.contact_whatsapp || '',
             email: club.email || club.contact_email || '',
             pin: club.pin
-          }))
+          })),
+          { onConflict: 'event_id,club_code' }
         )
     )
   }
