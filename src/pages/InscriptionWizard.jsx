@@ -4,7 +4,6 @@ import useRoster from '../hooks/useRoster'
 import Header from '../components/Header'
 import RosterPanel from '../components/RosterPanel'
 import AthleteForm from '../components/AthleteForm'
-import ImportPrevious from '../components/ImportPrevious'
 import PreviewPlanilla from '../components/PreviewPlanilla'
 import ConfirmationScreen from '../components/ConfirmationScreen'
 import InvalidToken from './InvalidToken'
@@ -21,7 +20,7 @@ export default function InscriptionWizard() {
   const token = new URLSearchParams(window.location.search).get('t') || ''
   const access = useToken(token)
   if (access.loading) return <div className="flex min-h-screen items-center justify-center text-brand-800">Validando invitación…</div>
-  if (!access.valid) return <InvalidToken networkError={access.networkError} />
+  if (!access.valid) return <InvalidToken networkError={access.networkError} noToken={access.noToken} />
   if (['draft', 'closed', 'archived'].includes(access.event.status)) return <ClosedEvent event={access.event} />
   return <VerifiedWizard token={token} access={access} />
 }
@@ -61,11 +60,6 @@ function WizardContent({ token, access }) {
       setRoster((current) => current.filter((item) => item.id !== athlete.id))
       if (editing?.id === athlete.id) setEditing(null)
     }
-  }
-  const importPrevious = (data) => {
-    const incoming = data.roster || data._swimtimer_roster
-    if (Array.isArray(incoming)) setRoster(incoming)
-    else window.alert('Este JSON no incluye la lista editable. Usa un respaldo generado por esta versión.')
   }
   const submit = async () => {
     setSending(true)
@@ -107,14 +101,15 @@ function WizardContent({ token, access }) {
         )}
         <EventStatusBanner event={access.event} />
         <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} />
-        {access.already_submitted && (
+        {access.already_submitted && (roster.length > 0 ? (
           <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
-            <strong>Este club ya envió una inscripción.</strong> Puedes editarla y enviar una versión actualizada; la anterior será reemplazada.
+            <strong>Tus nadadores ya están cargados abajo.</strong> Puedes agregar los que falten, corregir algo, y volver a enviar cuando quieras. ¿Necesitas agregar más después? Vuelve a abrir este mismo enlace.
           </div>
-        )}
-        <div className="flex justify-end">
-          <ImportPrevious onImport={importPrevious} />
-        </div>
+        ) : (
+          <div className="rounded-xl bg-warning-50 p-4 text-sm text-warning-800">
+            <strong>Ya enviaste una inscripción para este club.</strong> Si no ves tus nadadores abajo, agrégalos y vuelve a enviar.
+          </div>
+        ))}
         {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
         {entryMethod && (
           <button type="button" className="text-sm font-bold text-brand-700 hover:underline" onClick={changeMethod}>

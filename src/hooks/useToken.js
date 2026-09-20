@@ -6,7 +6,7 @@ import { accessFromDemoToken, decodeDemoToken } from '../utils/demoToken'
 export default function useToken(token) {
   const [state, setState] = useState({ loading: true, valid: false })
   useEffect(() => {
-    if (!token) return setState({ loading: false, valid: false })
+    if (!token) return setState({ loading: false, valid: false, noToken: true })
     const embedded = DEMO_MODE ? decodeDemoToken(token) : null
     if (embedded) setState({ loading: false, ...accessFromDemoToken(embedded), localMode: false })
     validateToken(token)
