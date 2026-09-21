@@ -181,22 +181,22 @@ export default function AdminDashboard({ eventId }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a className="btn-secondary inline-flex items-center gap-2 text-sm" href={`/admin/eventos/${eventId}/editar`}>
+            <a className="btn-manage inline-flex items-center gap-2 text-sm" href={`/admin/eventos/${eventId}/editar`}>
               <Pencil className="size-4" />
               Editar evento
             </a>
             {data.event.status === 'active' && (
-              <button className="btn-secondary text-sm" onClick={() => setCloseOpen(true)}>
+              <button className="btn-caution text-sm" onClick={() => setCloseOpen(true)}>
                 Cerrar inscripciones
               </button>
             )}
             {data.event.status === 'accepting_late' && (
-              <button className="btn-secondary text-sm" onClick={() => setCloseOpen(true)}>
+              <button className="btn-danger text-sm" onClick={() => setCloseOpen(true)}>
                 Cerrar definitivamente
               </button>
             )}
             {data.event.status === 'closed' && (
-              <button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={archive}>
+              <button className="btn-danger inline-flex items-center gap-2 text-sm" onClick={archive}>
                 <Archive className="size-4" />
                 Archivar
               </button>
@@ -248,7 +248,7 @@ export default function AdminDashboard({ eventId }) {
           </div>
         </section>
         <section className="mt-12 flex justify-end border-t border-danger-700/20 pt-6">
-          <button className="inline-flex items-center gap-2 rounded-lg border border-danger-700 px-4 py-2.5 font-bold text-danger-700 transition hover:bg-danger-50" onClick={requestDelete}>
+          <button className="btn-danger inline-flex items-center gap-2" onClick={requestDelete}>
             <Trash2 className="size-4" />
             Eliminar evento
           </button>
