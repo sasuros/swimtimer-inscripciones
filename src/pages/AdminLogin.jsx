@@ -24,11 +24,11 @@ export default function AdminLogin() {
         return
       }
 
-      if (!supabase) throw new Error('Supabase no esta configurado')
+      if (!supabase) throw new Error('Supabase no está configurado')
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
     } catch (error) {
-      setError(error.message || 'No se pudo iniciar sesion')
+      setError(error.message || 'No se pudo iniciar sesión')
     } finally {
       setLoading(false)
     }
@@ -44,16 +44,16 @@ export default function AdminLogin() {
         <p className="mt-1 text-slate-500">Acceso privado de SWIMTIMER</p>
         {DEMO_MODE && (
           <p className="mt-4 rounded-lg bg-brand-50 p-3 text-sm text-brand-800">
-            <strong>Demostracion local:</strong> la clave es <code>{DEMO_ADMIN_PASSWORD}</code>
+            <strong>Demostración local:</strong> la clave es <code>{DEMO_ADMIN_PASSWORD}</code>
           </p>
         )}
         {!DEMO_MODE && (
           <>
-            <label htmlFor="email" className="label mt-6">Correo electronico</label>
+            <label htmlFor="email" className="label mt-6">Correo electrónico</label>
             <input id="email" type="email" className={`input ${error ? 'input-error' : ''}`} value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" autoFocus />
           </>
         )}
-        <label htmlFor="password" className={`label ${DEMO_MODE ? 'mt-6' : 'mt-4'}`}>Contrasena</label>
+        <label htmlFor="password" className={`label ${DEMO_MODE ? 'mt-6' : 'mt-4'}`}>Contraseña</label>
         <input id="password" type="password" className={`input ${error ? 'input-error' : ''}`} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={DEMO_MODE ? 'current-password' : 'current-password'} autoFocus={DEMO_MODE} />
         <ErrorMessage>{error}</ErrorMessage>
         <button className="btn-primary mt-5 w-full" disabled={disabled}>{loading ? 'Entrando...' : 'Entrar'}</button>

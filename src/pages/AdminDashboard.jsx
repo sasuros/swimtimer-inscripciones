@@ -246,90 +246,6 @@ export default function AdminDashboard({ eventId }) {
               <ClubLinkCard key={club.code} club={club} eventId={eventId} emailing={emailing} url={club.token ? registrationUrl(club.token) : ''} onCopy={copyText} onOpenDetail={viewDetail} onEmail={sendInvitations} onRevoke={revokeInvitation} onToggle={toggleParticipation} onRegeneratePin={regeneratePin} onRegenerateToken={regenerateToken} />
             ))}
           </div>
-          <div className="hidden">
-            <table className="w-full min-w-[1280px] text-left text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="p-3">Estado</th>
-                  <th className="p-3">Club</th>
-                  <th className="p-3">Correo</th>
-                  <th className="p-3">Nadadores</th>
-                  <th className="p-3">Envío</th>
-                  <th className="p-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.clubs.map((club) => (
-                  <tr key={club.code} className={`border-t transition hover:bg-slate-100 ${club.status === 'not_participating' ? 'bg-slate-100 text-slate-500' : ''}`}>
-                    <td className="p-3">
-                      <ClubStatus status={club.status} />
-                    </td>
-                    <td className="p-3 font-semibold">
-                      {club.name}
-                      <span className="ml-2 font-mono text-xs text-slate-500">{club.abbreviation}</span>
-                    </td>
-                    <td className="p-3">
-                      <p>{club.email || <span className="text-slate-400">Sin correo</span>}</p>
-                      <EmailStatus club={club} />
-                      {!club.email && (
-                        <a className="text-xs font-bold text-brand-800" href={`/admin/eventos/${eventId}/editar`}>
-                          Agregar
-                        </a>
-                      )}
-                    </td>
-                    <td className="p-3">{club.athlete_count || '—'}</td>
-                    <td className="p-3 text-slate-500">{club.submitted_at ? new Date(club.submitted_at).toLocaleString('es-VE') : '—'}</td>
-                    <td className="p-3">
-                      <div className="flex flex-wrap items-center gap-1">
-                        {club.status === 'not_participating' ? (
-                          <button className="btn-secondary px-2 py-1.5 text-xs" onClick={() => toggleParticipation(club)}>
-                            Reincorporar
-                          </button>
-                        ) : (
-                          <button className="btn-secondary px-2 py-1.5 text-xs" onClick={() => toggleParticipation(club)}>
-                            No participa
-                          </button>
-                        )}
-                        {club.status !== 'not_participating' && club.token && (
-                          <>
-                            <button className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" onClick={() => copyText(registrationUrl(club.token))}>
-                              <Clipboard className="size-3" />
-                              Copiar enlace
-                            </button>
-                            <a className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" href={registrationUrl(club.token)} target="_blank" rel="noreferrer">
-                              <ExternalLink className="size-3" />
-                              Abrir
-                            </a>
-                          </>
-                        )}
-                        {club.status !== 'not_participating' && club.email && (
-                          <button className="btn-secondary inline-flex items-center gap-1 px-2 py-1.5 text-xs" disabled={emailing} onClick={() => sendInvitations(club)}>
-                            <Mail className="size-3" />
-                            Enviar invitación
-                          </button>
-                        )}
-                        {club.status !== 'not_participating' && club.email && club.invitation_sent_at && (
-                          <>
-                            <button className="btn-secondary px-2 py-1.5 text-xs" disabled={emailing} onClick={() => sendInvitations(club)}>
-                              Reenviar invitación
-                            </button>
-                            <button className="px-2 py-1.5 text-xs font-bold text-danger-700" onClick={() => revokeInvitation(club)}>
-                              Revocar acceso
-                            </button>
-                          </>
-                        )}
-                        {club.status === 'received' && (
-                          <button className="ml-2 font-semibold text-brand-800" onClick={() => viewDetail(club)}>
-                            Ver detalle
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </section>
         <section className="mt-12 flex justify-end border-t border-danger-700/20 pt-6">
           <button className="inline-flex items-center gap-2 rounded-lg border border-danger-700 px-4 py-2.5 font-bold text-danger-700 transition hover:bg-danger-50" onClick={requestDelete}>
@@ -422,12 +338,8 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
             </button>
             <a className="btn-secondary inline-flex items-center justify-center gap-1 text-xs" href={url} target="_blank" rel="noreferrer">
               <ExternalLink className="size-3" />
-              Abrir
+              Abrir panel de inscripciones
             </a>
-            <button className="inline-flex items-center justify-center gap-1 text-xs font-semibold text-slate-500 hover:underline" title="Crea un enlace nuevo para este club; el anterior deja de funcionar" onClick={() => onRegenerateToken(club)}>
-              <RefreshCw className="size-3" />
-              Regenerar enlace
-            </button>
           </>
         )}
         {club.email && (
@@ -438,7 +350,13 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
         )}
         {club.status === 'received' && (
           <button className="btn-secondary text-xs" onClick={() => onOpenDetail(club)}>
-            Ver detalle
+            Ver inscripciones
+          </button>
+        )}
+        {url && (
+          <button className="inline-flex items-center justify-center gap-1 text-xs font-semibold text-slate-500 hover:underline" title="Crea un enlace nuevo para este club; el anterior deja de funcionar" onClick={() => onRegenerateToken(club)}>
+            <RefreshCw className="size-3" />
+            Crear enlace nuevo
           </button>
         )}
       </div>

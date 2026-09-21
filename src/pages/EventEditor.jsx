@@ -93,7 +93,7 @@ export default function EventEditor({ eventId, cloneId }) {
   const updateEvent = (eventPtr, patch) => set('events', form.events.map((event) => (event.event_ptr === eventPtr ? { ...event, ...patch } : event)))
 
   const addClub = async () => {
-    if (!newClub.name.trim() || !newClub.code || masterClubs.some((item) => Number(item.code) === Number(newClub.code))) return setError('Escribe un nombre y un codigo numerico unico')
+    if (!newClub.name.trim() || !newClub.code || masterClubs.some((item) => Number(item.code) === Number(newClub.code))) return setError('Escribe un nombre y un código numérico único')
     const club = ensureClubPin({
       name: newClub.name.trim(),
       code: Number(newClub.code),
@@ -127,7 +127,7 @@ export default function EventEditor({ eventId, cloneId }) {
       if (!form.reference_date) missing.push('fecha de referencia')
       if (!form.clubs.length) missing.push('al menos un club')
       if (!form.events.some((event) => event.active)) missing.push('al menos una prueba activa')
-      if (invalidEmails.length) return 'Corrige los correos invalidos antes de guardar'
+      if (invalidEmails.length) return 'Corrige los correos inválidos antes de guardar'
     }
     return missing.length ? `Completa: ${missing.join(', ')}` : 'Revisa los datos antes de guardar'
   }
@@ -154,21 +154,21 @@ export default function EventEditor({ eventId, cloneId }) {
       </AdminHeader>
       <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[.2em] text-brand-800">Configuracion</p>
+          <p className="text-sm font-bold uppercase tracking-[.2em] text-brand-800">Configuración</p>
           <h1 className="mt-1 text-3xl font-extrabold">{eventId ? 'Editar evento' : cloneId ? 'Clonar evento' : 'Crear evento nuevo'}</h1>
-          <p className="mt-1 text-slate-500">Elige si este evento recibira inscripciones o solo publicara resultados desde Drive.</p>
+          <p className="mt-1 text-slate-500">Elige si este evento recibirá inscripciones o solo publicará resultados desde Drive.</p>
         </div>
 
         <ModeSelector value={eventMode} onChange={setEventMode} />
 
         {imported && (
           <div className="rounded-lg border border-warning-800/30 bg-warning-50 p-4 text-warning-800">
-            <strong>Evento importado desde Meet Manager.</strong> Revisa los datos y activalo cuando estes listo.
+            <strong>Evento importado desde Meet Manager.</strong> Revisa los datos y actívalo cuando estés listo.
           </div>
         )}
         {error && <p className="rounded-lg bg-danger-50 p-3 text-danger-700">{error}</p>}
 
-        <Step number="1" title="Datos basicos">
+        <Step number="1" title="Datos básicos">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Nombre del evento *">
               <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="V Copa Navidad Mantarrayas 2026" />
@@ -202,12 +202,12 @@ export default function EventEditor({ eventId, cloneId }) {
             <label>
               <span className="label">Link de Google Drive</span>
               <input type="url" className="input" value={form.drive_url || ''} onChange={(e) => set('drive_url', e.target.value)} placeholder="https://drive.google.com/drive/folders/..." />
-              <span className="field-help">La carpeta de Drive donde subiras los resultados de Hy-Tek durante el evento</span>
+              <span className="field-help">La carpeta de Drive donde subirás los resultados de Hy-Tek durante el evento</span>
             </label>
             <label className="flex items-start gap-3 rounded-lg border bg-slate-50 p-3">
               <input type="checkbox" className="mt-1" checked={form.show_on_landing !== false} onChange={(e) => set('show_on_landing', e.target.checked)} />
               <span>
-                <strong className="text-sm text-brand-800">Mostrar en landing publica</strong>
+                <strong className="text-sm text-brand-800">Mostrar en landing pública</strong>
                 <span className="field-help">Solo los eventos con link de Drive y este checkbox activado aparecen en la landing</span>
               </span>
             </label>
@@ -217,7 +217,7 @@ export default function EventEditor({ eventId, cloneId }) {
         {!resultsOnly && (
           <CollapsibleStep number="2" title="Opciones adicionales" open={showAdvancedOptions} onToggle={() => setShowAdvancedOptions((value) => !value)}>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Limite de inscripcion">
+              <Field label="Límite de inscripción">
                 <input type="date" className="input" value={form.deadline || ''} onChange={(e) => set('deadline', e.target.value)} />
               </Field>
               <Field label="WhatsApp del organizador">
@@ -243,7 +243,7 @@ export default function EventEditor({ eventId, cloneId }) {
         )}
 
         {!resultsOnly && (
-          <CollapsibleStep number="4" title="Pruebas de natacion" open={showEventsSection} onToggle={() => setShowEventsSection((value) => !value)}>
+          <CollapsibleStep number="4" title="Pruebas de natación" open={showEventsSection} onToggle={() => setShowEventsSection((value) => !value)}>
             <EventSelector form={form} filters={filters} setFilters={setFilters} visibleEvents={visibleEvents} set={set} toggleEvents={toggleEvents} updateEvent={updateEvent} />
           </CollapsibleStep>
         )}
@@ -309,10 +309,10 @@ function ModeSelector({ value, onChange }) {
       <p className="text-sm font-bold uppercase tracking-[.16em] text-brand-800">Modo del evento</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <ModeButton active={value === 'results'} title="Solo resultados (Drive)" onClick={() => onChange('results')}>
-          Crea una tarjeta publica para publicar series, carriles y resultados desde Google Drive.
+          Crea una tarjeta pública para publicar series, carriles y resultados desde Google Drive.
         </ModeButton>
         <ModeButton active={value === 'inscriptions'} title="Con inscripciones" onClick={() => onChange('inscriptions')}>
-          Configura clubes, pruebas, tokens e inscripcion de nadadores.
+          Configura clubes, pruebas, tokens e inscripción de nadadores.
         </ModeButton>
       </div>
     </section>
@@ -352,7 +352,7 @@ function ClubSelector({ masterClubs, formClubs, invalidEmails, selected, toggleC
               <label className="flex cursor-pointer items-center gap-3 font-bold">
                 <input type="checkbox" checked={selected(club.code)} onChange={() => toggleClub(club)} />
                 {club.name}
-                {selected(club.code) && !current?.email && <span title="Sin correo - no se podra enviar invitacion" className="text-warning-800">!</span>}
+                {selected(club.code) && !current?.email && <span title="Sin correo - no se podrá enviar invitación" className="text-warning-800">!</span>}
                 <span className="ml-auto font-mono text-xs text-slate-500">#{club.code}</span>
               </label>
               {selected(club.code) && (
@@ -361,13 +361,13 @@ function ClubSelector({ masterClubs, formClubs, invalidEmails, selected, toggleC
                   <input className="input text-sm" placeholder="WhatsApp" value={current?.contact_whatsapp || ''} onChange={(e) => updateClub(club.code, 'contact_whatsapp', e.target.value.replace(/\D/g, ''))} />
                   <label>
                     <input type="email" className={`input text-sm ${invalidEmail ? 'input-error' : ''}`} placeholder="entrenador@ejemplo.com" value={current?.email || ''} onChange={(e) => updateClub(club.code, 'email', e.target.value.trim())} />
-                    <span className="field-help">Correo donde se enviara la invitacion</span>
-                    {invalidEmail && <span className="block text-xs text-danger-700">Escribe un correo valido</span>}
+                    <span className="field-help">Correo donde se enviará la invitación</span>
+                    {invalidEmail && <span className="block text-xs text-danger-700">Escribe un correo válido</span>}
                   </label>
                   <label>
                     <span className="label">PIN de acceso</span>
                     <input className="input font-mono text-lg tracking-[.35em]" inputMode="numeric" maxLength="4" value={current?.pin || ''} onChange={(e) => updateClub(club.code, 'pin', normalizeClubPin(e.target.value))} />
-                    <span className="field-help">4 digitos para verificar al entrenador</span>
+                    <span className="field-help">4 dígitos para verificar al entrenador</span>
                   </label>
                 </div>
               )}
@@ -407,7 +407,7 @@ function EventSelector({ form, filters, setFilters, visibleEvents, set, toggleEv
           {[...new Set(form.events.map((item) => item.style))].map((value) => <option key={value}>{value}</option>)}
         </select>
         <select className="input" value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
-          <option value="">Todas las categorias</option>
+          <option value="">Todas las categorías</option>
           {[...new Set(form.events.map((item) => `${item.age_lo}-${item.age_hi}`))].map((value) => <option key={value}>{value}</option>)}
         </select>
       </div>
@@ -459,7 +459,7 @@ function NewClubModal({ newClub, setNewClub, addClub, close }) {
           <Field label="Nombre">
             <input className="input" value={newClub.name} onChange={(e) => setNewClub({ ...newClub, name: e.target.value })} />
           </Field>
-          <Field label="Codigo">
+          <Field label="Código">
             <input type="number" className="input" value={newClub.code} onChange={(e) => setNewClub({ ...newClub, code: e.target.value })} />
           </Field>
         </div>
