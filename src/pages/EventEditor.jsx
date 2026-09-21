@@ -47,6 +47,17 @@ export default function EventEditor({ eventId, cloneId }) {
   const [newClub, setNewClub] = useState({ name: '', code: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [pendingFocusId, setPendingFocusId] = useState(null)
+
+  useEffect(() => {
+    if (!pendingFocusId) return
+    const node = document.getElementById(pendingFocusId)
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (node instanceof HTMLInputElement) node.focus({ preventScroll: true })
+    }
+    setPendingFocusId(null)
+  }, [pendingFocusId])
 
   useEffect(() => {
     Promise.all([getMasterClubs(), eventId ? getEvent(eventId) : cloneId ? cloneEvent(cloneId) : Promise.resolve(null)])
@@ -114,26 +125,30 @@ export default function EventEditor({ eventId, cloneId }) {
   }
 
   const invalidEmails = form.clubs.filter((club) => club.email && !EMAIL_RE.test(club.email))
-  const baseValid = form.name.trim() && form.date_start && form.venue.trim()
-  const valid = resultsOnly ? baseValid : baseValid && form.reference_date && form.clubs.length && form.events.some((event) => event.active) && !invalidEmails.length
   const activeCount = form.events.filter((event) => event.active).length
 
-  const validationMessage = () => {
-    const missing = []
-    if (!form.name.trim()) missing.push('nombre')
-    if (!form.date_start) missing.push('fecha de inicio')
-    if (!form.venue.trim()) missing.push('sede')
-    if (!resultsOnly) {
-      if (!form.reference_date) missing.push('fecha de referencia')
-      if (!form.clubs.length) missing.push('al menos un club')
-      if (!form.events.some((event) => event.active)) missing.push('al menos una prueba activa')
-      if (invalidEmails.length) return 'Corrige los correos inválidos antes de guardar'
-    }
-    return missing.length ? `Completa: ${missing.join(', ')}` : 'Revisa los datos antes de guardar'
-  }
+  const issues = [
+    { id: 'field-name', active: !form.name.trim(), message: 'Escribe el nombre del evento.' },
+    { id: 'field-venue', active: !form.venue.trim(), message: 'Escribe la sede del evento.' },
+    { id: 'field-date-start', active: !form.date_start, message: 'Elige la fecha de inicio.' },
+    ...(resultsOnly
+      ? []
+      : [
+          { id: 'field-reference-date', active: !form.reference_date, message: 'Elige la fecha de referencia (Paso 1).' },
+          { id: 'section-clubs', active: !form.clubs.length, message: 'Selecciona al menos un club en la sección 3 (Clubes participantes).', expand: () => setShowClubsSection(true) },
+          { id: 'section-clubs', active: invalidEmails.length > 0, message: `Corrige el correo de ${invalidEmails[0]?.name || 'un club'} en la sección 3 (Clubes participantes).`, expand: () => setShowClubsSection(true) },
+          { id: 'section-events', active: !form.events.some((event) => event.active), message: 'Activa al menos una prueba en la sección 4 (Pruebas de natación).', expand: () => setShowEventsSection(true) }
+        ])
+  ]
 
   const save = async (activate) => {
-    if (!valid) return setError(validationMessage())
+    const issue = issues.find((item) => item.active)
+    if (issue) {
+      setError(issue.message)
+      issue.expand?.()
+      setPendingFocusId(issue.id)
+      return
+    }
     setSaving(true)
     try {
       const saved = await saveEvent(resultsOnly ? { ...form, clubs: [], events: [] } : form, activate)
@@ -171,13 +186,14 @@ export default function EventEditor({ eventId, cloneId }) {
         <Step number="1" title="Datos básicos">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Nombre del evento *">
-              <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="V Copa Navidad Mantarrayas 2026" />
+              <input id="field-name" className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="V Copa Navidad Mantarrayas 2026" />
             </Field>
             <Field label="Sede *">
-              <input className="input" value={form.venue} onChange={(e) => set('venue', e.target.value)} placeholder="Piscina Municipal de Baruta" />
+              <input id="field-venue" className="input" value={form.venue} onChange={(e) => set('venue', e.target.value)} placeholder="Piscina Municipal de Baruta" />
             </Field>
             <Field label="Fecha de inicio *">
               <input
+                id="field-date-start"
                 type="date"
                 className="input"
                 value={form.date_start}
@@ -191,12 +207,12 @@ export default function EventEditor({ eventId, cloneId }) {
                 }}
               />
             </Field>
-            <Field label="Fecha de fin">
+            <Field label="Fecha de fin" help="Opcional. Solo si el evento dura más de un día.">
               <input type="date" className="input" value={form.date_end || ''} onChange={(e) => set('date_end', e.target.value)} />
             </Field>
             {!resultsOnly && (
-              <Field label="Fecha de referencia *">
-                <input type="date" className="input" value={form.reference_date} onChange={(e) => set('reference_date', e.target.value)} />
+              <Field label="Fecha de referencia *" help="Se usa para calcular la edad de los nadadores el día de la competencia.">
+                <input id="field-reference-date" type="date" className="input" value={form.reference_date} onChange={(e) => set('reference_date', e.target.value)} />
               </Field>
             )}
             <label>
@@ -217,10 +233,10 @@ export default function EventEditor({ eventId, cloneId }) {
         {!resultsOnly && (
           <CollapsibleStep number="2" title="Opciones adicionales" open={showAdvancedOptions} onToggle={() => setShowAdvancedOptions((value) => !value)}>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Límite de inscripción">
+              <Field label="Límite de inscripción" help="Opcional. Se muestra a los clubes como fecha tope para inscribirse.">
                 <input type="date" className="input" value={form.deadline || ''} onChange={(e) => set('deadline', e.target.value)} />
               </Field>
-              <Field label="WhatsApp del organizador">
+              <Field label="WhatsApp del organizador" help="Opcional. Aparece como contacto de WhatsApp para los clubes.">
                 <input className="input" value={form.organizer_whatsapp || ''} onChange={(e) => set('organizer_whatsapp', e.target.value.replace(/\D/g, ''))} placeholder="584121234567" />
               </Field>
             </div>
@@ -228,7 +244,7 @@ export default function EventEditor({ eventId, cloneId }) {
         )}
 
         {!resultsOnly && (
-          <CollapsibleStep number="3" title="Clubes participantes" open={showClubsSection} onToggle={() => setShowClubsSection((value) => !value)}>
+          <CollapsibleStep id="section-clubs" number="3" title="Clubes participantes" open={showClubsSection} onToggle={() => setShowClubsSection((value) => !value)}>
             <ClubSelector
               masterClubs={masterClubs}
               formClubs={form.clubs}
@@ -243,7 +259,7 @@ export default function EventEditor({ eventId, cloneId }) {
         )}
 
         {!resultsOnly && (
-          <CollapsibleStep number="4" title="Pruebas de natación" open={showEventsSection} onToggle={() => setShowEventsSection((value) => !value)}>
+          <CollapsibleStep id="section-events" number="4" title="Pruebas de natación" open={showEventsSection} onToggle={() => setShowEventsSection((value) => !value)}>
             <EventSelector form={form} filters={filters} setFilters={setFilters} visibleEvents={visibleEvents} set={set} toggleEvents={toggleEvents} updateEvent={updateEvent} />
           </CollapsibleStep>
         )}
@@ -481,9 +497,9 @@ function Step({ number, title, children }) {
   )
 }
 
-function CollapsibleStep({ number, title, open, onToggle, children }) {
+function CollapsibleStep({ id, number, title, open, onToggle, children }) {
   return (
-    <section className="card p-4 sm:p-6">
+    <section id={id} className="card p-4 sm:p-6">
       <button type="button" className="mb-0 flex w-full items-center gap-3 text-left" onClick={onToggle} aria-expanded={open}>
         <StepHeader number={number} title={title} className="flex-1" />
         <ChevronDown className={`size-5 text-brand-800 transition ${open ? 'rotate-180' : ''}`} />
@@ -503,12 +519,12 @@ function StepHeader({ number, title, className = '' }) {
   )
 }
 
-function Field({ label, children }) {
+function Field({ label, help, children }) {
   return (
     <label>
       <span className="label">{label}</span>
       {children}
-      <span className="field-help">Completa este dato para configurar correctamente el evento</span>
+      {help && <span className="field-help">{help}</span>}
     </label>
   )
 }
