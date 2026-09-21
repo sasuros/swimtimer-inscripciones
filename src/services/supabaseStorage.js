@@ -5,6 +5,7 @@ import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
 import { createMagicToken } from '../utils/magicToken'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
+import { referenceDateFor } from '../utils/referenceDate'
 import { supabase as configuredClient } from './supabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
 
@@ -46,7 +47,7 @@ const eventPayload = (input, status) => ({
   date_start: input.date_start,
   date_end: input.date_end || null,
   venue: input.venue || '',
-  reference_date: input.reference_date || input.date_start,
+  reference_date: referenceDateFor(input.date_start),
   deadline: input.deadline || null,
   course: input.course || 'S',
   notes: input.notes || '',

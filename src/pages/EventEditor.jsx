@@ -5,6 +5,7 @@ import { addMasterClub, cloneEvent, getEvent, getMasterClubs, saveEvent } from '
 import { standardEventTemplate } from '../utils/eventTemplate'
 import { DEMO_WHATSAPP } from '../config'
 import { ensureClubPin, normalizeClubPin } from '../utils/clubPin'
+import { referenceDateFor } from '../utils/referenceDate'
 
 const blank = {
   id: '',
@@ -134,7 +135,6 @@ export default function EventEditor({ eventId, cloneId }) {
     ...(resultsOnly
       ? []
       : [
-          { id: 'field-reference-date', active: !form.reference_date, message: 'Elige la fecha de referencia (Paso 1).' },
           { id: 'section-clubs', active: !form.clubs.length, message: 'Selecciona al menos un club en la sección 3 (Clubes participantes).', expand: () => setShowClubsSection(true) },
           { id: 'section-clubs', active: invalidEmails.length > 0, message: `Corrige el correo de ${invalidEmails[0]?.name || 'un club'} en la sección 3 (Clubes participantes).`, expand: () => setShowClubsSection(true) },
           { id: 'section-events', active: !form.events.some((event) => event.active), message: 'Activa al menos una prueba en la sección 4 (Pruebas de natación).', expand: () => setShowEventsSection(true) }
@@ -197,22 +197,17 @@ export default function EventEditor({ eventId, cloneId }) {
                 type="date"
                 className="input"
                 value={form.date_start}
-                onChange={(e) => {
-                  const old = form.date_start
-                  setForm((current) => ({
-                    ...current,
-                    date_start: e.target.value,
-                    reference_date: !current.reference_date || current.reference_date === old ? e.target.value : current.reference_date
-                  }))
-                }}
+                onChange={(e) => set('date_start', e.target.value)}
               />
             </Field>
             <Field label="Fecha de fin" help="Opcional. Solo si el evento dura más de un día.">
               <input type="date" className="input" value={form.date_end || ''} onChange={(e) => set('date_end', e.target.value)} />
             </Field>
             {!resultsOnly && (
-              <Field label="Fecha de referencia *" help="Se usa para calcular la edad de los nadadores el día de la competencia.">
-                <input id="field-reference-date" type="date" className="input" value={form.reference_date} onChange={(e) => set('reference_date', e.target.value)} />
+              <Field label="Fecha de referencia" help="Se usa para calcular la edad de los nadadores el día de la competencia.">
+                <p className="input flex items-center bg-slate-50 text-slate-600">
+                  {form.date_start ? `La edad se calcula al 31 de diciembre de ${referenceDateFor(form.date_start).slice(0, 4)}.` : 'Elige primero la fecha de inicio.'}
+                </p>
               </Field>
             )}
             <label>

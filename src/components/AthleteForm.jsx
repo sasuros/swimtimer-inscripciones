@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { CircleAlert } from 'lucide-react'
-import { calculateAge, categoryForAge } from '../utils/ageCalculator'
+import { birthDateBounds, calculateAge, categoryForAge } from '../utils/ageCalculator'
 import { validateAthlete } from '../utils/validation'
 import useEventFilter from '../hooks/useEventFilter'
 import ErrorMessage from './ErrorMessage'
@@ -19,6 +19,7 @@ export default function AthleteForm({ roster, referenceDate, eventConfig, editin
   const age = calculateAge(form.birthDate, referenceDate)
   const eventCategories = eventConfig?.events ? [...new Map(eventConfig.events.map(event => [`${event.age_lo}-${event.age_hi}`, [event.age_lo, event.age_hi]])).values()] : undefined
   const category = categoryForAge(age, eventCategories)
+  const bounds = birthDateBounds(eventCategories, referenceDate)
   const availableEvents = useEventFilter(category, form.sex, eventConfig)
   const errors = useMemo(() => validateAthlete(form, roster, referenceDate, editing?.id, eventCategories), [form, roster, referenceDate, editing, eventConfig])
   const errorList = [...new Set(Object.values(errors))]
@@ -39,7 +40,7 @@ export default function AthleteForm({ roster, referenceDate, eventConfig, editin
       <div><label className="label" htmlFor="lastName">Apellido *</label><input id="lastName" className={fieldClass('lastName')} value={form.lastName} onChange={e => set('lastName', e.target.value)} autoComplete="family-name" placeholder="Ejemplo: Pérez" /><p className="field-help">Escribe solo el primer apellido del nadador.</p><ErrorMessage>{showErrors && errors.lastName}</ErrorMessage></div>
       <div><label className="label" htmlFor="firstName">Nombre *</label><input id="firstName" className={fieldClass('firstName')} value={form.firstName} onChange={e => set('firstName', e.target.value)} autoComplete="given-name" placeholder="Ejemplo: Ana María" /><p className="field-help">Escribe el primer nombre del nadador. Si es compuesto (como 'Ana María'), escríbelo completo.</p><ErrorMessage>{showErrors && errors.firstName}</ErrorMessage></div>
       <div><label className="label" htmlFor="sex">Sexo *</label><select id="sex" className={fieldClass('sex')} value={form.sex} onChange={e => set('sex', e.target.value)}><option value="">Elegir sexo</option><option value="F">Femenino</option><option value="M">Masculino</option></select><p className="field-help">Se usa para mostrar las pruebas disponibles</p><ErrorMessage>{showErrors && errors.sex}</ErrorMessage></div>
-      <div><label className="label" htmlFor="birthDate">Fecha de nacimiento *</label><input id="birthDate" type="date" min="2007-01-01" max="2022-12-31" className={fieldClass('birthDate')} value={form.birthDate} onChange={e => { setInteracted(true); setForm(current => ({ ...current, birthDate: e.target.value, selectedEvents: [], times: {} })) }} /><p className="field-help">La edad se calcula automáticamente</p><ErrorMessage>{showErrors && errors.birthDate}</ErrorMessage></div>
+      <div><label className="label" htmlFor="birthDate">Fecha de nacimiento *</label><input id="birthDate" type="date" min={bounds?.min} max={bounds?.max} className={fieldClass('birthDate')} value={form.birthDate} onChange={e => { setInteracted(true); setForm(current => ({ ...current, birthDate: e.target.value, selectedEvents: [], times: {} })) }} /><p className="field-help">La edad se calcula automáticamente</p><ErrorMessage>{showErrors && errors.birthDate}</ErrorMessage></div>
     </div>
     {category && form.sex && <div className="rounded-lg border border-brand-600/20 bg-brand-50 p-4 text-center text-lg font-extrabold text-brand-600">{category.label} · {form.sex === 'F' ? 'Femenino' : 'Masculino'}<span className="mt-1 block text-xs font-semibold opacity-70">Edad calculada: {age} años</span></div>}
     <ErrorMessage>{showErrors && errors.duplicate}</ErrorMessage></section>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateAge, categoryForAge } from './ageCalculator'
+import { birthDateBounds, calculateAge, categoryForAge } from './ageCalculator'
 import { formatTimeInput, validateTime } from './timeParser'
 import { ATHLETE_FIELDS, RESULT_FIELDS, buildMMExport } from './mmSchema'
 import { standardEventTemplate } from './eventTemplate'
@@ -7,6 +7,9 @@ import { standardEventTemplate } from './eventTemplate'
 describe('reglas de inscripción', () => {
   it('calcula la edad en la fecha de referencia', () => expect(calculateAge('2013-12-16', '2025-12-15')).toBe(11))
   it('ubica la categoría', () => expect(categoryForAge(12)?.label).toBe('12-13 Años'))
+  it('calcula los límites de nacimiento para una categoría amplia (19-99)', () => expect(birthDateBounds([[19, 99]], '2026-12-31')).toEqual({ min: '1927-01-01', max: '2007-12-31' }))
+  it('calcula los límites de nacimiento para categorías angostas', () => expect(birthDateBounds([[12, 13], [14, 15]], '2026-12-31')).toEqual({ min: '2011-01-01', max: '2014-12-31' }))
+  it('no calcula límites sin categorías o sin fecha de referencia', () => { expect(birthDateBounds([], '2026-12-31')).toBeNull(); expect(birthDateBounds([[19, 99]], '')).toBeNull() })
   it('exige centésimas', () => expect(validateTime('32.5')).toContain('centésimas'))
   it('acepta tiempos válidos', () => expect(validateTime('1:25.30')).toBe(''))
   it('exige dos dígitos de segundos cuando hay minutos', () => expect(validateTime('1:5.30')).not.toBe(''))

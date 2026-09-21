@@ -6,6 +6,7 @@ import { teamIdentity } from '../utils/teamUtils'
 import { buildConsolidatedExport } from '../utils/mmSchema'
 import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/demoToken'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
+import { referenceDateFor } from '../utils/referenceDate'
 
 const LEGACY_EVENT_ID = 'evt_demo_2025'
 const read = (key, fallback) => {
@@ -110,6 +111,7 @@ export function demoSaveEvent(input, activate = false) {
     id,
     clubs: input.clubs.map(teamIdentity).map(ensureClubPin),
     date_end: input.date_end || null,
+    reference_date: referenceDateFor(input.date_start),
     deadline: input.deadline || null,
     status,
     created_at: input.created_at || new Date().toISOString(),

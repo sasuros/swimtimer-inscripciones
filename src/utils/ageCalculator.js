@@ -14,3 +14,11 @@ export function categoryForAge(age, ranges = CATEGORIES) {
   const range = ranges.find(([min, max]) => age >= min && age <= max)
   return range ? { min: range[0], max: range[1], label: `${range[0]}-${range[1]} Años` } : null
 }
+
+export function birthDateBounds(categories, referenceDate) {
+  if (!categories?.length || !referenceDate) return null
+  const refYear = new Date(`${referenceDate}T12:00:00`).getFullYear()
+  const minAge = Math.min(...categories.map(([lo]) => lo))
+  const maxAge = Math.max(...categories.map(([, hi]) => hi))
+  return { min: `${refYear - maxAge}-01-01`, max: `${refYear - minAge}-12-31` }
+}

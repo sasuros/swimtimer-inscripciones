@@ -236,3 +236,29 @@ describe('saveEvent preserva invitation_sent_at (Sprint 9 Fase 1)', () => {
     expect(db.tables.event_clubs.some((row) => row.club_code === 5)).toBe(true)
   })
 })
+
+describe('reference_date blindado (v1.9.0)', () => {
+  it('saveEvent fuerza reference_date al 31 de diciembre del año de date_start, ignorando cualquier valor entrante', async () => {
+    const db = createFakeSupabase()
+    __setSupabaseClient(db)
+
+    await saveEvent({
+      name: 'Copa Navidad', date_start: '2026-09-19', venue: 'Piscina Municipal', reference_date: '2026-09-19', status: 'draft',
+      clubs: [], events: []
+    }, false)
+
+    expect(db.tables.events[0].reference_date).toBe('2026-12-31')
+  })
+
+  it('saveEvent deriva reference_date aunque no venga en el input (import de Meet Manager)', async () => {
+    const db = createFakeSupabase()
+    __setSupabaseClient(db)
+
+    await saveEvent({
+      name: 'Copa Verano', date_start: '2027-03-02', venue: 'Piscina Municipal', status: 'draft',
+      clubs: [], events: []
+    }, false)
+
+    expect(db.tables.events[0].reference_date).toBe('2027-12-31')
+  })
+})
