@@ -10,7 +10,9 @@ export default {
         male: { 50: '#e6f1fb', 800: '#0c447c' },
         danger: { 50: '#FEF2F2', 700: '#DC2626' },
         success: { 50: '#ECFDF5', 800: '#16A34A' },
-        warning: { 50: '#FFF7ED', 800: '#D97706' }
+        warning: { 50: '#FFF7ED', 800: '#D97706' },
+        caution: { 50: '#FFF7ED', 700: '#B45309' },
+        manage: { 50: '#EFF6FF', 700: '#1D4ED8' }
       }
     }
   },

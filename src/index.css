@@ -21,6 +21,8 @@
   .btn-primary:hover:not(:disabled) { background: #065f46; }
   .btn-secondary { @apply rounded-lg border border-slate-300 bg-[#F3F4F6] px-4 py-2.5 font-semibold text-slate-700 transition hover:bg-slate-200; }
   .btn-danger { @apply rounded-lg bg-danger-700 px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40; }
+  .btn-caution { @apply rounded-lg bg-caution-700 px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40; }
+  .btn-manage { @apply rounded-lg bg-manage-700 px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40; }
   .gold-divider { height: 1px; background: #d1d5db; }
   .app-header .btn-secondary { border-color: rgba(255,255,255,.55); background: transparent; color: white; }
   .app-header .btn-secondary:hover { background: rgba(255,255,255,.12); }
