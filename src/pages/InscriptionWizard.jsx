@@ -51,7 +51,7 @@ function WizardContent({ token, access }) {
     setTimeout(() => setHighlightId(null), 2000)
   }
   const editAthlete = (athlete) => {
-    setEditing(athlete)
+    setEditing({ ...athlete })
     setEntryMethod('manual')
   }
   const changeMethod = () => {

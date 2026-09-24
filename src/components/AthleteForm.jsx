@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
-import { CircleAlert } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { CircleAlert, Pencil } from 'lucide-react'
 import { birthDateBounds, calculateAge, categoryForAge } from '../utils/ageCalculator'
 import { validateAthlete } from '../utils/validation'
+import { revealEditForm } from '../utils/revealEditForm'
 import useEventFilter from '../hooks/useEventFilter'
 import ErrorMessage from './ErrorMessage'
 import EventSelector from './EventSelector'
@@ -13,6 +14,9 @@ export default function AthleteForm({ roster, referenceDate, eventConfig, editin
   const [form, setForm] = useState(() => editing ? toForm(editing) : emptyForm)
   const [attempted, setAttempted] = useState(false)
   const [interacted, setInteracted] = useState(false)
+  const formRef = useRef(null)
+  // Cada ✏️ llega como objeto nuevo (InscriptionWizard.editAthlete), así también re-enfoca al tocar el mismo nadador.
+  useEffect(() => { if (editing) revealEditForm(formRef.current) }, [editing])
   const editingKey = editing?.id || 'new'
   const [loadedKey, setLoadedKey] = useState(editingKey)
   if (loadedKey !== editingKey) { setLoadedKey(editingKey); setForm(editing ? toForm(editing) : emptyForm); setAttempted(false); setInteracted(false) }
@@ -34,8 +38,10 @@ export default function AthleteForm({ roster, referenceDate, eventConfig, editin
     setForm(emptyForm); setAttempted(false); setInteracted(false)
   }
   const fieldClass = key => `input ${showErrors && errors[key] ? 'input-error' : ''}`
-  return <form onSubmit={submit} className="card p-4 sm:p-6">
-    <div className="mb-6"><p className="text-sm font-semibold text-brand-600">{editing ? 'Editando nadador' : 'Nuevo registro'}</p><h2 className="text-xl font-bold">{editing ? `${editing.firstName} ${editing.lastName}` : `Inscribir nadador #${roster.length + 1}`}</h2></div>
+  return <form ref={formRef} onSubmit={submit} className={`card scroll-mt-4 p-4 sm:p-6 ${editing ? 'ring-2 ring-brand-600' : ''}`} data-editing={editing ? 'true' : undefined}>
+    {editing
+      ? <div className="mb-6 flex items-start gap-3 rounded-lg border border-brand-600/30 bg-brand-50 p-3" role="status"><Pencil className="mt-0.5 size-5 shrink-0 text-brand-700" /><div><h2 className="text-lg font-bold text-brand-800">{`Editando a ${editing.firstName} ${editing.lastName}`}</h2><p className="text-sm text-slate-600">Cambia lo que necesites y toca «Guardar cambios». «Cancelar» deja todo como estaba.</p></div></div>
+      : <div className="mb-6"><p className="text-sm font-semibold text-brand-600">Nuevo registro</p><h2 className="text-xl font-bold">{`Inscribir nadador #${roster.length + 1}`}</h2></div>}
     <section className="space-y-4"><StepTitle number="1" title="Datos del nadador" /><div className="grid gap-4 sm:grid-cols-2">
       <div><label className="label" htmlFor="lastName">Apellido *</label><input id="lastName" className={fieldClass('lastName')} value={form.lastName} onChange={e => set('lastName', e.target.value)} autoComplete="family-name" placeholder="Ejemplo: Pérez" /><p className="field-help">Escribe solo el primer apellido del nadador.</p><ErrorMessage>{showErrors && errors.lastName}</ErrorMessage></div>
       <div><label className="label" htmlFor="firstName">Nombre *</label><input id="firstName" className={fieldClass('firstName')} value={form.firstName} onChange={e => set('firstName', e.target.value)} autoComplete="given-name" placeholder="Ejemplo: Ana María" /><p className="field-help">Escribe el primer nombre del nadador. Si es compuesto (como 'Ana María'), escríbelo completo.</p><ErrorMessage>{showErrors && errors.firstName}</ErrorMessage></div>

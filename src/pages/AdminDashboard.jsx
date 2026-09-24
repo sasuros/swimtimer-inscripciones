@@ -402,7 +402,7 @@ function StatusBadge({ status }) {
 function ClubStatus({ status }) {
   const map = {
     received: ['bg-success-800 text-white', '● Recibida'],
-    sent: ['bg-warning-50 text-warning-800', '● Enlace enviado'],
+    sent: ['bg-warning-50 text-warning-800', '● Con enlace'],
     missing: ['bg-danger-50 text-danger-700', '● Sin enlace'],
     not_participating: ['bg-slate-200 text-slate-700', '● No participa']
   }
