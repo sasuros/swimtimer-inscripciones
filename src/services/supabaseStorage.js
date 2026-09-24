@@ -9,6 +9,7 @@ import { ensureClubPin, generateClubPin } from '../utils/clubPin'
 import { referenceDateFor } from '../utils/referenceDate'
 import { supabase as configuredClient } from './supabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
+import { AUDIT_FIELDS, logAdminAction, statusAction } from './auditLog'
 
 let client = configuredClient
 
@@ -150,17 +151,64 @@ export async function upsertClub(club) {
 
 export const addMasterClub = upsertClub
 
+// Firma estable para comparar: '' / null / undefined valen lo mismo y las claves
+// de objetos se ordenan (jsonb no conserva el orden de las claves).
+const stableJson = (value) => JSON.stringify(value === '' || value === undefined ? null : value, (_key, item) => (item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item))
+const DIFF_FIELDS = AUDIT_FIELDS.filter((field) => !['clubs', 'pruebas'].includes(field))
+const pruebasSignature = (rows) => stableJson([...rows].map((row) => [Number(row.event_ptr), Number(row.distance), row.style, Number(row.age_lo), Number(row.age_hi), row.sex, row.active !== false]).sort((a, b) => a[0] - b[0]))
+
+// Qué registrar al guardar desde el editor: cambio de estado (incluye el reabrir
+// silencioso por formulario desactualizado) y nombres de campos cambiados.
+// Sin fila previa es una creación, que no se registra en Fase 1.
+// Si las lecturas fallan, no se registra nada y el guardado sigue igual.
+async function editorAuditEntries(id, status, payload, selectedCodes, currentClubRows, pruebas) {
+  try {
+    const previous = unwrap(await db().from('events').select('*').eq('id', id).maybeSingle())
+    if (!previous) return []
+    const previousPruebas = unwrap(await db().from('event_events').select('event_ptr,distance,style,age_lo,age_hi,sex,active').eq('event_id', id))
+    const entries = []
+    if (previous.status !== status) entries.push({ action: statusAction(previous.status, status), details: { from: previous.status, to: status, via: 'editor' } })
+    const previousCodes = new Set(currentClubRows.map((row) => Number(row.club_code)))
+    const campos = DIFF_FIELDS.filter((field) => stableJson(previous[field]) !== stableJson(payload[field]))
+    if (previousCodes.size !== selectedCodes.size || [...selectedCodes].some((code) => !previousCodes.has(code))) campos.push('clubs')
+    if (pruebasSignature(previousPruebas) !== pruebasSignature(pruebas)) campos.push('pruebas')
+    if (campos.length) entries.push({ action: 'event.details_updated', details: { campos, via: 'editor' } })
+    return entries
+  } catch (error) {
+    console.warn('audit_log:', error?.message)
+    return []
+  }
+}
+
 export async function saveEvent(input, activate = false) {
   const id = input.id || `evt_${crypto.randomUUID().slice(0, 8)}`
   const status = activate ? 'active' : input.status || 'draft'
   const event = { ...input, id }
-  unwrap(await db().from('events').upsert(eventPayload(event, status), { onConflict: 'id' }))
-
+  const payload = eventPayload(event, status)
   const clubs = (input.clubs || []).map(teamIdentity).map(ensureClubPin)
-  if (clubs.length) unwrap(await db().from('clubs').upsert(clubs.map(clubPayload), { onConflict: 'code' }))
+  const selectedCodes = new Set(clubs.map((club) => Number(club.code)))
 
   const currentClubRows = unwrap(await db().from('event_clubs').select('club_code').eq('event_id', id))
-  const selectedCodes = new Set(clubs.map((club) => Number(club.code)))
+  const auditEntries = input.id ? await editorAuditEntries(id, status, payload, selectedCodes, currentClubRows, input.events || []) : []
+  const logAll = async (outcome) => {
+    for (const entry of auditEntries) await logAdminAction(client, { ...entry, eventId: id, outcome })
+  }
+
+  try {
+    await persistEvent(id, payload, clubs, selectedCodes, currentClubRows, input, activate)
+  } catch (error) {
+    await logAll('failure')
+    throw error
+  }
+  await logAll('success')
+  return getEvent(id)
+}
+
+async function persistEvent(id, payload, clubs, selectedCodes, currentClubRows, input, activate) {
+  unwrap(await db().from('events').upsert(payload, { onConflict: 'id' }))
+
+  if (clubs.length) unwrap(await db().from('clubs').upsert(clubs.map(clubPayload), { onConflict: 'code' }))
+
   const removedCodes = currentClubRows.map((row) => Number(row.club_code)).filter((code) => !selectedCodes.has(code))
   if (removedCodes.length) {
     unwrap(await db().from('tokens').delete().eq('event_id', id).in('club_code', removedCodes))
@@ -206,7 +254,6 @@ export async function saveEvent(input, activate = false) {
     )
   }
   if (activate) await generateTokens(id)
-  return getEvent(id)
 }
 
 export const createEvent = (data) => saveEvent(data, false)
@@ -504,11 +551,24 @@ export const exportAll = exportConsolidated
 export const exportSupplement = (eventId) => exportConsolidated(eventId, 'supplement')
 
 export async function updateEventStatus(id, status) {
+  let from
+  try {
+    from = unwrap(await db().from('events').select('status').eq('id', id).maybeSingle())?.status
+  } catch (error) {
+    console.warn('audit_log:', error?.message) // sin estado previo el log sale sin "from"
+  }
+  const entry = { action: statusAction(from, status), eventId: id, details: { from, to: status, via: 'dashboard' } }
   const updates = { status }
   if (status === 'active') updates.opened_at = new Date().toISOString()
   if (['accepting_late', 'closed'].includes(status)) updates.closed_at = new Date().toISOString()
-  unwrap(await db().from('events').update(updates).eq('id', id))
-  if (status === 'active') await generateTokens(id)
+  try {
+    unwrap(await db().from('events').update(updates).eq('id', id))
+    if (status === 'active') await generateTokens(id)
+  } catch (error) {
+    await logAdminAction(client, { ...entry, outcome: 'failure' })
+    throw error
+  }
+  await logAdminAction(client, entry)
   return getEvent(id)
 }
 

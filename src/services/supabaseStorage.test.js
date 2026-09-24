@@ -4,6 +4,7 @@ import {
   __setSupabaseClient,
   getMasterClubs,
   saveEvent,
+  updateEventStatus,
   updateLandingSettings,
   upsertClub,
   validateToken
@@ -17,7 +18,7 @@ afterEach(() => __setSupabaseClient(null))
 // payload -- en vez de reemplazar la fila entera. Es la única forma de que
 // el test detecte de verdad si invitation_sent_at sobrevive o no.
 function createFakeSupabase(seed = {}) {
-  const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], ...seed }
+  const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], audit_log: [], ...seed }
 
   const matchesFilters = (row, filters) =>
     filters.every(([col, op, value]) => (op === 'in' ? value.includes(row[col]) : row[col] === value))
@@ -260,5 +261,113 @@ describe('reference_date blindado (v1.9.0)', () => {
     }, false)
 
     expect(db.tables.events[0].reference_date).toBe('2027-12-31')
+  })
+})
+
+describe('audit log de acciones del admin (v1.14.0)', () => {
+  const ROW = {
+    id: 'evt-1', name: 'Copa', date_start: '2026-05-01', date_end: null, venue: 'Sede A',
+    reference_date: '2026-12-31', deadline: null, course: 'S', notes: '', drive_url: '',
+    is_live: 'upcoming', show_on_landing: true, organizer: 'Org', organizer_whatsapp: '584120000000',
+    imported_from: {}, opened_at: null, closed_at: null, created_at: '2026-04-01T00:00:00.000Z'
+  }
+  const PRUEBA = { event_ptr: 1, distance: 50, style: 'Libre', age_lo: 9, age_hi: 10, sex: 'F', active: true }
+
+  function seed(status) {
+    const db = createFakeSupabase()
+    db.tables.events.push({ ...ROW, status })
+    db.tables.clubs.push({ code: 5, name: 'Club Cinco', short_name: 'C5', abbreviation: 'CIN' })
+    db.tables.event_clubs.push({ event_id: 'evt-1', club_code: 5, status: 'invited', contact_name: '', contact_whatsapp: '', email: '', pin: '1234', invitation_sent_at: null, invitation_error: '' })
+    db.tables.event_events.push({ event_id: 'evt-1', ...PRUEBA })
+    return db
+  }
+  // Formulario tal como lo carga el editor: mismos valores que la fila guardada.
+  const form = (patch = {}) => ({ ...ROW, clubs: [{ code: 5, name: 'Club Cinco', pin: '1234' }], events: [{ ...PRUEBA }], ...patch })
+
+  // Envuelve el fake para romper tablas a pedido.
+  function breaking(db, { audit, eventsUpdate } = {}) {
+    return {
+      tables: db.tables,
+      from(table) {
+        if (table === 'audit_log' && audit === 'throw') return { insert: () => Promise.reject(new Error('audit caído')) }
+        if (table === 'audit_log' && audit === 'error') return { insert: () => Promise.resolve({ data: null, error: { message: 'RLS' } }) }
+        const builder = db.from(table)
+        if (table === 'events' && eventsUpdate) builder.update = () => ({ eq: () => Promise.resolve({ data: null, error: { message: 'update falló' } }) })
+        return builder
+      }
+    }
+  }
+
+  it('updateEventStatus closed → active registra event.reopened con from/to', async () => {
+    const db = seed('closed')
+    __setSupabaseClient(db)
+    await updateEventStatus('evt-1', 'active')
+    expect(db.tables.audit_log).toEqual([{ action: 'event.reopened', event_id: 'evt-1', club_code: null, details: { from: 'closed', to: 'active', via: 'dashboard' }, outcome: 'success' }])
+  })
+
+  it('updateEventStatus registra cierre con tardías, cierre definitivo y archivo', async () => {
+    const db = seed('active')
+    __setSupabaseClient(db)
+    await updateEventStatus('evt-1', 'accepting_late')
+    await updateEventStatus('evt-1', 'closed')
+    await updateEventStatus('evt-1', 'archived')
+    expect(db.tables.audit_log.map((row) => row.action)).toEqual(['event.closed_accepting_late', 'event.closed_final', 'event.archived'])
+  })
+
+  it('saveEvent(form, true) sobre un evento cerrado registra event.reopened vía editor', async () => {
+    const db = seed('closed')
+    __setSupabaseClient(db)
+    await saveEvent(form({ status: 'closed' }), true)
+    expect(db.tables.audit_log).toEqual([expect.objectContaining({ action: 'event.reopened', details: { from: 'closed', to: 'active', via: 'editor' } })])
+  })
+
+  it('reabrir silencioso: base cerrada, formulario viejo en active, "Guardar cambios" queda registrado', async () => {
+    const db = seed('closed')
+    __setSupabaseClient(db)
+    await saveEvent(form({ status: 'active' }), false)
+    expect(db.tables.events[0].status).toBe('active') // no se tapa en este sprint, solo se registra
+    expect(db.tables.audit_log).toEqual([expect.objectContaining({ action: 'event.reopened', details: { from: 'closed', to: 'active', via: 'editor' } })])
+  })
+
+  it('editar evento registra solo los nombres de los campos cambiados, sin valores', async () => {
+    const db = seed('active')
+    __setSupabaseClient(db)
+    await saveEvent(form({ status: 'active', venue: 'Sede Nueva Secreta', drive_url: 'https://drive.example/x' }), false)
+    expect(db.tables.audit_log).toEqual([{ action: 'event.details_updated', event_id: 'evt-1', club_code: null, details: { campos: ['drive_url', 'venue'], via: 'editor' }, outcome: 'success' }])
+    expect(JSON.stringify(db.tables.audit_log)).not.toMatch(/Secreta|drive\.example/)
+  })
+
+  it('cambios de clubes y pruebas se registran como nombres de campo, sin detalle por club', async () => {
+    const db = seed('active')
+    __setSupabaseClient(db)
+    await saveEvent(form({ status: 'active', clubs: [{ code: 5, name: 'Club Cinco', pin: '1234' }, { code: 9, name: 'Club Nueve', pin: '9999', email: 'x@y.com' }], events: [{ ...PRUEBA, distance: 100 }] }), false)
+    expect(db.tables.audit_log[0].details).toEqual({ campos: ['clubs', 'pruebas'], via: 'editor' })
+    expect(JSON.stringify(db.tables.audit_log)).not.toMatch(/Nueve|x@y|9999/)
+  })
+
+  it('guardar sin cambios no registra nada; crear un evento tampoco', async () => {
+    const db = seed('active')
+    __setSupabaseClient(db)
+    await saveEvent(form({ status: 'active' }), false)
+    await saveEvent({ name: 'Nuevo', date_start: '2026-06-01', venue: 'X', status: 'draft', clubs: [], events: [] }, false)
+    expect(db.tables.audit_log).toEqual([])
+  })
+
+  it.each(['throw', 'error'])('si el audit log falla (%s), la acción principal sigue igual', async (audit) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const db = seed('closed')
+    __setSupabaseClient(breaking(db, { audit }))
+    await expect(updateEventStatus('evt-1', 'archived')).resolves.toMatchObject({ status: 'archived' })
+    await expect(saveEvent(form({ status: 'archived', venue: 'Otra' }), true)).resolves.toMatchObject({ status: 'active', venue: 'Otra' })
+    expect(db.tables.audit_log).toEqual([])
+    warn.mockRestore()
+  })
+
+  it('si la acción principal falla, registra outcome failure y relanza el error', async () => {
+    const db = seed('active')
+    __setSupabaseClient(breaking(db, { eventsUpdate: true }))
+    await expect(updateEventStatus('evt-1', 'closed')).rejects.toThrow('update falló')
+    expect(db.tables.events[0].status).toBe('active')
+    expect(db.tables.audit_log).toEqual([expect.objectContaining({ action: 'event.closed_final', outcome: 'failure' })])
   })
 })

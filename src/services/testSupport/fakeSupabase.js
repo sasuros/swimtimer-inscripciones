@@ -13,7 +13,7 @@ const INSCRIPTIONS_UNIQUE = ['event_id', 'club_code', 'is_late']
 // - barrier: las primeras N escrituras sobre inscriptions esperan a juntarse y salen a la vez,
 //   para simular dos envíos que llegan al mismo tiempo (doble click / dos pestañas).
 export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = {}) {
-  const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], inscriptions: [] }
+  const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], inscriptions: [], audit_log: [] }
   const calls = []
   let nextId = 1
   let clock = Date.parse('2026-10-01T12:00:00Z')

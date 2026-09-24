@@ -135,3 +135,28 @@ CREATE POLICY auth_all_inscriptions ON inscriptions  FOR ALL TO authenticated US
 DROP POLICY IF EXISTS anon_public_events ON events;
 CREATE POLICY anon_public_events ON events FOR SELECT TO anon
   USING (show_on_landing = true AND status IN ('active','closed','archived'));
+
+-- Audit log (v1.14.0): solo-agregar, sin FK a events para que sobreviva al borrado.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  actor TEXT NOT NULL DEFAULT (auth.jwt() ->> 'email'),
+  actor_type TEXT NOT NULL DEFAULT 'admin' CHECK (actor_type IN ('admin', 'coach', 'system')),
+  action TEXT NOT NULL,
+  event_id TEXT,        -- sin FK a propósito: el historial sobrevive al borrado del evento
+  club_code INTEGER,
+  details JSONB NOT NULL DEFAULT '{}',
+  outcome TEXT NOT NULL DEFAULT 'success' CHECK (outcome IN ('success', 'failure'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_event ON audit_log(event_id, created_at DESC);
+
+-- Append-only: el admin inserta (firmado con su propio email) y lee; nadie edita ni borra.
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS audit_insert ON audit_log;
+DROP POLICY IF EXISTS audit_select ON audit_log;
+CREATE POLICY audit_insert ON audit_log FOR INSERT TO authenticated
+  WITH CHECK (actor = auth.jwt() ->> 'email');
+CREATE POLICY audit_select ON audit_log FOR SELECT TO authenticated USING (true);
+REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM authenticated, anon;
+REVOKE INSERT, SELECT ON audit_log FROM anon;
