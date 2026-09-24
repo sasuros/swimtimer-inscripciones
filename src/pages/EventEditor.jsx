@@ -169,19 +169,19 @@ export default function EventEditor({ eventId, cloneId }) {
       </AdminHeader>
       <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[.2em] text-brand-800">Configuración</p>
+          <p className="text-sm font-bold uppercase tracking-[.2em] text-ink-strong">Configuración</p>
           <h1 className="mt-1 text-3xl font-extrabold">{eventId ? 'Editar evento' : cloneId ? 'Clonar evento' : 'Crear evento nuevo'}</h1>
-          <p className="mt-1 text-slate-500">Elige si este evento recibirá inscripciones o solo publicará resultados desde Drive.</p>
+          <p className="mt-1 text-ink-muted">Elige si este evento recibirá inscripciones o solo publicará resultados desde Drive.</p>
         </div>
 
         <ModeSelector value={eventMode} onChange={setEventMode} />
 
         {imported && (
-          <div className="rounded-lg border border-warning-800/30 bg-warning-50 p-4 text-warning-800">
+          <div className="rounded-lg border border-warning-fg/30 bg-warning-bg p-4 text-warning-fg">
             <strong>Evento importado desde Meet Manager.</strong> Revisa los datos y actívalo cuando estés listo.
           </div>
         )}
-        {error && <p className="rounded-lg bg-danger-50 p-3 text-danger-700">{error}</p>}
+        {error && <p className="rounded-lg bg-danger-bg p-3 text-danger-fg">{error}</p>}
 
         <Step number="1" title="Datos básicos">
           <div className="grid gap-4 md:grid-cols-2">
@@ -205,7 +205,7 @@ export default function EventEditor({ eventId, cloneId }) {
             </Field>
             {!resultsOnly && (
               <Field label="Fecha de referencia" help="Se usa para calcular la edad de los nadadores el día de la competencia.">
-                <p className="input flex items-center bg-slate-50 text-slate-600">
+                <p className="input flex items-center bg-surface-muted text-ink-soft">
                   {form.date_start ? `La edad se calcula al 31 de diciembre de ${referenceDateFor(form.date_start).slice(0, 4)}.` : 'Elige primero la fecha de inicio.'}
                 </p>
               </Field>
@@ -215,10 +215,10 @@ export default function EventEditor({ eventId, cloneId }) {
               <input type="url" className="input" value={form.drive_url || ''} onChange={(e) => set('drive_url', e.target.value)} placeholder="https://drive.google.com/drive/folders/..." />
               <span className="field-help">La carpeta de Drive donde subirás los resultados de Hy-Tek durante el evento</span>
             </label>
-            <label className="flex items-start gap-3 rounded-lg border bg-slate-50 p-3">
+            <label className="flex items-start gap-3 rounded-lg border bg-surface-muted p-3">
               <input type="checkbox" className="mt-1" checked={form.show_on_landing !== false} onChange={(e) => set('show_on_landing', e.target.checked)} />
               <span>
-                <strong className="text-sm text-brand-800">Mostrar en landing pública</strong>
+                <strong className="text-sm text-ink-strong">Mostrar en landing pública</strong>
                 <span className="field-help">Solo los eventos con link de Drive y este checkbox activado aparecen en la landing</span>
               </span>
             </label>
@@ -266,8 +266,8 @@ export default function EventEditor({ eventId, cloneId }) {
             <Summary icon={<Check />} label="Estado" value={STATUS_LABELS[form.status] || 'Borrador'} />
           </div>
           <div className="mt-5 rounded-xl border p-4">
-            <h3 className="text-xl font-bold text-brand-800">{form.name || 'Evento sin nombre'}</h3>
-            <p className="mt-1 text-slate-500">
+            <h3 className="text-xl font-bold text-ink-strong">{form.name || 'Evento sin nombre'}</h3>
+            <p className="mt-1 text-ink-muted">
               {form.date_start || 'Sin fecha'} - {form.venue || 'Sin sede'}
             </p>
           </div>
@@ -295,7 +295,7 @@ export default function EventEditor({ eventId, cloneId }) {
                   Guardar cambios
                 </button>
                 <button
-                  className="rounded-lg border border-danger-700 px-4 py-2.5 font-bold text-danger-700 transition hover:bg-danger-50"
+                  className="rounded-lg border border-danger-fg px-4 py-2.5 font-bold text-danger-fg transition hover:bg-danger-bg"
                   disabled={saving}
                   onClick={() => {
                     if (window.confirm('Este evento está cerrado. Activarlo REABRIRÁ las inscripciones. ¿Continuar?')) save(true)
@@ -317,7 +317,7 @@ export default function EventEditor({ eventId, cloneId }) {
 function ModeSelector({ value, onChange }) {
   return (
     <section className="card p-4 sm:p-5">
-      <p className="text-sm font-bold uppercase tracking-[.16em] text-brand-800">Modo del evento</p>
+      <p className="text-sm font-bold uppercase tracking-[.16em] text-ink-strong">Modo del evento</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <ModeButton active={value === 'results'} title="Solo resultados (Drive)" onClick={() => onChange('results')}>
           Crea una tarjeta pública para publicar series, carriles y resultados desde Google Drive.
@@ -332,9 +332,9 @@ function ModeSelector({ value, onChange }) {
 
 function ModeButton({ active, title, children, onClick }) {
   return (
-    <button type="button" className={`rounded-xl border p-4 text-left transition hover:border-brand-600 ${active ? 'border-brand-600 bg-success-50' : 'border-slate-200 bg-white'}`} onClick={onClick}>
-      <span className="block text-lg font-extrabold text-brand-800">{title}</span>
-      <span className="mt-1 block text-sm text-slate-600">{children}</span>
+    <button type="button" className={`rounded-xl border p-4 text-left transition hover:border-brand-fg ${active ? 'border-brand-fg bg-success-bg' : 'border-line bg-surface'}`} onClick={onClick}>
+      <span className="block text-lg font-extrabold text-ink-strong">{title}</span>
+      <span className="mt-1 block text-sm text-ink-soft">{children}</span>
     </button>
   )
 }
@@ -359,12 +359,12 @@ function ClubSelector({ masterClubs, formClubs, invalidEmails, selected, toggleC
           const current = formClubs.find((item) => Number(item.code) === Number(club.code))
           const invalidEmail = invalidEmails.some((item) => Number(item.code) === Number(club.code))
           return (
-            <div key={club.code} className={`rounded-xl border p-3 ${selected(club.code) ? 'bg-slate-100' : 'opacity-60'}`}>
+            <div key={club.code} className={`rounded-xl border p-3 ${selected(club.code) ? 'bg-surface-alt' : 'opacity-60'}`}>
               <label className="flex cursor-pointer items-center gap-3 font-bold">
                 <input type="checkbox" checked={selected(club.code)} onChange={() => toggleClub(club)} />
                 {club.name}
-                {selected(club.code) && !current?.email && <span title="Sin correo - no se podrá enviar invitación" className="text-warning-800">!</span>}
-                <span className="ml-auto font-mono text-xs text-slate-500">#{club.code}</span>
+                {selected(club.code) && !current?.email && <span title="Sin correo - no se podrá enviar invitación" className="text-warning-fg">!</span>}
+                <span className="ml-auto font-mono text-xs text-ink-muted">#{club.code}</span>
               </label>
               {selected(club.code) && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -373,7 +373,7 @@ function ClubSelector({ masterClubs, formClubs, invalidEmails, selected, toggleC
                   <label>
                     <input type="email" className={`input text-sm ${invalidEmail ? 'input-error' : ''}`} placeholder="entrenador@ejemplo.com" value={current?.email || ''} onChange={(e) => updateClub(club.code, 'email', e.target.value.trim())} />
                     <span className="field-help">Correo donde se enviará la invitación</span>
-                    {invalidEmail && <span className="block text-xs text-danger-700">Escribe un correo válido</span>}
+                    {invalidEmail && <span className="block text-xs text-danger-fg">Escribe un correo válido</span>}
                   </label>
                   <label>
                     <span className="label">PIN de acceso</span>
@@ -424,7 +424,7 @@ function EventSelector({ form, filters, setFilters, visibleEvents, set, toggleEv
       </div>
       <div className="max-h-[520px] overflow-auto rounded-xl border">
         <table className="w-full min-w-[700px] text-left text-sm">
-          <thead className="sticky top-0 bg-slate-50">
+          <thead className="sticky top-0 bg-surface-muted">
             <tr>
               <th className="p-3">Activa</th>
               <th className="p-3">Distancia</th>
@@ -435,7 +435,7 @@ function EventSelector({ form, filters, setFilters, visibleEvents, set, toggleEv
           </thead>
           <tbody>
             {visibleEvents.map((event) => (
-              <tr key={event.event_ptr} className="border-t hover:bg-slate-100">
+              <tr key={event.event_ptr} className="border-t hover:bg-surface-alt">
                 <td className="p-3"><input type="checkbox" checked={event.active} onChange={(e) => updateEvent(event.event_ptr, { active: e.target.checked })} /></td>
                 <td className="p-2"><input type="number" className="input w-24" value={event.distance} onChange={(e) => updateEvent(event.event_ptr, { distance: Number(e.target.value) })} /></td>
                 <td className="p-2"><input className="input" value={event.style} onChange={(e) => updateEvent(event.event_ptr, { style: e.target.value })} /></td>
@@ -463,7 +463,7 @@ function EventSelector({ form, filters, setFilters, visibleEvents, set, toggleEv
 
 function NewClubModal({ newClub, setNewClub, addClub, close }) {
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/70 p-4">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-overlay/70 p-4">
       <div className="card w-full max-w-md p-5">
         <h2 className="text-xl font-bold">Agregar club</h2>
         <div className="mt-4 space-y-3">
@@ -497,7 +497,7 @@ function CollapsibleStep({ id, number, title, open, onToggle, children }) {
     <section id={id} className="card p-4 sm:p-6">
       <button type="button" className="mb-0 flex w-full items-center gap-3 text-left" onClick={onToggle} aria-expanded={open}>
         <StepHeader number={number} title={title} className="flex-1" />
-        <ChevronDown className={`size-5 text-brand-800 transition ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`size-5 text-ink-strong transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="mt-5">{children}</div>}
     </section>
@@ -526,10 +526,10 @@ function Field({ label, help, children }) {
 
 function Summary({ icon, label, value }) {
   return (
-    <div className="rounded-lg border bg-slate-50 p-4">
-      <span className="text-success-800">{icon}</span>
-      <p className="mt-3 text-sm text-slate-500">{label}</p>
-      <p className="text-2xl font-extrabold text-brand-800">{value}</p>
+    <div className="rounded-lg border bg-surface-muted p-4">
+      <span className="text-success-fg">{icon}</span>
+      <p className="mt-3 text-sm text-ink-muted">{label}</p>
+      <p className="text-2xl font-extrabold text-ink-strong">{value}</p>
     </div>
   )
 }

@@ -34,28 +34,28 @@ export default function AdminTools() {
     <AdminHeader />
     <main className="mx-auto max-w-7xl space-y-8 p-4 sm:p-6">
       <header>
-        <p className="text-sm font-bold uppercase tracking-[.2em] text-brand-800">Panel del organizador</p>
+        <p className="text-sm font-bold uppercase tracking-[.2em] text-ink-strong">Panel del organizador</p>
         <h1 className="mt-1 text-3xl font-extrabold">Herramientas SWIMTIMER</h1>
-        <p className="mt-2 text-slate-500">Descarga las herramientas de escritorio para tu PC.</p>
+        <p className="mt-2 text-ink-muted">Descarga las herramientas de escritorio para tu PC.</p>
       </header>
 
       <section className="grid gap-6 lg:grid-cols-2" aria-label="Herramientas disponibles">
         {tools.map(({ Icon, ...tool }) => <article key={tool.name} className="card flex flex-col p-5 sm:p-7">
           <div className="flex items-start gap-4">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700" aria-hidden="true"><Icon className="size-6" /></span>
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-brand-bg text-brand-700" aria-hidden="true"><Icon className="size-6" /></span>
             <div>
               <h2 className="text-xl font-extrabold normal-case">{tool.name} <span className="whitespace-nowrap text-brand-700">{tool.version}</span></h2>
-              <p className="mt-3 leading-relaxed text-slate-600">{tool.description}</p>
+              <p className="mt-3 leading-relaxed text-ink-soft">{tool.description}</p>
             </div>
           </div>
 
-          {tool.features && <ul className="mt-5 space-y-2 pl-4 text-slate-700">
+          {tool.features && <ul className="mt-5 space-y-2 pl-4 text-ink">
             {tool.features.map(feature => <li key={feature} className="flex gap-2"><span className="font-bold text-brand-700" aria-hidden="true">•</span><span>{feature}</span></li>)}
           </ul>}
 
           <dl className="mt-auto space-y-2 border-t pt-5 text-sm">
-            <div className="flex flex-wrap gap-x-2"><dt className="font-bold text-slate-700">Requisito:</dt><dd className="text-slate-600">{tool.requirement}</dd></div>
-            <div className="flex gap-2"><dt className="font-bold text-slate-700">Tamaño:</dt><dd className="text-slate-600">{tool.size}</dd></div>
+            <div className="flex flex-wrap gap-x-2"><dt className="font-bold text-ink">Requisito:</dt><dd className="text-ink-soft">{tool.requirement}</dd></div>
+            <div className="flex gap-2"><dt className="font-bold text-ink">Tamaño:</dt><dd className="text-ink-soft">{tool.size}</dd></div>
           </dl>
 
           <a className="btn-primary mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 text-center" href={tool.url} download>

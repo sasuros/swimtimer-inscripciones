@@ -39,11 +39,11 @@ export default function AdminLogin() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md items-center p-4">
       <form onSubmit={submit} className="card w-full p-8">
-        <Logo className="size-24" showByline variant="color" />
-        <h1 className="mt-5 text-2xl font-bold text-brand-800">Panel del organizador</h1>
-        <p className="mt-1 text-slate-500">Acceso privado de SWIMTIMER</p>
+        <Logo className="size-24 login-logo" showByline variant="color" />
+        <h1 className="mt-5 text-2xl font-bold text-ink-strong">Panel del organizador</h1>
+        <p className="mt-1 text-ink-muted">Acceso privado de SWIMTIMER</p>
         {DEMO_MODE && (
-          <p className="mt-4 rounded-lg bg-brand-50 p-3 text-sm text-brand-800">
+          <p className="mt-4 rounded-lg bg-brand-bg p-3 text-sm text-ink-strong">
             <strong>Demostración local:</strong> la clave es <code>{DEMO_ADMIN_PASSWORD}</code>
           </p>
         )}

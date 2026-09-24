@@ -168,17 +168,17 @@ export default function AdminDashboard({ eventId }) {
         </a>
       </AdminHeader>
       <main className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6">
-        {toast && <div className="fixed right-4 top-20 z-50 rounded-lg bg-success-50 px-4 py-3 font-bold text-success-800">{toast}</div>}
+        {toast && <div className="fixed right-4 top-20 z-50 rounded-lg bg-success-bg px-4 py-3 font-bold text-success-fg">{toast}</div>}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <a href="/admin/eventos" className="text-sm font-bold text-brand-800">
+            <a href="/admin/eventos" className="text-sm font-bold text-ink-strong">
               ← Volver al inicio
             </a>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <StatusBadge status={data.event.status} />
               <h1 className="text-2xl font-extrabold">{data.event.name}</h1>
             </div>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-sm text-ink-muted">
               {data.event.date_start} · {data.event.venue || 'Sede por definir'}
             </p>
           </div>
@@ -213,8 +213,8 @@ export default function AdminDashboard({ eventId }) {
             ['Nadadores', data.counts.athletes]
           ].map(([label, value]) => (
             <div className="card p-4" key={label}>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p>
-              <p className="mt-1 text-3xl font-extrabold text-brand-800">{value}</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">{label}</p>
+              <p className="mt-1 text-3xl font-extrabold text-ink-strong">{value}</p>
             </div>
           ))}
         </section>
@@ -223,7 +223,7 @@ export default function AdminDashboard({ eventId }) {
           <Timestamp label="Última inscripción recibida" value={data.timestamps.last_submission_at} />
           <Timestamp label="Inscripciones cerradas" value={data.timestamps.closed_at} />
         </section>
-        {error && <p className="rounded-lg bg-danger-50 p-3 text-danger-700">{error}</p>}
+        {error && <p className="rounded-lg bg-danger-bg p-3 text-danger-fg">{error}</p>}
         <LiveResultsSettings event={data.event} onSaved={load} />
         <EmailInvitationsPanel clubs={data.clubs} sending={emailing} results={invitationResults} onSendAll={() => sendInvitations(null)} />
         <LateReviewPanel submissions={data.late || []} onReview={handleReview} />
@@ -231,7 +231,7 @@ export default function AdminDashboard({ eventId }) {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
             <div>
               <h2 className="font-bold">Clubes y enlaces</h2>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-ink-muted">
                 {data.counts.total_clubs} clubes · {data.counts.received} {data.counts.received === 1 ? 'inscripción recibida' : 'inscripciones recibidas'} · {data.counts.pending} pendientes
               </p>
             </div>
@@ -249,7 +249,7 @@ export default function AdminDashboard({ eventId }) {
             ))}
           </div>
         </section>
-        <section className="mt-12 flex justify-end border-t border-danger-700/20 pt-6">
+        <section className="mt-12 flex justify-end border-t border-danger-fg/20 pt-6">
           <button className="btn-danger inline-flex items-center gap-2" onClick={requestDelete}>
             <Trash2 className="size-4" />
             Eliminar evento
@@ -280,42 +280,42 @@ function LiveResultsSettings({ event, onSaved }) {
   }
   const stateLabel = { upcoming: 'Próximamente', live: 'En vivo', finished: 'Finalizado' }[isLive]
   const downloadQr = async () => { setGeneratingQr(true); setMessage(''); try { await downloadEventQr(event) } catch (error) { setMessage(error.message) } finally { setGeneratingQr(false) } }
-  return <section className="card p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-extrabold uppercase tracking-[.18em] text-brand-600">Publicación</p><h2 className="mt-1 text-xl font-extrabold">Resultados en vivo</h2></div><span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider text-white ${isLive === 'live' ? 'live-badge' : isLive === 'upcoming' ? 'bg-[#1B3A5C]' : 'bg-slate-500'}`}>{isLive === 'live' && <span className="live-dot" />}{stateLabel}</span></div><div className="mt-5 grid gap-5 lg:grid-cols-[1fr_18rem]"><label><span className="label">Link de Google Drive *</span><input type="url" className="input" value={driveUrl} onChange={e => setDriveUrl(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." /><span className="field-help">La carpeta donde subes los HTML de resultados de Hy-Tek</span></label><label><span className="label">Estado público</span><select className="input" value={isLive} onChange={e => setIsLive(e.target.value)}><option value="upcoming">PRÓXIMAMENTE</option><option value="live">EN VIVO</option><option value="finished">FINALIZADO</option></select><span className="field-help">Controla el badge que se muestra en la landing pública</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center"><button className="btn-primary" disabled={saving} onClick={save}>{saving ? 'Guardando…' : 'Guardar cambios'}</button><a className="btn-secondary text-center" href="/" target="_blank" rel="noreferrer">Abrir landing pública</a><button className="btn-secondary inline-flex items-center justify-center gap-2" disabled={generatingQr} onClick={downloadQr}><QrCode className="size-4" />{generatingQr ? 'Generando QR…' : 'Descargar QR'}</button><span className={`text-sm font-semibold ${message === 'Cambios guardados' ? 'text-success-800' : 'text-danger-700'}`}>{message}</span></div><p className="mt-3 text-xs text-slate-500">Vista previa: swimtimer-oficial.vercel.app</p></section>
+  return <section className="card p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-extrabold uppercase tracking-[.18em] text-brand-fg">Publicación</p><h2 className="mt-1 text-xl font-extrabold">Resultados en vivo</h2></div><span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider text-white ${isLive === 'live' ? 'live-badge' : isLive === 'upcoming' ? 'bg-info-solid' : 'bg-slate-500'}`}>{isLive === 'live' && <span className="live-dot" />}{stateLabel}</span></div><div className="mt-5 grid gap-5 lg:grid-cols-[1fr_18rem]"><label><span className="label">Link de Google Drive *</span><input type="url" className="input" value={driveUrl} onChange={e => setDriveUrl(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." /><span className="field-help">La carpeta donde subes los HTML de resultados de Hy-Tek</span></label><label><span className="label">Estado público</span><select className="input" value={isLive} onChange={e => setIsLive(e.target.value)}><option value="upcoming">PRÓXIMAMENTE</option><option value="live">EN VIVO</option><option value="finished">FINALIZADO</option></select><span className="field-help">Controla el badge que se muestra en la landing pública</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center"><button className="btn-primary" disabled={saving} onClick={save}>{saving ? 'Guardando…' : 'Guardar cambios'}</button><a className="btn-secondary text-center" href="/" target="_blank" rel="noreferrer">Abrir landing pública</a><button className="btn-secondary inline-flex items-center justify-center gap-2" disabled={generatingQr} onClick={downloadQr}><QrCode className="size-4" />{generatingQr ? 'Generando QR…' : 'Descargar QR'}</button><span className={`text-sm font-semibold ${message === 'Cambios guardados' ? 'text-success-fg' : 'text-danger-fg'}`}>{message}</span></div><p className="mt-3 text-xs text-ink-muted">Vista previa: swimtimer-oficial.vercel.app</p></section>
 }
 
 function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEmail, onRevoke, onToggle, onRegeneratePin, onRegenerateToken }) {
   const inactive = club.status === 'not_participating'
   if (inactive)
     return (
-      <article className="rounded-xl border border-slate-200 bg-slate-100 p-4 text-slate-500 opacity-70">
+      <article className="rounded-xl border border-line bg-surface-alt p-4 text-ink-muted opacity-70">
         <div className="flex flex-wrap items-center gap-3">
           <ClubStatus status={club.status} />
           <h3 className="font-extrabold">
             {club.name} <span className="font-mono text-xs">{club.abbreviation}</span>
           </h3>
         </div>
-        <button className="mt-3 text-sm font-bold text-slate-600 hover:underline" onClick={() => onToggle(club)}>
+        <button className="mt-3 text-sm font-bold text-ink-soft hover:underline" onClick={() => onToggle(club)}>
           Reincorporar
         </button>
       </article>
     )
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <ClubStatus status={club.status} />
-          <h3 className="font-extrabold text-brand-800">
-            {club.name} <span className="font-mono text-xs text-slate-500">{club.abbreviation}</span>
+          <h3 className="font-extrabold text-ink-strong">
+            {club.name} <span className="font-mono text-xs text-ink-muted">{club.abbreviation}</span>
           </h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded bg-slate-100 px-3 py-1 font-mono text-sm font-bold text-brand-800">PIN: {club.pin || '—'}</span>
-          <button className="p-1.5 text-slate-500 hover:text-brand-700" title="Regenerar PIN" aria-label={`Regenerar PIN de ${club.name}`} onClick={() => onRegeneratePin(club)}>
+          <span className="rounded bg-surface-alt px-3 py-1 font-mono text-sm font-bold text-ink-strong">PIN: {club.pin || '—'}</span>
+          <button className="p-1.5 text-ink-muted hover:text-brand-700" title="Regenerar PIN" aria-label={`Regenerar PIN de ${club.name}`} onClick={() => onRegeneratePin(club)}>
             <KeyRound className="size-4" />
           </button>
         </div>
       </div>
-      <div className="mt-3 text-sm text-slate-600">
+      <div className="mt-3 text-sm text-ink-soft">
         <p>
           {club.email || (
             <>
@@ -356,18 +356,18 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
           </button>
         )}
         {url && (
-          <button className="inline-flex items-center justify-center gap-1 text-xs font-semibold text-slate-500 hover:underline" title="Crea un enlace nuevo para este club; el anterior deja de funcionar" onClick={() => onRegenerateToken(club)}>
+          <button className="inline-flex items-center justify-center gap-1 text-xs font-semibold text-ink-muted hover:underline" title="Crea un enlace nuevo para este club; el anterior deja de funcionar" onClick={() => onRegenerateToken(club)}>
             <RefreshCw className="size-3" />
             Crear enlace nuevo
           </button>
         )}
       </div>
-      <div className="mt-3 flex flex-col items-start gap-2 border-t border-slate-100 pt-3 sm:flex-row">
-        <button className="text-xs font-semibold text-slate-500 hover:underline" onClick={() => onToggle(club)}>
+      <div className="mt-3 flex flex-col items-start gap-2 border-t border-line-soft pt-3 sm:flex-row">
+        <button className="text-xs font-semibold text-ink-muted hover:underline" onClick={() => onToggle(club)}>
           No participa
         </button>
         {club.invitation_sent_at && (
-          <button className="text-xs font-bold text-danger-700 hover:underline" onClick={() => onRevoke(club)}>
+          <button className="text-xs font-bold text-danger-fg hover:underline" onClick={() => onRevoke(club)}>
             Revocar acceso
           </button>
         )}
@@ -379,15 +379,15 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
 function Timestamp({ label, value }) {
   return (
     <div>
-      <p className="text-slate-500">{label}</p>
+      <p className="text-ink-muted">{label}</p>
       <p className="mt-1 font-bold">{value ? new Date(value).toLocaleString('es-VE') : '—'}</p>
     </div>
   )
 }
 function EmailStatus({ club }) {
-  if (club.invitation_error) return <p className="mt-1 text-xs text-danger-700">📧 Error: {club.invitation_error}</p>
-  if (club.invitation_sent_at) return <p className="mt-1 text-xs text-success-800">📧 Invitación enviada · {new Date(club.invitation_sent_at).toLocaleString('es-VE')}</p>
-  return <p className="mt-1 text-xs text-slate-400">📧 No enviada</p>
+  if (club.invitation_error) return <p className="mt-1 text-xs text-danger-fg">📧 Error: {club.invitation_error}</p>
+  if (club.invitation_sent_at) return <p className="mt-1 text-xs text-success-fg">📧 Invitación enviada · {new Date(club.invitation_sent_at).toLocaleString('es-VE')}</p>
+  return <p className="mt-1 text-xs text-ink-subtle">📧 No enviada</p>
 }
 function StatusBadge({ status }) {
   const labels = {
@@ -397,14 +397,14 @@ function StatusBadge({ status }) {
     closed: 'Cerrado',
     archived: 'Archivado'
   }
-  return <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${status === 'active' ? 'bg-success-800 text-white' : status === 'accepting_late' ? 'bg-warning-800 text-white' : 'bg-slate-200 text-slate-700'}`}>{labels[status] || status}</span>
+  return <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${status === 'active' ? 'bg-success-solid text-white' : status === 'accepting_late' ? 'bg-warning-solid text-white' : 'bg-surface-strong text-ink'}`}>{labels[status] || status}</span>
 }
 function ClubStatus({ status }) {
   const map = {
-    received: ['bg-success-800 text-white', '● Recibida'],
-    sent: ['bg-warning-50 text-warning-800', '● Con enlace'],
-    missing: ['bg-danger-50 text-danger-700', '● Sin enlace'],
-    not_participating: ['bg-slate-200 text-slate-700', '● No participa']
+    received: ['bg-success-solid text-white', '● Recibida'],
+    sent: ['bg-warning-bg text-warning-fg', '● Con enlace'],
+    missing: ['bg-danger-bg text-danger-fg', '● Sin enlace'],
+    not_participating: ['bg-surface-strong text-ink', '● No participa']
   }
   return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${map[status][0]}`}>{map[status][1]}</span>
 }
@@ -412,12 +412,12 @@ function Detail({ club, regular, late, onClose }) {
   const view = mergeClubInscriptions(regular, late)
   const title = regular?.meta?.club_name || club.name
   return (
-    <div className="fixed inset-0 z-20 overflow-y-auto bg-slate-950/70 p-4">
+    <div className="fixed inset-0 z-20 overflow-y-auto bg-overlay/70 p-4">
       <section className="card no-print mx-auto max-w-4xl p-5 sm:p-6">
         <div className="flex justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold">{title}</h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-ink-muted">
               {view.athleteCount} nadadores · {view.resultCount} inscripciones
             </p>
           </div>
@@ -428,9 +428,9 @@ function Detail({ club, regular, late, onClose }) {
         <DetailRoster roster={view.regularRoster} />
         {view.lateApprovedRoster.length > 0 && (
           <div className="mt-6">
-            <h3 className="flex items-center gap-2 font-bold text-warning-800">
+            <h3 className="flex items-center gap-2 font-bold text-warning-fg">
               Tardías aprobadas
-              <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs">{view.lateApprovedRoster.length}</span>
+              <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs">{view.lateApprovedRoster.length}</span>
             </h3>
             <DetailRoster roster={view.lateApprovedRoster} late />
           </div>
@@ -455,11 +455,11 @@ function DetailRoster({ roster, late = false }) {
   return (
     <div className="mt-3 space-y-3">
       {roster.map((athlete) => (
-        <div key={athlete.id} className={`rounded-lg border p-3 ${late ? 'border-warning-800/30 bg-warning-50' : 'bg-slate-100'}`}>
+        <div key={athlete.id} className={`rounded-lg border p-3 ${late ? 'border-warning-fg/30 bg-warning-bg' : 'bg-surface-alt'}`}>
           <p className="font-bold">
             {athlete.lastName}, {athlete.firstName} · {athlete.sex} · {athlete.age} años
           </p>
-          <p className="mt-1 text-sm text-slate-600">{athlete.events.map((item) => `${item.label}: ${item.time}`).join(' · ')}</p>
+          <p className="mt-1 text-sm text-ink-soft">{athlete.events.map((item) => `${item.label}: ${item.time}`).join(' · ')}</p>
         </div>
       ))}
     </div>

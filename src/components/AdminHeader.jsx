@@ -1,6 +1,8 @@
-import { CalendarDays, LogOut, Wrench } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarDays, LogOut, Moon, Sun, Wrench } from 'lucide-react'
 import { DEMO_MODE } from '../config'
 import { supabase } from '../services/supabase'
+import { applyAdminTheme, saveAdminTheme } from '../utils/adminTheme'
 import Logo from './Logo'
 
 /* global __APP_VERSION__ */
@@ -15,6 +17,14 @@ export default function AdminHeader({ children }) {
   const path = window.location.pathname
   const navClass = active => `btn-secondary inline-flex items-center gap-2 text-sm ${active ? 'bg-white/15' : ''}`
   const eventsActive = path === '/admin' || path.startsWith('/admin/eventos')
+  const [theme, setTheme] = useState(() => (document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'))
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    saveAdminTheme(next)
+    applyAdminTheme(next)
+    setTheme(next)
+  }
+  const themeLabel = theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'
 
   return <header className="app-header border-b border-[#1B3A5C] bg-[#1B3A5C] text-white">
     <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-3 sm:gap-4 sm:px-6">
@@ -29,6 +39,7 @@ export default function AdminHeader({ children }) {
         <a className={navClass(path === '/admin/herramientas')} href="/admin/herramientas" aria-current={path === '/admin/herramientas' ? 'page' : undefined}><Wrench className="size-4" />Herramientas</a>
       </nav>
       {children}
+      <button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={toggleTheme} aria-pressed={theme === 'dark'} aria-label={themeLabel} title={themeLabel}>{theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}</button>
       <button className="btn-secondary inline-flex items-center gap-2 text-sm" onClick={logout}><LogOut className="size-4" /><span className="hidden sm:inline">Salir</span></button>
     </div>
   </header>

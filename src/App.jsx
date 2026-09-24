@@ -60,5 +60,5 @@ function useAdminAuth(path) {
 }
 
 function AdminLoading() {
-  return <div className="flex min-h-screen items-center justify-center bg-slate-100 font-bold text-brand-800">Verificando sesion...</div>
+  return <div className="flex min-h-screen items-center justify-center bg-app font-bold text-ink-strong">Verificando sesion...</div>
 }

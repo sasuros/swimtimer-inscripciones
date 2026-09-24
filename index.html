@@ -22,6 +22,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>SWIMTIMER · Resultados en vivo</title>
+    <!-- Modo oscuro SOLO del admin (v1.15.0): se aplica antes de pintar, y nunca fuera de /admin. -->
+    <script id="admin-theme-boot">
+      try { if (location.pathname.indexOf('/admin') === 0 && localStorage.getItem('swimtimer-admin-theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark') } catch (e) {}
+    </script>
   </head>
   <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
 </html>

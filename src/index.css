@@ -2,28 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tokens de color (v1.15.0). Valores claros = los hex exactos de antes (gate:
+   scripts/lightCss.mjs). El oscuro solo existe bajo [data-theme="dark"], que el
+   script de index.html pone únicamente en rutas /admin; y solo en pantalla, así
+   que imprimir desde oscuro siempre resuelve los tokens claros. */
+:root {
+  --app: 240 242 245; --surface: 255 255 255; --surface-muted: 248 249 250; --surface-alt: 240 242 245; --surface-strong: 229 231 235;
+  --ink: 55 65 81; --ink-strong: 44 62 80; --ink-soft: 75 85 99; --ink-muted: 107 114 128; --ink-subtle: 156 163 175;
+  --line: 229 231 235; --line-soft: 240 242 245; --line-strong: 209 213 219; --overlay: 17 24 39;
+  --control: 243 244 246; --control-hover: 229 231 235; --help: 5 150 105;
+  --brand-bg: 236 253 245; --brand-fg: 4 120 87;
+  --success-bg: 236 253 245; --success-fg: 22 163 74; --success-solid: 22 163 74;
+  --warning-bg: 255 247 237; --warning-fg: 217 119 6; --warning-solid: 217 119 6;
+  --danger-bg: 254 242 242; --danger-fg: 220 38 38; --danger-solid: 220 38 38;
+  --info-solid: 27 58 92;
+}
+@media screen {
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --app: 15 23 42; --surface: 30 41 59; --surface-muted: 34 46 65; --surface-alt: 39 52 72; --surface-strong: 61 77 102;
+    --ink: 203 213 225; --ink-strong: 241 245 249; --ink-soft: 184 196 212; --ink-muted: 156 170 191; --ink-subtle: 144 158 181;
+    --line: 51 65 85; --line-soft: 41 53 72; --line-strong: 71 85 105; --overlay: 2 6 23;
+    --control: 45 60 82; --control-hover: 61 77 102; --help: 52 211 153;
+    --brand-bg: 6 60 45; --brand-fg: 52 211 153;
+    --success-bg: 6 60 40; --success-fg: 74 222 128; --success-solid: 21 128 61;
+    --warning-bg: 66 42 8; --warning-fg: 251 191 36; --warning-solid: 180 83 9;
+    --danger-bg: 69 20 24; --danger-fg: 252 129 129; --danger-solid: 185 28 28;
+    --info-solid: 43 90 138;
+  }
+  [data-theme="dark"] .input { color-scheme: dark; }
+  /* Componentes compartidos con el wizard que no se tocan: se recalibran solo en oscuro. */
+  [data-theme="dark"] .text-danger-700 { color: rgb(var(--danger-fg)); }
+  [data-theme="dark"] .login-logo { filter: brightness(0) invert(1); }
+  [data-theme="dark"] .login-logo + span { color: rgb(var(--ink-muted)); }
+}
+
 @layer base {
-  * { border-color: #e5e7eb; }
-  body { @apply m-0 bg-slate-100 text-slate-700 antialiased; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  h1, h2 { color: #2c3e50; font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
-  h3 { color: #2c3e50; letter-spacing: .01em; }
+  * { border-color: rgb(var(--line)); }
+  body { @apply m-0 bg-app text-ink antialiased; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1, h2 { color: rgb(var(--ink-strong)); font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
+  h3 { color: rgb(var(--ink-strong)); letter-spacing: .01em; }
   button, input, select, textarea { font: inherit; }
   input[type='checkbox'] { accent-color: #047857; }
 }
 @layer components {
-  .card { @apply rounded-lg border bg-white; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .label { @apply mb-1.5 block text-sm font-semibold text-slate-700; }
-  .field-help { @apply mt-1 block text-xs font-medium; color: #059669; }
+  .card { @apply rounded-lg border bg-surface; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .label { @apply mb-1.5 block text-sm font-semibold text-ink; }
+  .field-help { @apply mt-1 block text-xs font-medium; color: rgb(var(--help)); }
   .step-number { @apply inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white; background: #047857; }
-  .input { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-700 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-50; color-scheme: light; }
-  .input-error { @apply border-danger-700 bg-danger-50 pr-10 focus:border-danger-700 focus:ring-danger-50; }
+  .input { @apply w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-ink outline-none transition focus:border-brand-fg focus:ring-2 focus:ring-brand-bg; color-scheme: light; }
+  .input-error { @apply border-danger-fg bg-danger-bg pr-10 focus:border-danger-fg focus:ring-danger-bg; }
   .btn-primary { @apply rounded-lg bg-brand-600 px-4 py-2.5 font-bold uppercase text-white transition disabled:cursor-not-allowed disabled:bg-slate-400; letter-spacing: .5px; }
   .btn-primary:hover:not(:disabled) { background: #065f46; }
-  .btn-secondary { @apply rounded-lg border border-slate-300 bg-[#F3F4F6] px-4 py-2.5 font-semibold text-slate-700 transition hover:bg-slate-200; }
-  .btn-danger { @apply rounded-lg bg-danger-700 px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40; }
+  .btn-secondary { @apply rounded-lg border border-line-strong bg-control px-4 py-2.5 font-semibold text-ink transition hover:bg-control-hover; }
+  .btn-danger { @apply rounded-lg bg-danger-solid px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40; }
   .btn-caution { @apply rounded-lg bg-caution-700 px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40; }
   .btn-manage { @apply rounded-lg bg-manage-700 px-4 py-2.5 font-bold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40; }
-  .gold-divider { height: 1px; background: #d1d5db; }
+  .gold-divider { height: 1px; background: rgb(var(--line-strong)); }
   .app-header .btn-secondary { border-color: rgba(255,255,255,.55); background: transparent; color: white; }
   .app-header .btn-secondary:hover { background: rgba(255,255,255,.12); }
   .app-header h1, .app-header h2, .app-header h3 { color: white; }
