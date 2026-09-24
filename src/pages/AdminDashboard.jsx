@@ -11,7 +11,8 @@ import PrintRoster from '../components/PrintRoster'
 import { downloadJson } from '../utils/download'
 import { downloadEventQr } from '../utils/eventQr'
 import { buildClubFileExport } from '../utils/mmSchema'
-import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getDashboard, getInscription, recordInvitationResults, regenerateClubToken, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
+import { mergeClubInscriptions } from '../utils/clubInscriptionView'
+import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getClubInscriptions, getDashboard, recordInvitationResults, regenerateClubToken, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
 import { DEMO_MODE } from '../config'
 
 export default function AdminDashboard({ eventId }) {
@@ -45,7 +46,7 @@ export default function AdminDashboard({ eventId }) {
   }
   const viewDetail = async (club) => {
     try {
-      setDetail(await getInscription(eventId, club.code))
+      setDetail({ club, ...(await getClubInscriptions(eventId, club.code)) })
     } catch (error) {
       setError(error.message)
     }
@@ -255,7 +256,7 @@ export default function AdminDashboard({ eventId }) {
           </button>
         </section>
       </main>
-      {detail && <Detail inscription={detail} onClose={() => setDetail(null)} />}
+      {detail && <Detail club={detail.club} regular={detail.regular} late={detail.late} onClose={() => setDetail(null)} />}
       {distributionOpen && <LinkDistributionModal event={data.event} eventId={eventId} clubs={data.clubs.filter((club) => club.status !== 'not_participating')} urlFor={registrationUrl} onCopy={copyText} onSendEmail={sendInvitations} emailing={emailing} onClose={() => setDistributionOpen(false)} />}
       {closeOpen && <CloseRegistrationModal event={data.event} clubs={data.clubs} urlFor={registrationUrl} onSelect={changeStatus} onClose={() => setCloseOpen(false)} />}
       {deleteOpen && <DeleteEventModal event={data.event} onClose={() => setDeleteOpen(false)} onConfirm={confirmDelete} />}
@@ -349,7 +350,7 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
             {club.invitation_sent_at ? 'Reenviar invitación' : 'Enviar invitación'}
           </button>
         )}
-        {club.status === 'received' && (
+        {(club.status === 'received' || club.late_approved_count > 0) && (
           <button className="btn-secondary text-xs" onClick={() => onOpenDetail(club)}>
             Ver inscripciones
           </button>
@@ -407,42 +408,60 @@ function ClubStatus({ status }) {
   }
   return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${map[status][0]}`}>{map[status][1]}</span>
 }
-function Detail({ inscription, onClose }) {
+function Detail({ club, regular, late, onClose }) {
+  const view = mergeClubInscriptions(regular, late)
+  const title = regular?.meta?.club_name || club.name
   return (
     <div className="fixed inset-0 z-20 overflow-y-auto bg-slate-950/70 p-4">
       <section className="card no-print mx-auto max-w-4xl p-5 sm:p-6">
         <div className="flex justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold">{inscription.meta.club_name}</h2>
+            <h2 className="text-xl font-bold">{title}</h2>
             <p className="text-sm text-slate-500">
-              {inscription.athletes.length} nadadores · {inscription.results.length} inscripciones
+              {view.athleteCount} nadadores · {view.resultCount} inscripciones
             </p>
           </div>
           <button className="btn-secondary" onClick={onClose}>
             Cerrar
           </button>
         </div>
-        <div className="mt-5 space-y-3">
-          {inscription.roster?.map((athlete) => (
-            <div key={athlete.id} className="rounded-lg border bg-slate-100 p-3">
-              <p className="font-bold">
-                {athlete.lastName}, {athlete.firstName} · {athlete.sex} · {athlete.age} años
-              </p>
-              <p className="mt-1 text-sm text-slate-600">{athlete.events.map((item) => `${item.label}: ${item.time}`).join(' · ')}</p>
-            </div>
-          ))}
-        </div>
+        <DetailRoster roster={view.regularRoster} />
+        {view.lateApprovedRoster.length > 0 && (
+          <div className="mt-6">
+            <h3 className="flex items-center gap-2 font-bold text-warning-800">
+              Tardías aprobadas
+              <span className="rounded-full bg-warning-50 px-2 py-0.5 text-xs">{view.lateApprovedRoster.length}</span>
+            </h3>
+            <DetailRoster roster={view.lateApprovedRoster} late />
+          </div>
+        )}
         <div className="mt-5 flex flex-wrap gap-2">
-          <button className="btn-primary inline-flex items-center gap-2" onClick={async () => downloadJson(await buildClubFileExport(inscription), `inscripcion-${inscription.meta.club_code}.json`)}>
-            Descargar JSON del club
-          </button>
+          {regular && (
+            <button className="btn-primary inline-flex items-center gap-2" onClick={async () => downloadJson(await buildClubFileExport(regular), `inscripcion-${regular.meta.club_code}.json`)}>
+              Descargar JSON del club
+            </button>
+          )}
           <button className="btn-secondary inline-flex items-center gap-2" onClick={() => window.print()}>
             <Printer className="size-4" />
             Imprimir / Descargar PDF
           </button>
         </div>
       </section>
-      <PrintRoster inscription={inscription} />
+      <PrintRoster title={title} view={view} />
+    </div>
+  )
+}
+function DetailRoster({ roster, late = false }) {
+  return (
+    <div className="mt-3 space-y-3">
+      {roster.map((athlete) => (
+        <div key={athlete.id} className={`rounded-lg border p-3 ${late ? 'border-warning-800/30 bg-warning-50' : 'bg-slate-100'}`}>
+          <p className="font-bold">
+            {athlete.lastName}, {athlete.firstName} · {athlete.sex} · {athlete.age} años
+          </p>
+          <p className="mt-1 text-sm text-slate-600">{athlete.events.map((item) => `${item.label}: ${item.time}`).join(' · ')}</p>
+        </div>
+      ))}
     </div>
   )
 }

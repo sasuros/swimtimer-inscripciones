@@ -12,6 +12,7 @@ const storage = DEMO_MODE
       generateTokens: demo.demoGenerateTokens,
       regenerateClubToken: demo.demoRegenerateClubToken,
       getInscription: demo.demoGetInscription,
+      getClubInscriptions: demo.demoGetClubInscriptions,
       exportAll: demo.demoExportAll,
       reviewLate: demo.demoReviewLate,
       listEvents: demo.demoListEvents,
@@ -57,6 +58,7 @@ export const getDashboard = (...args) => Promise.resolve(storage.getDashboard(..
 export const generateTokens = (...args) => Promise.resolve(storage.generateTokens(...args))
 export const regenerateClubToken = (...args) => Promise.resolve(storage.regenerateClubToken(...args))
 export const getInscription = (...args) => Promise.resolve(storage.getInscription(...args))
+export const getClubInscriptions = (...args) => Promise.resolve(storage.getClubInscriptions(...args))
 export const exportAll = (...args) => Promise.resolve(storage.exportAll(...args))
 export const reviewLate = (...args) => Promise.resolve(storage.reviewLate(...args))
 export const listEvents = (...args) => Promise.resolve(storage.listEvents(...args))

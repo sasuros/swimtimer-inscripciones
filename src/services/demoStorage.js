@@ -4,6 +4,7 @@ import { DEMO_ADMIN_PASSWORD, DEMO_WHATSAPP, STORAGE_KEYS } from '../config'
 import { standardEventTemplate } from '../utils/eventTemplate'
 import { teamIdentity } from '../utils/teamUtils'
 import { buildConsolidatedExport } from '../utils/mmSchema'
+import { mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/demoToken'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
 import { referenceDateFor } from '../utils/referenceDate'
@@ -361,11 +362,13 @@ export function demoDashboard(eventId = LEGACY_EVENT_ID) {
     const token = tokens.find((item) => (item.eventId || LEGACY_EVENT_ID) === event.id && Number(item.club.code) === Number(club.code))
     const inscription = inscriptions[inscriptionKey(event.id, club.code)] || (event.id === LEGACY_EVENT_ID ? inscriptions[club.code] : null)
     const participating = participation[participationKey(event.id, club.code)] !== false
+    const view = mergeClubInscriptions(inscription, lateMap[inscriptionKey(event.id, club.code)])
     return {
       ...club,
       status: participating ? (inscription ? 'received' : token ? 'sent' : 'missing') : 'not_participating',
-      athlete_count: participating ? inscription?.athletes?.length || 0 : 0,
-      inscription_count: participating ? inscription?.results?.length || 0 : 0,
+      athlete_count: participating ? view.athleteCount : 0,
+      inscription_count: participating ? view.resultCount : 0,
+      late_approved_count: participating ? view.lateApprovedCount : 0,
       submitted_at: participating ? inscription?.submitted_at || null : null,
       token: token?.id || null,
       expires_at: token?.expires_at || null
@@ -429,6 +432,16 @@ export function demoGetInscription(eventId, clubCode) {
   const inscription = inscriptions[inscriptionKey(eventId, clubCode)] || (eventId === LEGACY_EVENT_ID ? inscriptions[clubCode] : null)
   if (!inscription) throw new Error('Inscripción no encontrada')
   return inscription
+}
+
+// Regular + tardía (cualquiera puede faltar) para "Ver inscripciones" e Imprimir/PDF.
+export function demoGetClubInscriptions(eventId, clubCode) {
+  const inscriptions = read(STORAGE_KEYS.inscriptions, {})
+  const key = inscriptionKey(eventId, clubCode)
+  return {
+    regular: inscriptions[key] || (eventId === LEGACY_EVENT_ID ? inscriptions[clubCode] : null) || null,
+    late: read(STORAGE_KEYS.lateInscriptions, {})[key] || null
+  }
 }
 
 export function demoReviewLate(eventId, clubCode, action, athleteIds = []) {

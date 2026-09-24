@@ -1,6 +1,7 @@
 import { DEMO_ADMIN_PASSWORD, DEMO_WHATSAPP } from '../config'
 import { encodeDemoToken } from '../utils/demoToken'
 import { buildConsolidatedExport } from '../utils/mmSchema'
+import { mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
 import { createMagicToken } from '../utils/magicToken'
@@ -395,20 +396,30 @@ export async function getInscriptionForClub(eventId, clubCode) {
 
 export const getInscription = getInscriptionForClub
 
+// Regular + tardía (cualquiera puede faltar) para "Ver inscripciones" e Imprimir/PDF.
+export async function getClubInscriptions(eventId, clubCode) {
+  const [regular, late] = await Promise.all([latestInscription(eventId, clubCode, false), latestInscription(eventId, clubCode, true)])
+  return { regular: regular ? inscriptionFromRow(regular) : null, late: late ? inscriptionFromRow(late) : null }
+}
+
 export async function getDashboard(eventId) {
   const [event, tokens, rows] = await Promise.all([getEvent(eventId), getTokensForEvent(eventId), getInscriptionsForEvent(eventId)])
   const latestNormal = new Map()
   rows.filter((row) => !row.is_late).forEach((row) => latestNormal.set(Number(row.club_code), row))
+  const latestLate = new Map()
+  rows.filter((row) => row.is_late).forEach((row) => latestLate.set(Number(row.club_code), inscriptionFromRow(row)))
   const tokenByClub = new Map(tokens.map((token) => [Number(token.club_code), token]))
   const clubs = event.clubs.map((club) => {
     const inscription = latestNormal.get(Number(club.code))
     const token = tokenByClub.get(Number(club.code))
     const excluded = club.participation_status === 'not_participating'
+    const view = mergeClubInscriptions(inscription, latestLate.get(Number(club.code)))
     return {
       ...club,
       status: excluded ? 'not_participating' : inscription ? 'received' : token ? 'sent' : 'missing',
-      athlete_count: excluded ? 0 : inscription?.athletes?.length || 0,
-      inscription_count: excluded ? 0 : inscription?.results?.length || 0,
+      athlete_count: excluded ? 0 : view.athleteCount,
+      inscription_count: excluded ? 0 : view.resultCount,
+      late_approved_count: excluded ? 0 : view.lateApprovedCount,
       submitted_at: excluded ? null : inscription?.submitted_at || null,
       token: token?.token_value || null
     }

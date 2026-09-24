@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { buildClubFileExport } from '../utils/mmSchema'
-import { demoCloneEvent, demoGetInscription, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoUpdateLandingSettings, demoValidateToken } from './demoStorage'
+import { demoCloneEvent, demoGetClubInscriptions, demoGetInscription, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoUpdateLandingSettings, demoValidateToken } from './demoStorage'
 
 const memory = new Map()
 globalThis.localStorage = {
@@ -132,6 +132,36 @@ describe('storage local de la demo', () => {
     expect(clubFile.roster).toEqual(roster)
     expect(clubFile.meta.sha256).toMatch(/^[a-f0-9]{64}$/)
     expect(demoGetInscription('evt_demo_2025', 2).athletes[0].Last_name).toBe('De la Cruz Pérez')
+  })
+
+  it('tardías aprobadas suman al contador del club y aparecen en su detalle', async () => {
+    const [first, second] = demoGenerateTokens().tokens
+    const code = first.club.code
+    const athletes = n => Array.from({ length: n }, (_, i) => ({ Ath_no: code * 1000 + i + 1, Team_no: code, Last_name: `N${i}`, First_name: 'X', Ath_age: 12 }))
+    const results = n => athletes(n).map(athlete => ({ Event_ptr: 1, Ath_no: athlete.Ath_no, ActualSeed_time: '32.50' }))
+    const roster = (n, prefix) => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}` }))
+    demoSubmitInscription({ token: first.id, meta: { club_code: code }, athletes: athletes(3), results: results(3), roster: roster(3, 'R') })
+    demoUpdateEventStatus('evt_demo_2025', 'accepting_late')
+    demoSubmitInscription({ token: first.id, meta: { club_code: code }, athletes: athletes(2), results: results(2), roster: roster(2, 'T') })
+    demoReviewLate('evt_demo_2025', code, 'approve', [code * 1000 + 2])
+
+    const club = demoDashboard('evt_demo_2025').clubs.find(item => item.code === code)
+    const complete = await demoExportAll('evt_demo_2025', 'completo')
+    expect(club).toMatchObject({ athlete_count: 4, inscription_count: 4, late_approved_count: 1, status: 'received' })
+    expect(club.athlete_count).toBe(complete.athletes.filter(athlete => athlete.Team_no === code).length)
+    const detail = demoGetClubInscriptions('evt_demo_2025', code)
+    expect(detail.regular.roster.map(item => item.id)).toEqual(['R0', 'R1', 'R2'])
+    expect(detail.late.status).toBe('partially_approved')
+    expect(demoGetInscription('evt_demo_2025', code).athletes).toHaveLength(3)
+
+    // Club solo-tardía: no tiene regular, pero se ve y abre sin error.
+    const other = second.club.code
+    demoSubmitInscription({ token: second.id, meta: { club_code: other }, athletes: [{ Ath_no: other * 1000 + 1, Team_no: other }], results: [], roster: roster(1, 'S') })
+    demoReviewLate('evt_demo_2025', other, 'approve_all')
+    const lateOnly = demoDashboard('evt_demo_2025').clubs.find(item => item.code === other)
+    expect(lateOnly.status).not.toBe('received')
+    expect(lateOnly).toMatchObject({ athlete_count: 1, late_approved_count: 1 })
+    expect(demoGetClubInscriptions('evt_demo_2025', other)).toMatchObject({ regular: null, late: { status: 'approved' } })
   })
 
   it('tras abrir tardías sin envío tardío aún, expone la inscripción normal por separado (no mezclada en `inscription`)', () => {
