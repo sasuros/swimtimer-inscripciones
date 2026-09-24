@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { allLinksText, emailInvitation, whatsappInvitation } from './messageTemplates'
+import { allLinksText, clubLinkText, emailInvitation, whatsappInvitation } from './messageTemplates'
+import LinkDistributionModal from '../components/LinkDistributionModal'
 
 const event = { name: 'Copa Test', date_start: '2026-10-01', deadline: '2026-09-25', venue: 'Sede', organizer: 'Org' }
 const url = 'https://ejemplo.test/inscribir?t=abc'
@@ -20,5 +21,31 @@ describe('mensajes con PIN (v1.16.0)', () => {
     expect(text).toContain('Club A: u/a · PIN: 1111')
     expect(text).toContain('Club B: u/b · PIN: 2222')
     expect(text).not.toContain('3333')
+  })
+})
+
+describe('"Copiar enlace" de un club copia URL + PIN (v1.16.0)', () => {
+  it('mismo formato que cada línea de "Copiar todos"', () => {
+    const club = { name: 'Club A', token: 'a', pin: '1111' }
+    expect(clubLinkText(club, 'u/a')).toBe('Club A: u/a · PIN: 1111')
+    expect(allLinksText(event, [club], (token) => `u/${token}`).split('\n').at(-1)).toBe(clubLinkText(club, 'u/a'))
+  })
+
+  it('sin PIN copia solo nombre y URL', () => {
+    expect(clubLinkText({ name: 'Club A' }, 'u/a')).toBe('Club A: u/a')
+  })
+
+  it('el botón del modal de distribución copia el texto con PIN', () => {
+    const copies = []
+    const tree = LinkDistributionModal({ event, eventId: 'evt-1', clubs: [{ code: 5, name: 'Club A', token: 'a', pin: '1111', email: '' }], urlFor: (token) => `u/${token}`, onCopy: (...args) => copies.push(args), onSendEmail: () => {}, emailing: false, onClose: () => {} })
+    const find = (node) => {
+      if (!node || typeof node !== 'object') return null
+      if (Array.isArray(node)) return node.map(find).find(Boolean) || null
+      const children = [node.props?.children].flat()
+      if (node.type === 'button' && children.includes('Copiar enlace')) return node
+      return find(node.props?.children)
+    }
+    find(tree).props.onClick()
+    expect(copies).toEqual([['Club A: u/a · PIN: 1111', 'Enlace y PIN copiados']])
   })
 })

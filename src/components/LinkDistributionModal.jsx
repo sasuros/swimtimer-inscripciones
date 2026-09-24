@@ -1,5 +1,5 @@
 import { Clipboard, Mail, X } from 'lucide-react'
-import { allLinksText } from '../utils/messageTemplates'
+import { allLinksText, clubLinkText } from '../utils/messageTemplates'
 
 export default function LinkDistributionModal({ event, eventId, clubs, urlFor, onCopy, onSendEmail, emailing, onClose }) {
   const copyAll = () => onCopy(allLinksText(event, clubs, urlFor), 'Todos los enlaces copiados')
@@ -31,7 +31,7 @@ export default function LinkDistributionModal({ event, eventId, clubs, urlFor, o
               </div>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 {club.token ? (
-                  <button className="btn-secondary inline-flex items-center justify-center gap-2 text-sm" onClick={() => onCopy(urlFor(club.token), 'Enlace copiado')}>
+                  <button className="btn-secondary inline-flex items-center justify-center gap-2 text-sm" onClick={() => onCopy(clubLinkText(club, urlFor(club.token)), 'Enlace y PIN copiados')}>
                     <Clipboard className="size-4" />
                     Copiar enlace
                   </button>

@@ -12,6 +12,7 @@ import { downloadJson } from '../utils/download'
 import { downloadEventQr } from '../utils/eventQr'
 import { buildClubFileExport } from '../utils/mmSchema'
 import { mergeClubInscriptions } from '../utils/clubInscriptionView'
+import { clubLinkText } from '../utils/messageTemplates'
 import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getClubInscriptions, getDashboard, recordInvitationResults, regenerateClubToken, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
 import { DEMO_MODE } from '../config'
 
@@ -334,7 +335,7 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         {url && (
           <>
-            <button className="btn-secondary inline-flex items-center justify-center gap-1 text-xs" onClick={() => onCopy(url)}>
+            <button className="btn-secondary inline-flex items-center justify-center gap-1 text-xs" onClick={() => onCopy(clubLinkText(club, url), 'Enlace y PIN copiados')}>
               <Clipboard className="size-3" />
               Copiar enlace
             </button>

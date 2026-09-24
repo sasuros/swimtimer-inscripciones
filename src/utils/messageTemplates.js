@@ -13,6 +13,11 @@ export function emailInvitation(event, url, pin) {
   return { subject, body }
 }
 
+// Línea de un club: "Club: URL · PIN: 1234". La usan "Copiar enlace" y "Copiar todos".
+export function clubLinkText(club, url) {
+  return `${club.name}: ${url}${club.pin ? ` · PIN: ${club.pin}` : ''}`
+}
+
 export function allLinksText(event, clubs, urlFor) {
-  return `SWIMTIMER · Inscripciones\n${event.name}\n\n${clubs.filter(club => club.token).map(club => `${club.name}: ${urlFor(club.token)}${club.pin ? ` · PIN: ${club.pin}` : ''}`).join('\n')}`
+  return `SWIMTIMER · Inscripciones\n${event.name}\n\n${clubs.filter(club => club.token).map(club => clubLinkText(club, urlFor(club.token))).join('\n')}`
 }
