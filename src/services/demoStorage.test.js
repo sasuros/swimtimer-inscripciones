@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { demoCloneEvent, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoUpdateLandingSettings, demoValidateToken } from './demoStorage'
+import { buildClubFileExport } from '../utils/mmSchema'
+import { demoCloneEvent, demoGetInscription, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoUpdateLandingSettings, demoValidateToken } from './demoStorage'
 
 const memory = new Map()
 globalThis.localStorage = {
@@ -110,6 +111,27 @@ describe('storage local de la demo', () => {
     expect(supplement.athletes[0].late).toBe(true)
     expect(Object.keys(complete.results[0])).toHaveLength(87)
     expect(complete.meta.sha256).toMatch(/^[a-f0-9]{64}$/)
+  })
+
+  it('el consolidado y el JSON por club llevan nombre corto; lo guardado queda completo', async () => {
+    const token = demoGenerateTokens().tokens[0].id
+    const athlete = { Ath_no: 2001, Last_name: 'De la Cruz Pérez', First_name: 'María de los Ángeles', Ath_Sex: 'F', Birth_date: '2013-05-15', Team_no: 2, Ath_age: 12, Comp_no: 2001 }
+    const result = { Event_ptr: 1, Ath_no: 2001, ActSeed_course: 'S', ActualSeed_time: '32.50', ConvSeed_course: 'S', ConvSeed_time: '32.50' }
+    const roster = [{ id: 'r1', lastName: 'De la Cruz Pérez', firstName: 'María de los Ángeles' }]
+    demoSubmitInscription({ token, meta: { club_code: 2, sha256: 'original' }, athletes: [athlete], results: [result], roster })
+
+    const complete = await demoExportAll('evt_demo_2025', 'completo')
+    expect(complete.athletes[0]).toMatchObject({ Last_name: 'De la Cruz', First_name: 'María Á.', Pref_name: '' })
+
+    const saved = demoGetInscription('evt_demo_2025', 2)
+    expect(saved.athletes[0]).toMatchObject({ Last_name: 'De la Cruz Pérez', First_name: 'María de los Ángeles' })
+    expect(saved.roster).toEqual(roster)
+
+    const clubFile = await buildClubFileExport(saved)
+    expect(clubFile.athletes[0]).toMatchObject({ Last_name: 'De la Cruz', First_name: 'María Á.' })
+    expect(clubFile.roster).toEqual(roster)
+    expect(clubFile.meta.sha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(demoGetInscription('evt_demo_2025', 2).athletes[0].Last_name).toBe('De la Cruz Pérez')
   })
 
   it('tras abrir tardías sin envío tardío aún, expone la inscripción normal por separado (no mezclada en `inscription`)', () => {

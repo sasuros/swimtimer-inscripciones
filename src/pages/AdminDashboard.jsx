@@ -10,6 +10,7 @@ import EmailInvitationsPanel from '../components/EmailInvitationsPanel'
 import PrintRoster from '../components/PrintRoster'
 import { downloadJson } from '../utils/download'
 import { downloadEventQr } from '../utils/eventQr'
+import { buildClubFileExport } from '../utils/mmSchema'
 import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getDashboard, getInscription, recordInvitationResults, regenerateClubToken, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
 import { DEMO_MODE } from '../config'
 
@@ -432,7 +433,7 @@ function Detail({ inscription, onClose }) {
           ))}
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
-          <button className="btn-primary inline-flex items-center gap-2" onClick={() => downloadJson(inscription, `inscripcion-${inscription.meta.club_code}.json`)}>
+          <button className="btn-primary inline-flex items-center gap-2" onClick={async () => downloadJson(await buildClubFileExport(inscription), `inscripcion-${inscription.meta.club_code}.json`)}>
             Descargar JSON del club
           </button>
           <button className="btn-secondary inline-flex items-center gap-2" onClick={() => window.print()}>
