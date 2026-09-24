@@ -89,6 +89,7 @@ CREATE TABLE inscriptions (
   meta JSONB DEFAULT '{}',
   approved_athletes JSONB NOT NULL DEFAULT '[]',
   rejected_athletes JSONB NOT NULL DEFAULT '[]',
+  version INTEGER NOT NULL DEFAULT 1,   -- v1.18.0: guardia anti-pisado (sube +1 en cada escritura)
   CONSTRAINT inscriptions_event_club_late_key UNIQUE (event_id, club_code, is_late)
 );
 

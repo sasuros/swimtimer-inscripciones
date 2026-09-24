@@ -100,8 +100,12 @@ export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = 
   return { from, tables, calls }
 }
 
+// Último fake sembrado: lo usa payload() para comportarse como un cliente "al día".
+let seededDb = null
+
 export async function seed(options) {
   const db = createFakeSupabase(options)
+  seededDb = db
   db.tables.events.push({ id: 'evt-1', name: 'Copa Test', date_start: '2026-10-01', date_end: null, venue: '', reference_date: '2026-12-31', course: 'S', status: 'active', organizer_whatsapp: '584120000000', imported_from: {}, created_at: '2026-09-01T00:00:00Z' })
   db.tables.clubs.push({ code: 5, name: 'Club Cinco', short_name: 'C5', abbreviation: 'CIN' })
   db.tables.event_clubs.push({ event_id: 'evt-1', club_code: 5, status: 'invited', contact_name: '', contact_whatsapp: '', email: 'club5@test.com', pin: '1234', invitation_sent_at: null, invitation_error: '' })
@@ -114,4 +118,21 @@ export async function seed(options) {
 export const athleteSet = n => Array.from({ length: n }, (_, i) => ({ Ath_no: 5000 + i + 1, Last_name: `Nadador${i}`, First_name: 'X', Team_no: 5, Ath_age: 12 }))
 export const resultSet = n => Array.from({ length: n }, (_, i) => ({ Event_ptr: 1, Ath_no: 5000 + i + 1, ActualSeed_time: '32.50' }))
 export const rosterSet = (n, prefix = 'N') => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, lastName: `${prefix}${i}`, firstName: 'X', sex: 'F', age: 12, events: [] }))
-export const payload = (token, n, prefix = 'N', pin = '1234') => ({ token, pin, athletes: athleteSet(n), results: resultSet(n), roster: rosterSet(n, prefix), meta: { club_code: 5, club_name: 'Club Cinco' } })
+// v1.18.0: expected_version se calcula AL MOMENTO DE ENVIAR (getter) con la fila actual del
+// club en el último fake sembrado: es un cliente que acaba de recargar. Para simular una
+// vista vieja, fijar el valor: { ...payload(...), expected_version: 1 }.
+export const currentVersion = (db, clubCode = 5) => {
+  const isLate = db.tables.events[0]?.status === 'accepting_late'
+  return db.tables.inscriptions.find((row) => Number(row.club_code) === Number(clubCode) && row.is_late === isLate)?.version ?? 0
+}
+export const payload = (token, n, prefix = 'N', pin = '1234', clubCode = 5) => ({
+  token,
+  pin,
+  athletes: athleteSet(n),
+  results: resultSet(n),
+  roster: rosterSet(n, prefix),
+  meta: { club_code: 5, club_name: 'Club Cinco' },
+  get expected_version() {
+    return seededDb ? currentVersion(seededDb, clubCode) : 0
+  }
+})

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import useToken from '../hooks/useToken'
 import useRoster, { legacyRosterDraftKey, rosterDraftKey } from '../hooks/useRoster'
 import Header from '../components/Header'
@@ -16,6 +16,7 @@ import QuickEntryMode from '../components/QuickEntryMode'
 import RegistrationMethodSelector from '../components/RegistrationMethodSelector'
 import PinVerification from '../components/PinVerification'
 import { deriveRosterView } from '../utils/wizardRosterView'
+import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
 
 // v1.16.0: el PIN se guarda solo en esta pestaña (sessionStorage) y viaja en cada
 // validación y en el envío; el servidor lo verifica siempre.
@@ -53,7 +54,14 @@ function WizardContent({ token, pin, access }) {
   const { isLate, locked, editableInitial } = deriveRosterView(access)
   const rosterKey = rosterDraftKey(access.eventId, access.club.code, isLate)
   const legacyKey = legacyRosterDraftKey(token, isLate)
-  const [roster, setRoster] = useRoster(rosterKey, editableInitial, legacyKey)
+  // v1.18.0: versión de la fila del servidor al cargar (sin fila = 0). El borrador guarda
+  // sobre cuál se trabajó (baseVersion) y el envío la manda como expected_version.
+  const serverVersion = access.inscription?.version ?? 0
+  const [roster, setRoster, draft] = useRoster(rosterKey, editableInitial, legacyKey, serverVersion)
+  // D1: una tardía que el organizador ya revisó no se puede re-enviar desde aquí.
+  const lateDecided = isLate && Boolean(access.inscription) && access.inscription.status !== 'pending'
+  const [conflict, setConflict] = useState(null)
+  const sendingRef = useRef(false)
   const validationRoster = isLate ? [...locked, ...roster] : roster
   const [editing, setEditing] = useState(null)
   const [highlightId, setHighlightId] = useState(null)
@@ -81,7 +89,14 @@ function WizardContent({ token, pin, access }) {
       if (editing?.id === athlete.id) setEditing(null)
     }
   }
+  const reloadLatest = () => {
+    localStorage.removeItem(rosterKey)
+    localStorage.removeItem(legacyKey)
+    window.location.reload()
+  }
   const submit = async () => {
+    if (sendingRef.current) return // doble click antes de que el botón se deshabilite
+    sendingRef.current = true
     setSending(true)
     try {
       const output = await buildMMExport({
@@ -96,7 +111,8 @@ function WizardContent({ token, pin, access }) {
         athletes: output.athletes,
         results: output.results,
         meta: output.meta,
-        roster
+        roster,
+        expected_version: draft.baseVersion
       })
       if (!result.success) throw new Error(result.error || 'No se pudo enviar')
       setFinalData({ ...output, _swimtimer_roster: roster })
@@ -104,8 +120,15 @@ function WizardContent({ token, pin, access }) {
       localStorage.removeItem(legacyKey)
       setScreen('done')
     } catch (error) {
-      window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`)
+      if (error.status === 409) {
+        // No se escribió nada. Se vuelve al formulario con el aviso (y la lista intacta).
+        setConflict(error.lateDecided ? { text: LATE_DECIDED_TEXT } : error.staleClient ? { text: STALE_CLIENT_TEXT, reload: 'Recargar la página', keepDraft: true } : { text: CONFLICT_TEXT, reload: 'Cargar la versión más reciente' })
+        setScreen('form')
+      } else {
+        window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`)
+      }
     } finally {
+      sendingRef.current = false
       setSending(false)
     }
   }
@@ -122,6 +145,18 @@ function WizardContent({ token, pin, access }) {
           </div>
         )}
         <EventStatusBanner event={access.event} />
+        {conflict && (
+          <div role="alert" className="rounded-xl bg-danger-50 p-4 text-sm text-danger-700">
+            <p className="font-bold">{conflict.text}</p>
+            {conflict.reload && (
+              <button type="button" className="btn-primary mt-3" onClick={conflict.keepDraft ? () => window.location.reload() : reloadLatest}>
+                {conflict.reload}
+              </button>
+            )}
+          </div>
+        )}
+        {draft.replaced && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm text-warning-800">{ROSTER_REPLACED_TEXT}</div>}
+        {lateDecided && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm font-bold text-warning-800">{LATE_DECIDED_TEXT}</div>}
         {isLate && locked.length > 0 && (
           <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
             <strong>Ya enviaste tu inscripción regular con {locked.length} {locked.length === 1 ? 'nadador' : 'nadadores'}.</strong> Está abajo, solo para consultar. Agrega abajo a quienes quieras inscribir por la vía tardía.
@@ -153,7 +188,7 @@ function WizardContent({ token, pin, access }) {
         {entryMethod === 'expert' && <QuickEntryMode referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} roster={validationRoster} onImport={(items) => setRoster((current) => [...current, ...items])} />}
       </main>
       <BrandFooter />
-      {roster.length > 0 && (
+      {roster.length > 0 && !lateDecided && (
         <div className="fixed inset-x-0 bottom-0 border-t bg-white/95 p-3 backdrop-blur">
           <div className="mx-auto flex max-w-[720px] items-center justify-between gap-3">
             <p className="hidden text-sm text-slate-600 sm:block">

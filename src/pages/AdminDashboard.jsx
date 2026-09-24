@@ -75,8 +75,17 @@ export default function AdminDashboard({ eventId }) {
     }
     setDistributionOpen(true)
   }
-  const handleReview = async (clubCode, action, ids) => {
-    await reviewLate(eventId, clubCode, action, ids)
+  // v1.18.0: `seen` es la tardía de esta misma carga del tablero (IDs + versión).
+  const handleReview = async (clubCode, action, ids, seen) => {
+    try {
+      await reviewLate(eventId, clubCode, action, ids, seen)
+    } catch (reviewError) {
+      if (reviewError.status !== 409) throw reviewError
+      // Se recarga la versión actual y el aviso queda visible (load() limpia el error).
+      await load()
+      setError(reviewError.message)
+      return
+    }
     await load()
   }
   const toggleParticipation = async (club) => {

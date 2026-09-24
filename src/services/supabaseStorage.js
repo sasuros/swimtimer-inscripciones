@@ -11,6 +11,7 @@ import { referenceDateFor } from '../utils/referenceDate'
 import { supabase as configuredClient } from './supabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
 import { AUDIT_FIELDS, logAdminAction, statusAction } from './auditLog'
+import { ADMIN_CONFLICT_TEXT, ConflictError } from './concurrency.js'
 
 let client = configuredClient
 
@@ -78,6 +79,7 @@ const inscriptionFromRow = (row, club = null) => ({
   club: club || { code: row.club_code },
   token: row.token_id,
   submitted_at: row.submitted_at,
+  version: row.version ?? null,
   athletes: row.athletes || [],
   results: row.results || [],
   roster: row.roster || [],
@@ -536,12 +538,16 @@ export async function getDashboard(eventId) {
   }
 }
 
-export async function reviewLate(eventId, clubCode, action, athleteIds = []) {
-  const row = await latestInscription(eventId, clubCode, true)
-  if (!row) throw new Error('Inscripción tardía no encontrada')
-  const ids = action === 'approve_all' ? row.athletes.map((athlete) => Number(athlete.Ath_no)) : athleteIds.map(Number)
-  const approved = new Set((row.approved_athletes || []).map(Number))
-  const rejected = new Set((row.rejected_athletes || []).map(Number))
+// v1.18.0: `seen` es la tardía TAL COMO LA MOSTRÓ el tablero (misma carga que produjo los
+// Ath_no de la pantalla): de ahí salen los IDs, las decisiones previas y la versión esperada.
+// No se relee la fila: si cambió desde esa carga, el UPDATE condicional no calza y no se
+// aprueba a nadie que el admin no vio (los Ath_no son posicionales).
+export async function reviewLate(eventId, clubCode, action, athleteIds = [], seen = null) {
+  if (!seen || !Number.isInteger(seen.version)) throw new ConflictError(ADMIN_CONFLICT_TEXT, { conflict: true })
+  const athletes = seen.athletes || []
+  const ids = action === 'approve_all' ? athletes.map((athlete) => Number(athlete.Ath_no)) : athleteIds.map(Number)
+  const approved = new Set((seen.approved_athletes || []).map(Number))
+  const rejected = new Set((seen.rejected_athletes || []).map(Number))
   ids.forEach((id) => {
     if (action.startsWith('approve')) {
       approved.add(id)
@@ -552,27 +558,32 @@ export async function reviewLate(eventId, clubCode, action, athleteIds = []) {
     }
   })
   const decided = approved.size + rejected.size
-  const status = approved.size === row.athletes.length ? 'approved' : rejected.size === row.athletes.length ? 'rejected' : decided ? 'partially_approved' : 'pending'
+  const status = approved.size === athletes.length ? 'approved' : rejected.size === athletes.length ? 'rejected' : decided ? 'partially_approved' : 'pending'
   const updated = unwrap(
     await db()
       .from('inscriptions')
       .update({
         approved_athletes: [...approved],
         rejected_athletes: [...rejected],
-        late_status: status
+        late_status: status,
+        version: seen.version + 1
       })
-      .eq('id', row.id)
+      .eq('event_id', eventId)
+      .eq('club_code', clubCode)
+      .eq('is_late', true)
+      .eq('version', seen.version)
       .select()
-      .single()
   )
+  if (!updated?.length) throw new ConflictError(ADMIN_CONFLICT_TEXT, { conflict: true })
+  // Efecto secundario solo si la decisión se escribió de verdad.
   if (status === 'approved') {
     unwrap(await db().from('event_clubs').update({ status: 'late_approved' }).eq('event_id', eventId).eq('club_code', clubCode))
   }
-  return inscriptionFromRow(updated)
+  return inscriptionFromRow(updated[0])
 }
 
-export const approveLateAthletes = (eventId, clubCode, athleteIds) => reviewLate(eventId, clubCode, 'approve', athleteIds)
-export const rejectLateAthletes = (eventId, clubCode, athleteIds) => reviewLate(eventId, clubCode, 'reject', athleteIds)
+export const approveLateAthletes = (eventId, clubCode, athleteIds, seen) => reviewLate(eventId, clubCode, 'approve', athleteIds, seen)
+export const rejectLateAthletes = (eventId, clubCode, athleteIds, seen) => reviewLate(eventId, clubCode, 'reject', athleteIds, seen)
 
 export async function exportConsolidated(eventId, type = 'principal') {
   const [event, rows] = await Promise.all([getEvent(eventId), getInscriptionsForEvent(eventId)])

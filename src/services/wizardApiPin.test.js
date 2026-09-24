@@ -78,8 +78,8 @@ describe('/api/validate-token', () => {
 
 describe('/api/submit-inscription', () => {
   const body = (pin) => {
-    const { token, athletes, results, roster, meta } = payload(v2, 1, 'NUEVO')
-    return { token, pin, athletes, results, roster, meta }
+    const { token, athletes, results, roster, meta, expected_version } = payload(v2, 1, 'NUEVO')
+    return { token, pin, athletes, results, roster, meta, expected_version }
   }
 
   it('sin PIN responde 401 y no pisa el roster', async () => {

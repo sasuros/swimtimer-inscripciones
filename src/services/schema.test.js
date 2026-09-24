@@ -67,4 +67,13 @@ describe('schema Supabase', () => {
     expect(code).not.toMatch(/DROP|ALTER COLUMN|UPDATE |DELETE |INSERT |GRANT/)
     expect(code).not.toMatch(/ALTER TABLE (?!pin_attempts)\w+/)
   })
+
+  it('inscriptions.version (v1.18.0): entero NOT NULL DEFAULT 1; la migración solo agrega la columna', () => {
+    const schema = readFileSync(new URL('../../supabase/schema.sql', import.meta.url), 'utf8')
+    const migration = readFileSync(new URL('../../supabase/migration_inscriptions_version.sql', import.meta.url), 'utf8')
+    expect(schema).toMatch(/version INTEGER NOT NULL DEFAULT 1/)
+    expect(migration).toContain('ALTER TABLE inscriptions ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;')
+    const code = migration.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith('--'))
+    expect(code).toHaveLength(1)
+  })
 })

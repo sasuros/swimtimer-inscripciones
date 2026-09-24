@@ -4,6 +4,7 @@ import { generateClubPin } from '../utils/clubPin.js'
 import { teamIdentity } from '../utils/teamUtils.js'
 import { isShortId } from '../utils/shortId.js'
 import { RateLimitError, checkPinRateLimit, clearPinRateLimit } from './pinRateLimit.js'
+import { CONFLICT_TEXT, ConflictError, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, sameRoster } from './concurrency.js'
 
 const DEFAULT_WHATSAPP = '584120000000'
 
@@ -33,6 +34,7 @@ export const inscriptionFromRow = (row, club = null) => ({
   club: club ? withoutPin(club) : { code: row.club_code },
   token: row.token_id,
   submitted_at: row.submitted_at,
+  version: row.version ?? null,
   athletes: row.athletes || [],
   results: row.results || [],
   roster: row.roster || [],
@@ -251,28 +253,58 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     if (!access.pinVerified) throw new Error('Código de acceso incorrecto o faltante')
     if (['draft', 'closed', 'archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
     const isLate = access.event.status === 'accepting_late'
-    // Un solo INSERT ... ON CONFLICT DO UPDATE sobre UNIQUE(event_id, club_code, is_late):
-    // un reenvío (o dos envíos simultáneos) deja siempre una única fila por club.
-    const row = unwrap(
-      await db()
-        .from('inscriptions')
-        .upsert({
-          event_id: access.eventId,
-          club_code: access.club.code,
-          token_id: token,
-          submitted_at: new Date().toISOString(),
-          is_late: isLate,
-          late_status: isLate ? 'pending' : null,
-          athletes: payload.athletes,
-          results: payload.results,
-          roster: payload.roster || [],
-          meta: payload.meta || {},
-          approved_athletes: [],
-          rejected_athletes: []
-        }, { onConflict: 'event_id,club_code,is_late' })
-        .select()
-        .single()
-    )
+    // v1.18.0: escritura condicional por versión (anti-pisado). expected_version es la
+    // versión de la fila sobre la que el cliente trabajó (0/null = no había fila).
+    // Un cliente sin el campo es un bundle viejo (anterior al deploy): se le pide recargar.
+    const expected = payload.expected_version
+    if (expected === undefined) throw new ConflictError(STALE_CLIENT_SERVER_MESSAGE, { staleClient: true })
+    const expectedVersion = expected === null ? 0 : Number(expected)
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 0) throw new ConflictError(STALE_CLIENT_SERVER_MESSAGE, { staleClient: true })
+    // (a) Tardía ya revisada por el organizador (D1): el entrenador no puede re-enviarla.
+    // Si el admin decide DESPUÉS de esta lectura, reviewLate sube la versión y (b) no calza.
+    if (isLate && access.inscription && access.inscription.status !== 'pending') throw new ConflictError(LATE_DECIDED_TEXT, { lateDecided: true })
+    const content = {
+      token_id: token,
+      submitted_at: new Date().toISOString(),
+      late_status: isLate ? 'pending' : null,
+      athletes: payload.athletes,
+      results: payload.results,
+      roster: payload.roster || [],
+      meta: payload.meta || {},
+      approved_athletes: [],
+      rejected_athletes: []
+    }
+    const key = { event_id: access.eventId, club_code: access.club.code, is_late: isLate }
+    // (b) Una sola sentencia atómica: INSERT (sin fila; el UNIQUE frena al segundo) o
+    // UPDATE ... WHERE version = expected (0 filas = alguien escribió antes).
+    let row = null
+    if (expectedVersion === 0) {
+      const inserted = await db().from('inscriptions').insert({ ...key, ...content, version: 1 }).select().single()
+      if (inserted.error && inserted.error.code !== '23505') unwrap(inserted)
+      row = inserted.error ? null : inserted.data
+    } else {
+      const updated = unwrap(
+        await db()
+          .from('inscriptions')
+          .update({ ...content, version: expectedVersion + 1 })
+          .eq('event_id', key.event_id)
+          .eq('club_code', key.club_code)
+          .eq('is_late', key.is_late)
+          .eq('version', expectedVersion)
+          .select()
+      )
+      row = updated?.[0] || null
+    }
+    // (c) Conflicto. Si lo que hay en el servidor es idéntico a lo enviado (doble click,
+    // reintento por red lenta) es un éxito: no se escribe nada y se devuelve la versión actual.
+    if (!row) {
+      const current = await latestInscription(db(), key.event_id, key.club_code, isLate)
+      if (current && sameRoster(current.roster, payload.roster || [])) {
+        return { success: true, late: isLate, idempotent: true, version: current.version, summary: { athletes: payload.athletes.length, inscriptions: payload.results.length } }
+      }
+      throw new ConflictError(CONFLICT_TEXT, { conflict: true, currentVersion: current?.version ?? 0 })
+    }
+    // Efectos secundarios SOLO si la inscripción se escribió de verdad.
     const updates = await Promise.all([
       db()
         .from('tokens')
@@ -288,6 +320,7 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     return {
       success: true,
       late: isLate,
+      version: row.version,
       summary: {
         athletes: payload.athletes.length,
         inscriptions: payload.results.length

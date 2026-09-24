@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { __setSupabaseClient, exportConsolidated, getClubInscriptions, getDashboard, getInscription, reviewLate, submitInscription } from './supabaseStorage'
 import { payload, seed } from './testSupport/fakeSupabase'
 
+// v1.18.0: el admin decide sobre la tardía tal como la mostró el tablero (IDs + versión).
+const seenLate = async (clubCode = 5) => (await getDashboard('evt-1')).late.find((item) => Number(item.club.code) === clubCode)
+
 afterEach(() => __setSupabaseClient(null))
 
 describe('tardías aprobadas visibles por club (Supabase)', () => {
@@ -14,7 +17,7 @@ describe('tardías aprobadas visibles por club (Supabase)', () => {
     let club = (await getDashboard('evt-1')).clubs.find((item) => item.code === 5)
     expect(club).toMatchObject({ athlete_count: 3, inscription_count: 3, late_approved_count: 0, status: 'received' })
 
-    await reviewLate('evt-1', 5, 'approve', [5002])
+    await reviewLate('evt-1', 5, 'approve', [5002], await seenLate())
     const dashboard = await getDashboard('evt-1')
     club = dashboard.clubs.find((item) => item.code === 5)
     const consolidated = await exportConsolidated('evt-1', 'completo')
@@ -33,7 +36,7 @@ describe('tardías aprobadas visibles por club (Supabase)', () => {
     const { db, token } = await seed()
     db.tables.events[0].status = 'accepting_late'
     await submitInscription(payload(token, 2, 'T'))
-    await reviewLate('evt-1', 5, 'approve_all')
+    await reviewLate('evt-1', 5, 'approve_all', [], await seenLate())
 
     const club = (await getDashboard('evt-1')).clubs.find((item) => item.code === 5)
     expect(club.status).not.toBe('received')

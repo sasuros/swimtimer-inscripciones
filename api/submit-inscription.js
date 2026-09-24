@@ -23,14 +23,16 @@ function createServerWizardStorage(client) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Metodo no permitido' })
   try {
-    const { token, pin, athletes, results, roster, meta } = req.body || {}
+    const { token, pin, athletes, results, roster, meta, expected_version } = req.body || {}
     if (!token) return json(res, 400, { error: 'Token requerido' })
     if (!Array.isArray(athletes) || !Array.isArray(results)) return json(res, 400, { error: 'Inscripcion invalida' })
     const client = createServerClient()
     const admin = await isAdminPreview(req, client)
-    return json(res, 200, await createServerWizardStorage(client).submitInscription({ token, pin, athletes, results, roster, meta }, { admin, ip: clientIpKey(req) }))
+    return json(res, 200, await createServerWizardStorage(client).submitInscription({ token, pin, athletes, results, roster, meta, expected_version }, { admin, ip: clientIpKey(req) }))
   } catch (error) {
     if (error.status === 429) return json(res, 429, { error: error.message, retryAfter: error.retryAfter })
+    // v1.18.0: conflicto de versión (sin escribir nada): conflict / lateDecided / staleClient.
+    if (error.status === 409) return json(res, 409, { error: error.message, ...error.details })
     const message = error.message || ''
     const status = /Código de acceso/.test(message) ? 401 : /enlace|cerradas|Supabase/.test(message) ? 400 : 500
     return json(res, status, { error: message || 'No se pudo enviar la inscripcion' })
