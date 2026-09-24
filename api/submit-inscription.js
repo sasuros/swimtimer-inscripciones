@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseWizardStorage } from '../src/services/wizardSupabase.js'
 import { isAdminPreview } from './_adminAuth.js'
+import { clientIpKey } from './_clientIp.js'
 
 const json = (res, status, payload) => res.status(status).json(payload)
 
@@ -27,8 +28,9 @@ export default async function handler(req, res) {
     if (!Array.isArray(athletes) || !Array.isArray(results)) return json(res, 400, { error: 'Inscripcion invalida' })
     const client = createServerClient()
     const admin = await isAdminPreview(req, client)
-    return json(res, 200, await createServerWizardStorage(client).submitInscription({ token, pin, athletes, results, roster, meta }, { admin }))
+    return json(res, 200, await createServerWizardStorage(client).submitInscription({ token, pin, athletes, results, roster, meta }, { admin, ip: clientIpKey(req) }))
   } catch (error) {
+    if (error.status === 429) return json(res, 429, { error: error.message, retryAfter: error.retryAfter })
     const message = error.message || ''
     const status = /Código de acceso/.test(message) ? 401 : /enlace|cerradas|Supabase/.test(message) ? 400 : 500
     return json(res, status, { error: message || 'No se pudo enviar la inscripcion' })

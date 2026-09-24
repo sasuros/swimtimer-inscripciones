@@ -3,6 +3,7 @@ import { verifyMagicToken } from '../utils/magicToken.js'
 import { generateClubPin } from '../utils/clubPin.js'
 import { teamIdentity } from '../utils/teamUtils.js'
 import { isShortId } from '../utils/shortId.js'
+import { RateLimitError, checkPinRateLimit, clearPinRateLimit } from './pinRateLimit.js'
 
 const DEFAULT_WHATSAPP = '584120000000'
 
@@ -177,6 +178,20 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     return Boolean(relation?.pin && relation.pin === String(pin))
   }
 
+  // v1.16.1: con `ip` (lo pasan los handlers de /api) cada PIN enviado cuenta como un
+  // intento del par (IP + token canónico) ANTES de comparar; pasado el umbral se rechaza
+  // aunque el PIN sea correcto. Un PIN correcto resetea el par. Sin `ip` (llamadas
+  // internas/tests) no hay límite. Devuelve { match } o { rateLimited, retryAfter }.
+  const guardedPinMatches = async ({ eventId, clubCode, pin, ip, key }) => {
+    if (ip) {
+      const limit = await checkPinRateLimit(db(), ip, key)
+      if (limit.limited) return { match: false, rateLimited: true, retryAfter: limit.retryAfter }
+    }
+    const match = await pinMatches(eventId, clubCode, pin)
+    if (match && ip) await clearPinRateLimit(db(), ip, key)
+    return { match }
+  }
+
   // Sin PIN válido solo sale lo básico (evento y club) para mostrar la pantalla del PIN:
   // nada de roster ni de si ya envió.
   const basicAccess = ({ inscription, normal_inscription, already_submitted, ...rest }) => ({ ...rest, requiresPin: true, pinVerified: false })
@@ -191,18 +206,24 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     return row?.token_value || null
   }
 
-  const validateToken = async (tokenId, { pin, admin = false } = {}) => {
+  const validateToken = async (tokenId, { pin, admin = false, ip } = {}) => {
     const token = await resolveToken(tokenId)
     if (!token) return { valid: false }
     const access = await fullAccess(token)
     // Sin fila guardada (o sin backend) no hay datos del servidor que proteger;
     // además no se puede enviar (submit exige backendAvailable).
     if (!access.valid || !access.backendAvailable) return access
-    if (admin || (await pinMatches(access.eventId, access.club.code, pin))) return { ...access, pinVerified: true }
+    if (admin) return { ...access, pinVerified: true }
+    // Sin PIN (primera carga) no es un intento: no cuenta para el límite.
+    if (pin === undefined || pin === null || pin === '') return basicAccess(access)
+    const check = await guardedPinMatches({ eventId: access.eventId, clubCode: access.club.code, pin, ip, key: await tokenKey(token) })
+    if (check.match) return { ...access, pinVerified: true }
+    // Bloqueado: 200 con lo básico (sin roster) para que la pantalla del PIN muestre el aviso.
+    if (check.rateLimited) return { ...basicAccess(access), rateLimited: true, retryAfter: check.retryAfter }
     return basicAccess(access)
   }
 
-  const verifyAccessPin = async (tokenId, pin) => {
+  const verifyAccessPin = async (tokenId, pin, { ip } = {}) => {
     if (!client) return { valid: false }
     const token = await resolveToken(tokenId)
     if (!token) return { valid: false }
@@ -214,14 +235,17 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
         .maybeSingle()
     )
     if (!stored) return { valid: false }
-    return { valid: await pinMatches(stored.event_id, stored.club_code, pin) }
+    const check = await guardedPinMatches({ eventId: stored.event_id, clubCode: stored.club_code, pin, ip, key: await tokenKey(token) })
+    if (check.rateLimited) throw new RateLimitError(check.retryAfter)
+    return { valid: check.match }
   }
 
-  const submitInscription = async (payload, { admin = false } = {}) => {
+  const submitInscription = async (payload, { admin = false, ip } = {}) => {
     // Token largo canónico: se usa para validar, para token_id y para used_at.
     const token = await resolveToken(payload.token)
     if (!token) throw new Error('El enlace no es válido')
-    const access = await validateToken(token, { pin: payload.pin, admin })
+    const access = await validateToken(token, { pin: payload.pin, admin, ip })
+    if (access.rateLimited) throw new RateLimitError(access.retryAfter)
     if (!access.valid) throw new Error('El enlace no es válido')
     if (!access.backendAvailable) throw new Error('No se pudo conectar con Supabase')
     if (!access.pinVerified) throw new Error('Código de acceso incorrecto o faltante')

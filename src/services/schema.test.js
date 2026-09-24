@@ -53,4 +53,18 @@ describe('schema Supabase', () => {
     expect(statements).toHaveLength(2)
     expect(migration).not.toMatch(/DROP|ALTER COLUMN|UPDATE |DELETE /)
   })
+
+  it('pin_attempts (v1.16.1): RLS sin políticas; la migración solo crea tabla + índice', () => {
+    const schema = readFileSync(new URL('../../supabase/schema.sql', import.meta.url), 'utf8')
+    const migration = readFileSync(new URL('../../supabase/migration_pin_rate_limit.sql', import.meta.url), 'utf8')
+    for (const sql of [schema, migration]) {
+      expect(sql).toContain('CREATE TABLE IF NOT EXISTS pin_attempts')
+      expect(sql).toContain('CREATE INDEX IF NOT EXISTS pin_attempts_key_idx ON pin_attempts(ip_key, token_key, created_at)')
+      expect(sql).toContain('ALTER TABLE pin_attempts ENABLE ROW LEVEL SECURITY')
+      expect(sql).not.toMatch(/CREATE POLICY \w+ ON pin_attempts/)
+    }
+    const code = migration.split(/\r?\n/).filter((line) => !line.trim().startsWith('--')).join('\n')
+    expect(code).not.toMatch(/DROP|ALTER COLUMN|UPDATE |DELETE |INSERT |GRANT/)
+    expect(code).not.toMatch(/ALTER TABLE (?!pin_attempts)\w+/)
+  })
 })

@@ -31,7 +31,8 @@ const readPin = (token) => {
 export default function InscriptionWizard() {
   const token = new URLSearchParams(window.location.search).get('t') || ''
   const [pin, setPin] = useState(() => readPin(token))
-  const access = useToken(token, pin)
+  const [refresh, setRefresh] = useState(0)
+  const access = useToken(token, pin, refresh)
   const acceptPin = (value) => {
     try {
       sessionStorage.setItem(pinKey(token), value)
@@ -39,6 +40,7 @@ export default function InscriptionWizard() {
       // sin sessionStorage el PIN vive solo en memoria
     }
     setPin(value)
+    setRefresh((count) => count + 1)
   }
   if (access.loading) return <div className="flex min-h-screen items-center justify-center text-brand-800">Validando invitación…</div>
   if (!access.valid) return <InvalidToken networkError={access.networkError} noToken={access.noToken} />

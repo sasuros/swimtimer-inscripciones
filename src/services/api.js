@@ -48,7 +48,7 @@ async function postPublicWizard(path, body, fallbackMessage) {
     body: JSON.stringify(body)
   })
   const data = await response.json()
-  if (!response.ok) throw new Error(data.error || fallbackMessage)
+  if (!response.ok) throw Object.assign(new Error(data.error || fallbackMessage), { status: response.status, retryAfter: data.retryAfter })
   return data
 }
 

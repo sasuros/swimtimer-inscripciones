@@ -5,7 +5,8 @@ import { accessFromDemoToken, decodeDemoToken } from '../utils/demoToken'
 
 // v1.16.0: con PIN, el servidor devuelve el acceso completo (roster incluido);
 // sin PIN, solo lo básico para mostrar la pantalla del código.
-export default function useToken(token, pin = '') {
+// `refresh` fuerza revalidar con el mismo PIN (p. ej. tras un bloqueo por intentos, v1.16.1).
+export default function useToken(token, pin = '', refresh = 0) {
   const [state, setState] = useState({ loading: true, valid: false })
   useEffect(() => {
     if (!token) return setState({ loading: false, valid: false, noToken: true })
@@ -16,6 +17,6 @@ export default function useToken(token, pin = '') {
       .catch(() => setState(embedded
         ? { loading: false, ...accessFromDemoToken(embedded), backendAvailable: false, networkError: true }
         : { loading: false, valid: false, networkError: true }))
-  }, [token, pin])
+  }, [token, pin, refresh])
   return state
 }

@@ -7,13 +7,15 @@ const LOCK_MS = 5 * 60 * 1000
 
 export default function PinVerification({ token, access, onVerified }) {
   const [digits, setDigits] = useState(['', '', '', ''])
-  const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
   const inputs = useRef([])
   const storageKey = `swimtimer-pin-attempts:${access.eventId}:${access.club.code}`
   const initial = readAttempts(storageKey)
+  // v1.16.1: si el servidor ya bloqueó este enlace desde esta IP, se muestra de entrada.
+  const serverLock = access.rateLimited ? Date.now() + (Number(access.retryAfter) || 900) * 1000 : 0
   const [attempts, setAttempts] = useState(initial.attempts)
-  const [lockedUntil, setLockedUntil] = useState(initial.lockedUntil)
+  const [lockedUntil, setLockedUntil] = useState(Math.max(initial.lockedUntil, serverLock))
+  const [error, setError] = useState(serverLock ? rateLimitMessage(access.retryAfter) : '')
   const [now, setNow] = useState(Date.now())
   const locked = lockedUntil > now
   useEffect(() => {
@@ -67,6 +69,11 @@ export default function PinVerification({ token, access, onVerified }) {
       setDigits(['', '', '', ''])
       inputs.current[0]?.focus()
     } catch (verificationError) {
+      // 429 del servidor: el límite real de intentos (el de localStorage es solo visual).
+      if (verificationError.status === 429) {
+        setLockedUntil(Date.now() + (Number(verificationError.retryAfter) || 900) * 1000)
+        setDigits(['', '', '', ''])
+      }
       setError(verificationError.message || 'No se pudo verificar el código.')
     } finally {
       setChecking(false)
@@ -114,6 +121,10 @@ export default function PinVerification({ token, access, onVerified }) {
       </main>
     </>
   )
+}
+
+function rateLimitMessage(retryAfter) {
+  return `Demasiados intentos. Espera ${Math.max(1, Math.ceil((Number(retryAfter) || 900) / 60))} minutos e inténtalo de nuevo.`
 }
 
 function readAttempts(key) {

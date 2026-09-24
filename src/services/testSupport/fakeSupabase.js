@@ -13,7 +13,7 @@ const INSCRIPTIONS_UNIQUE = ['event_id', 'club_code', 'is_late']
 // - barrier: las primeras N escrituras sobre inscriptions esperan a juntarse y salen a la vez,
 //   para simular dos envíos que llegan al mismo tiempo (doble click / dos pestañas).
 export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = {}) {
-  const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], inscriptions: [], audit_log: [] }
+  const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], inscriptions: [], audit_log: [], pin_attempts: [] }
   const calls = []
   let nextId = 1
   let clock = Date.parse('2026-10-01T12:00:00Z')
@@ -24,7 +24,8 @@ export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = 
     if (waiting.length === barrier) waiting.splice(0).forEach((go) => go())
   })
 
-  const matchesFilters = (row, filters) => filters.every(([col, op, value]) => (op === 'in' ? value.includes(row[col]) : op === 'is' ? (row[col] ?? null) === value : row[col] === value))
+  const compare = { in: (a, b) => b.includes(a), is: (a, b) => (a ?? null) === b, gte: (a, b) => a >= b, lt: (a, b) => a < b, eq: (a, b) => a === b }
+  const matchesFilters = (row, filters) => filters.every(([col, op, value]) => compare[op](row[col], value))
   const sameKey = (a, b, cols) => cols.every((col) => a[col] === b[col])
   const uniqueViolation = { message: 'duplicate key value violates unique constraint "inscriptions_event_club_late_key"', code: '23505' }
 
@@ -35,6 +36,8 @@ export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = 
       eq(col, value) { state.filters.push([col, 'eq', value]); return builder },
       in(col, values) { state.filters.push([col, 'in', values]); return builder },
       is(col, value) { state.filters.push([col, 'is', value]); return builder },
+      gte(col, value) { state.filters.push([col, 'gte', value]); return builder },
+      lt(col, value) { state.filters.push([col, 'lt', value]); return builder },
       order(col, opts = {}) { state.orderCol = col; state.orderDesc = opts.ascending === false; return builder },
       limit(n) { state.limitN = n; return builder },
       single() { state.single = true; return builder },

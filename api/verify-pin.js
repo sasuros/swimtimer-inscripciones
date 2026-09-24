@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseWizardStorage } from '../src/services/wizardSupabase.js'
+import { clientIpKey } from './_clientIp.js'
 
 const json = (res, status, payload) => res.status(status).json(payload)
 
@@ -20,8 +21,9 @@ export default async function handler(req, res) {
     const { token, pin } = req.body || {}
     if (!token || !pin) return json(res, 400, { error: 'Token y PIN requeridos' })
     const storage = createServerWizardStorage()
-    return json(res, 200, await storage.verifyAccessPin(token, pin))
+    return json(res, 200, await storage.verifyAccessPin(token, pin, { ip: clientIpKey(req) }))
   } catch (error) {
+    if (error.status === 429) return json(res, 429, { error: error.message, retryAfter: error.retryAfter })
     return json(res, 500, { error: error.message || 'No se pudo verificar el PIN' })
   }
 }

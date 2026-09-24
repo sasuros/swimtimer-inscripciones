@@ -162,3 +162,14 @@ CREATE POLICY audit_insert ON audit_log FOR INSERT TO authenticated
 CREATE POLICY audit_select ON audit_log FOR SELECT TO authenticated USING (true);
 REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM authenticated, anon;
 REVOKE INSERT, SELECT ON audit_log FROM anon;
+
+-- Límite de intentos del PIN (v1.16.1): una fila por intento, por (IP + token canónico).
+-- RLS sin políticas: solo la service role de las funciones /api la usa.
+CREATE TABLE IF NOT EXISTS pin_attempts (
+  id BIGSERIAL PRIMARY KEY,
+  ip_key TEXT NOT NULL,             -- IPv4, o prefijo /64 en IPv6
+  token_key TEXT NOT NULL,          -- tokens.id (hash del token largo canónico)
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS pin_attempts_key_idx ON pin_attempts(ip_key, token_key, created_at);
+ALTER TABLE pin_attempts ENABLE ROW LEVEL SECURITY;
