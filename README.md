@@ -45,6 +45,10 @@ Para una instalación existente, ejecuta una vez `supabase/migration_email.sql` 
 
 Los enlaces de correo se pueden reenviar o revocar sin modificar los tokens v2 usados por Copiar y WhatsApp. En modo demo no se llama a Resend y la interfaz indica que deben usarse los enlaces v2.
 
+## Una inscripción por club (v1.11.0)
+
+Antes de desplegar v1.11.0 en una instalación existente, ejecuta una vez `supabase/migration_inscriptions_unique.sql` en **Supabase → SQL Editor**. Agrega `UNIQUE(event_id, club_code, is_late)`; el envío usa upsert sobre esa clave y falla si el constraint no existe.
+
 ## Rutas
 
 - `/admin` y `/admin/eventos`: lista de eventos.

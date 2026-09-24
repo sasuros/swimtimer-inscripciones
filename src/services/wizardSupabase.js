@@ -187,14 +187,16 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     if (!access.backendAvailable) throw new Error('No se pudo conectar con Supabase')
     if (['draft', 'closed', 'archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
     const isLate = access.event.status === 'accepting_late'
-    unwrap(await db().from('inscriptions').delete().eq('event_id', access.eventId).eq('club_code', access.club.code).eq('is_late', isLate))
+    // Un solo INSERT ... ON CONFLICT DO UPDATE sobre UNIQUE(event_id, club_code, is_late):
+    // un reenvío (o dos envíos simultáneos) deja siempre una única fila por club.
     const row = unwrap(
       await db()
         .from('inscriptions')
-        .insert({
+        .upsert({
           event_id: access.eventId,
           club_code: access.club.code,
           token_id: payload.token,
+          submitted_at: new Date().toISOString(),
           is_late: isLate,
           late_status: isLate ? 'pending' : null,
           athletes: payload.athletes,
@@ -203,7 +205,7 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
           meta: payload.meta || {},
           approved_athletes: [],
           rejected_athletes: []
-        })
+        }, { onConflict: 'event_id,club_code,is_late' })
         .select()
         .single()
     )

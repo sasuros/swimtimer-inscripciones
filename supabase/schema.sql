@@ -76,18 +76,19 @@ CREATE TABLE tokens (
 
 CREATE TABLE inscriptions (
   id BIGSERIAL PRIMARY KEY,
-  event_id TEXT REFERENCES events(id) ON DELETE CASCADE,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   club_code INTEGER NOT NULL REFERENCES clubs(code),
   token_id TEXT,
   submitted_at TIMESTAMPTZ DEFAULT NOW(),
-  is_late BOOLEAN DEFAULT FALSE,
+  is_late BOOLEAN NOT NULL DEFAULT FALSE,
   late_status TEXT DEFAULT NULL CHECK (late_status IS NULL OR late_status IN ('pending', 'partially_approved', 'approved', 'rejected')),
   athletes JSONB NOT NULL DEFAULT '[]',
   results JSONB NOT NULL DEFAULT '[]',
   roster JSONB NOT NULL DEFAULT '[]',
   meta JSONB DEFAULT '{}',
   approved_athletes JSONB NOT NULL DEFAULT '[]',
-  rejected_athletes JSONB NOT NULL DEFAULT '[]'
+  rejected_athletes JSONB NOT NULL DEFAULT '[]',
+  CONSTRAINT inscriptions_event_club_late_key UNIQUE (event_id, club_code, is_late)
 );
 
 CREATE INDEX idx_event_clubs_event ON event_clubs(event_id);
