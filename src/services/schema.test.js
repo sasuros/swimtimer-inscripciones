@@ -41,5 +41,16 @@ describe('schema Supabase', () => {
     expect(migration).toMatch(/BEGIN;[\s\S]*COMMIT;/)
     expect(migration).not.toMatch(/ALTER TABLE (?!audit_log)\w+/)
   })
-})
 
+  it('enlaces cortos: tokens.short_id con índice único parcial; la migración solo agrega', () => {
+    const schema = readFileSync(new URL('../../supabase/schema.sql', import.meta.url), 'utf8')
+    const migration = readFileSync(new URL('../../supabase/migration_short_links.sql', import.meta.url), 'utf8')
+    expect(schema).toContain('short_id TEXT')
+    expect(schema).toContain('CREATE UNIQUE INDEX tokens_short_id_key ON tokens(short_id) WHERE short_id IS NOT NULL')
+    expect(migration).toContain('ALTER TABLE tokens ADD COLUMN IF NOT EXISTS short_id TEXT;')
+    expect(migration).toContain('CREATE UNIQUE INDEX IF NOT EXISTS tokens_short_id_key ON tokens(short_id) WHERE short_id IS NOT NULL;')
+    const statements = migration.split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith('--'))
+    expect(statements).toHaveLength(2)
+    expect(migration).not.toMatch(/DROP|ALTER COLUMN|UPDATE |DELETE /)
+  })
+})

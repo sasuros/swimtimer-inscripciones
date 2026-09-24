@@ -2,6 +2,7 @@ import { accessFromDemoToken, decodeDemoToken } from '../utils/demoToken.js'
 import { verifyMagicToken } from '../utils/magicToken.js'
 import { generateClubPin } from '../utils/clubPin.js'
 import { teamIdentity } from '../utils/teamUtils.js'
+import { isShortId } from '../utils/shortId.js'
 
 const DEFAULT_WHATSAPP = '584120000000'
 
@@ -180,8 +181,20 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
   // nada de roster ni de si ya envió.
   const basicAccess = ({ inscription, normal_inscription, already_submitted, ...rest }) => ({ ...rest, requiresPin: true, pinVerified: false })
 
+  // v1.17.0: un enlace corto es solo un alias de URL de una fila de `tokens`. Se
+  // traduce al token largo ANTES de cualquier lógica (PIN incluido); los largos pasan
+  // tal cual. Un corto inexistente devuelve null.
+  const resolveToken = async (tokenId) => {
+    if (!isShortId(tokenId)) return tokenId
+    if (!client) return null
+    const row = unwrap(await db().from('tokens').select('token_value').eq('short_id', tokenId).maybeSingle())
+    return row?.token_value || null
+  }
+
   const validateToken = async (tokenId, { pin, admin = false } = {}) => {
-    const access = await fullAccess(tokenId)
+    const token = await resolveToken(tokenId)
+    if (!token) return { valid: false }
+    const access = await fullAccess(token)
     // Sin fila guardada (o sin backend) no hay datos del servidor que proteger;
     // además no se puede enviar (submit exige backendAvailable).
     if (!access.valid || !access.backendAvailable) return access
@@ -191,11 +204,13 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
 
   const verifyAccessPin = async (tokenId, pin) => {
     if (!client) return { valid: false }
+    const token = await resolveToken(tokenId)
+    if (!token) return { valid: false }
     const stored = unwrap(
       await db()
         .from('tokens')
         .select('event_id,club_code')
-        .eq('id', await tokenKey(tokenId))
+        .eq('id', await tokenKey(token))
         .maybeSingle()
     )
     if (!stored) return { valid: false }
@@ -203,7 +218,10 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
   }
 
   const submitInscription = async (payload, { admin = false } = {}) => {
-    const access = await validateToken(payload.token, { pin: payload.pin, admin })
+    // Token largo canónico: se usa para validar, para token_id y para used_at.
+    const token = await resolveToken(payload.token)
+    if (!token) throw new Error('El enlace no es válido')
+    const access = await validateToken(token, { pin: payload.pin, admin })
     if (!access.valid) throw new Error('El enlace no es válido')
     if (!access.backendAvailable) throw new Error('No se pudo conectar con Supabase')
     if (!access.pinVerified) throw new Error('Código de acceso incorrecto o faltante')
@@ -217,7 +235,7 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
         .upsert({
           event_id: access.eventId,
           club_code: access.club.code,
-          token_id: payload.token,
+          token_id: token,
           submitted_at: new Date().toISOString(),
           is_late: isLate,
           late_status: isLate ? 'pending' : null,
@@ -235,7 +253,7 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
       db()
         .from('tokens')
         .update({ used_at: row.submitted_at })
-        .eq('id', await tokenKey(payload.token)),
+        .eq('id', await tokenKey(token)),
       db()
         .from('event_clubs')
         .update({ status: isLate ? 'late_pending' : 'submitted' })

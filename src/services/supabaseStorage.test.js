@@ -21,7 +21,7 @@ function createFakeSupabase(seed = {}) {
   const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], audit_log: [], ...seed }
 
   const matchesFilters = (row, filters) =>
-    filters.every(([col, op, value]) => (op === 'in' ? value.includes(row[col]) : row[col] === value))
+    filters.every(([col, op, value]) => (op === 'in' ? value.includes(row[col]) : op === 'is' ? (row[col] ?? null) === value : row[col] === value))
 
   function from(table) {
     const state = { op: 'select', filters: [], payload: null, onConflict: [], selectCols: '', single: false, maybeSingle: false, updatePatch: null }
@@ -36,6 +36,10 @@ function createFakeSupabase(seed = {}) {
       },
       in(col, values) {
         state.filters.push([col, 'in', values])
+        return builder
+      },
+      is(col, value) {
+        state.filters.push([col, 'is', value])
         return builder
       },
       order() {

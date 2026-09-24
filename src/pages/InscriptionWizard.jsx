@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import useToken from '../hooks/useToken'
-import useRoster from '../hooks/useRoster'
+import useRoster, { legacyRosterDraftKey, rosterDraftKey } from '../hooks/useRoster'
 import Header from '../components/Header'
 import RosterPanel from '../components/RosterPanel'
 import AthleteForm from '../components/AthleteForm'
@@ -49,8 +49,9 @@ export default function InscriptionWizard() {
 
 function WizardContent({ token, pin, access }) {
   const { isLate, locked, editableInitial } = deriveRosterView(access)
-  const rosterKey = isLate ? `${token}:late` : token
-  const [roster, setRoster] = useRoster(rosterKey, editableInitial)
+  const rosterKey = rosterDraftKey(access.eventId, access.club.code, isLate)
+  const legacyKey = legacyRosterDraftKey(token, isLate)
+  const [roster, setRoster] = useRoster(rosterKey, editableInitial, legacyKey)
   const validationRoster = isLate ? [...locked, ...roster] : roster
   const [editing, setEditing] = useState(null)
   const [highlightId, setHighlightId] = useState(null)
@@ -97,7 +98,8 @@ function WizardContent({ token, pin, access }) {
       })
       if (!result.success) throw new Error(result.error || 'No se pudo enviar')
       setFinalData({ ...output, _swimtimer_roster: roster })
-      localStorage.removeItem(`swimtimer-roster:${rosterKey}`)
+      localStorage.removeItem(rosterKey)
+      localStorage.removeItem(legacyKey)
       setScreen('done')
     } catch (error) {
       window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`)

@@ -24,7 +24,7 @@ export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = 
     if (waiting.length === barrier) waiting.splice(0).forEach((go) => go())
   })
 
-  const matchesFilters = (row, filters) => filters.every(([col, op, value]) => (op === 'in' ? value.includes(row[col]) : row[col] === value))
+  const matchesFilters = (row, filters) => filters.every(([col, op, value]) => (op === 'in' ? value.includes(row[col]) : op === 'is' ? (row[col] ?? null) === value : row[col] === value))
   const sameKey = (a, b, cols) => cols.every((col) => a[col] === b[col])
   const uniqueViolation = { message: 'duplicate key value violates unique constraint "inscriptions_event_club_late_key"', code: '23505' }
 
@@ -34,6 +34,7 @@ export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = 
       select(cols = '*') { state.selectCols = cols; return builder },
       eq(col, value) { state.filters.push([col, 'eq', value]); return builder },
       in(col, values) { state.filters.push([col, 'in', values]); return builder },
+      is(col, value) { state.filters.push([col, 'is', value]); return builder },
       order(col, opts = {}) { state.orderCol = col; state.orderDesc = opts.ascending === false; return builder },
       limit(n) { state.limitN = n; return builder },
       single() { state.single = true; return builder },

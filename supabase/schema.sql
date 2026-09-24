@@ -71,6 +71,7 @@ CREATE TABLE tokens (
   club_code INTEGER REFERENCES clubs(code),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   used_at TIMESTAMPTZ,
+  short_id TEXT, -- v1.17.0: alias corto de la URL (/inscribir?t=<short_id>)
   UNIQUE(event_id, club_code, token_type)
 );
 
@@ -94,6 +95,7 @@ CREATE TABLE inscriptions (
 CREATE INDEX idx_event_clubs_event ON event_clubs(event_id);
 CREATE INDEX idx_event_events_event ON event_events(event_id);
 CREATE INDEX idx_tokens_event ON tokens(event_id);
+CREATE UNIQUE INDEX tokens_short_id_key ON tokens(short_id) WHERE short_id IS NOT NULL;
 CREATE INDEX idx_inscriptions_event ON inscriptions(event_id);
 CREATE INDEX idx_inscriptions_club ON inscriptions(event_id, club_code);
 

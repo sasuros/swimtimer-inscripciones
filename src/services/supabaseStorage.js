@@ -6,6 +6,7 @@ import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
 import { createMagicToken } from '../utils/magicToken'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
+import { generateShortId } from '../utils/shortId'
 import { referenceDateFor } from '../utils/referenceDate'
 import { supabase as configuredClient } from './supabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
@@ -311,10 +312,53 @@ async function buildTokenRow(event, club) {
   }
 }
 
+const SHORT_ID_TAKEN = '23505'
+
+// v1.17.0 — Llenado lazy de enlaces cortos: las filas sin short_id reciben uno.
+// No bloqueante: si falla (p. ej. falta la migración) se sigue con el enlace largo.
+// Solo escribe si la fila sigue sin short_id, así dos pestañas no se pisan.
+async function ensureShortIds(rows) {
+  await Promise.all(
+    rows
+      .filter((row) => !row.short_id)
+      .map(async (row) => {
+        try {
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            const shortId = generateShortId()
+            const result = await db().from('tokens').update({ short_id: shortId }).eq('id', row.id).is('short_id', null).select('short_id')
+            if (!result.error) {
+              if (result.data?.length) row.short_id = shortId
+              else row.short_id = unwrap(await db().from('tokens').select('short_id').eq('id', row.id).maybeSingle())?.short_id || null
+              return
+            }
+            if (result.error.code !== SHORT_ID_TAKEN) return
+          }
+        } catch {
+          // sin enlace corto: la fila sigue funcionando con el largo
+        }
+      })
+  )
+  return rows
+}
+
+// Upsert de filas que traen short_id nuevo; si choca con el índice único, reintenta con otros.
+async function upsertWithFreshShortIds(rows) {
+  for (let attempt = 0; ; attempt += 1) {
+    rows.forEach((row) => {
+      row.short_id = generateShortId()
+    })
+    const result = await db().from('tokens').upsert(rows, { onConflict: 'event_id,club_code,token_type' })
+    if (!result.error || result.error.code !== SHORT_ID_TAKEN || attempt >= 2) return unwrap(result)
+  }
+}
+
 export async function generateTokens(eventId) {
   const event = await getEvent(eventId)
   const tokens = await Promise.all(event.clubs.map((club) => buildTokenRow(event, club)))
+  // Sin short_id en el upsert: Postgres conserva el de cada fila (el enlace corto
+  // sobrevive a reactivar/reabrir); las filas nuevas lo reciben en el llenado lazy.
   if (tokens.length) unwrap(await db().from('tokens').upsert(tokens, { onConflict: 'event_id,club_code,token_type' }))
+  await ensureShortIds(await getTokensForEvent(eventId))
   return {
     success: true,
     tokens: tokens.map((token, index) => ({
@@ -330,8 +374,9 @@ export async function regenerateClubToken(eventId, clubCode) {
   const event = await getEvent(eventId)
   const club = event.clubs.find((item) => Number(item.code) === Number(clubCode))
   const row = await buildTokenRow(event, club)
-  unwrap(await db().from('tokens').upsert([row], { onConflict: 'event_id,club_code,token_type' }))
-  return { success: true, token: row.token_value }
+  // "Crear enlace nuevo": rota también el enlace corto (el anterior deja de funcionar).
+  await upsertWithFreshShortIds([row])
+  return { success: true, token: row.short_id }
 }
 
 export async function getTokensForEvent(eventId) {
@@ -360,18 +405,11 @@ export async function generateEmailInvitations(eventId, clubCodes = null) {
       }
     })
   )
-  if (invitations.length)
-    unwrap(
-      await db()
-        .from('tokens')
-        .upsert(
-          invitations.map((item) => item.row),
-          { onConflict: 'event_id,club_code,token_type' }
-        )
-    )
-  return invitations.map(({ club, tokenValue }) => ({
+  // Cada envío crea un v3 nuevo (como hasta ahora) con su propio enlace corto.
+  if (invitations.length) await upsertWithFreshShortIds(invitations.map((item) => item.row))
+  return invitations.map(({ club, row }) => ({
     club,
-    token: tokenValue
+    token: row.short_id
   }))
 }
 
@@ -451,6 +489,7 @@ export async function getClubInscriptions(eventId, clubCode) {
 
 export async function getDashboard(eventId) {
   const [event, tokens, rows] = await Promise.all([getEvent(eventId), getTokensForEvent(eventId), getInscriptionsForEvent(eventId)])
+  await ensureShortIds(tokens)
   const latestNormal = new Map()
   rows.filter((row) => !row.is_late).forEach((row) => latestNormal.set(Number(row.club_code), row))
   const latestLate = new Map()
@@ -468,7 +507,8 @@ export async function getDashboard(eventId) {
       inscription_count: excluded ? 0 : view.resultCount,
       late_approved_count: excluded ? 0 : view.lateApprovedCount,
       submitted_at: excluded ? null : inscription?.submitted_at || null,
-      token: token?.token_value || null
+      // v1.17.0: el enlace que ve y copia el admin es el corto (el largo sigue válido).
+      token: token?.short_id || token?.token_value || null
     }
   })
   const clubByCode = new Map(event.clubs.map((club) => [Number(club.code), club]))
