@@ -325,12 +325,12 @@ describe('audit log de acciones del admin (v1.14.0)', () => {
     expect(db.tables.audit_log).toEqual([expect.objectContaining({ action: 'event.reopened', details: { from: 'closed', to: 'active', via: 'editor' } })])
   })
 
-  it('reabrir silencioso: base cerrada, formulario viejo en active, "Guardar cambios" queda registrado', async () => {
+  it('reabrir silencioso cerrado (v1.18.0): base cerrada, formulario viejo en active, "Guardar cambios" no reabre ni registra', async () => {
     const db = seed('closed')
     __setSupabaseClient(db)
     await saveEvent(form({ status: 'active' }), false)
-    expect(db.tables.events[0].status).toBe('active') // no se tapa en este sprint, solo se registra
-    expect(db.tables.audit_log).toEqual([expect.objectContaining({ action: 'event.reopened', details: { from: 'closed', to: 'active', via: 'editor' } })])
+    expect(db.tables.events[0].status).toBe('closed')
+    expect(db.tables.audit_log).toEqual([])
   })
 
   it('editar evento registra solo los nombres de los campos cambiados, sin valores', async () => {

@@ -5,7 +5,7 @@ import { mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
 import { createMagicToken } from '../utils/magicToken'
-import { ensureClubPin, generateClubPin } from '../utils/clubPin'
+import { ensureClubPin, generateClubPin, normalizeClubPin } from '../utils/clubPin'
 import { generateShortId } from '../utils/shortId'
 import { referenceDateFor } from '../utils/referenceDate'
 import { supabase as configuredClient } from './supabase'
@@ -160,17 +160,17 @@ const stableJson = (value) => JSON.stringify(value === '' || value === undefined
 const DIFF_FIELDS = AUDIT_FIELDS.filter((field) => !['clubs', 'pruebas'].includes(field))
 const pruebasSignature = (rows) => stableJson([...rows].map((row) => [Number(row.event_ptr), Number(row.distance), row.style, Number(row.age_lo), Number(row.age_hi), row.sex, row.active !== false]).sort((a, b) => a[0] - b[0]))
 
-// Qué registrar al guardar desde el editor: cambio de estado (incluye el reabrir
-// silencioso por formulario desactualizado) y nombres de campos cambiados.
+// Qué registrar al guardar desde el editor: nombres de campos cambiados. Desde v1.18.0 el
+// editor no escribe el estado de un evento existente; el cambio de estado lo registra
+// updateEventStatus (con via: 'editor' cuando viene de "Guardar y activar"/"Reabrir").
 // Sin fila previa es una creación, que no se registra en Fase 1.
 // Si las lecturas fallan, no se registra nada y el guardado sigue igual.
-async function editorAuditEntries(id, status, payload, selectedCodes, currentClubRows, pruebas) {
+async function editorAuditEntries(id, payload, selectedCodes, currentClubRows, pruebas) {
   try {
     const previous = unwrap(await db().from('events').select('*').eq('id', id).maybeSingle())
     if (!previous) return []
     const previousPruebas = unwrap(await db().from('event_events').select('event_ptr,distance,style,age_lo,age_hi,sex,active').eq('event_id', id))
     const entries = []
-    if (previous.status !== status) entries.push({ action: statusAction(previous.status, status), details: { from: previous.status, to: status, via: 'editor' } })
     const previousCodes = new Set(currentClubRows.map((row) => Number(row.club_code)))
     const campos = DIFF_FIELDS.filter((field) => stableJson(previous[field]) !== stableJson(payload[field]))
     if (previousCodes.size !== selectedCodes.size || [...selectedCodes].some((code) => !previousCodes.has(code))) campos.push('clubs')
@@ -183,32 +183,66 @@ async function editorAuditEntries(id, status, payload, selectedCodes, currentClu
   }
 }
 
-export async function saveEvent(input, activate = false) {
+// v1.18.0 (síntoma C): en un evento que YA EXISTE, el editor no escribe el estado del
+// evento (status/opened_at/closed_at): eso lo hace solo updateEventStatus ("Guardar y
+// activar" y "Reabrir" pasan por ahí). En los event_clubs existentes escribe solo los
+// campos que el formulario cambió respecto de `loaded` (el evento tal como lo cargó el
+// editor); status solo si además es un cambio de participación. Así una pestaña vieja
+// sin cambios no revierte un cierre, un PIN regenerado ni el status de un club.
+// Sin `loaded` (llamadas viejas) no se escriben status ni PIN de clubes existentes.
+export async function saveEvent(input, activate = false, loaded = null) {
   const id = input.id || `evt_${crypto.randomUUID().slice(0, 8)}`
+  const existing = Boolean(input.id) && Boolean(unwrap(await db().from('events').select('id').eq('id', id).maybeSingle()))
   const status = activate ? 'active' : input.status || 'draft'
   const event = { ...input, id }
-  const payload = eventPayload(event, status)
+  const payload = existing ? eventDetailsPayload(event) : eventPayload(event, status)
   const clubs = (input.clubs || []).map(teamIdentity).map(ensureClubPin)
   const selectedCodes = new Set(clubs.map((club) => Number(club.code)))
 
   const currentClubRows = unwrap(await db().from('event_clubs').select('club_code').eq('event_id', id))
-  const auditEntries = input.id ? await editorAuditEntries(id, status, payload, selectedCodes, currentClubRows, input.events || []) : []
+  const auditEntries = existing ? await editorAuditEntries(id, payload, selectedCodes, currentClubRows, input.events || []) : []
   const logAll = async (outcome) => {
     for (const entry of auditEntries) await logAdminAction(client, { ...entry, eventId: id, outcome })
   }
 
   try {
-    await persistEvent(id, payload, clubs, selectedCodes, currentClubRows, input, activate)
+    await persistEvent(id, payload, clubs, selectedCodes, currentClubRows, input, { existing, activate, loaded })
   } catch (error) {
     await logAll('failure')
     throw error
   }
   await logAll('success')
+  if (existing && activate) return updateEventStatus(id, 'active', { via: 'editor' })
   return getEvent(id)
 }
 
-async function persistEvent(id, payload, clubs, selectedCodes, currentClubRows, input, activate) {
-  unwrap(await db().from('events').upsert(payload, { onConflict: 'id' }))
+const eventDetailsPayload = (input) => {
+  const { status: _status, opened_at: _openedAt, closed_at: _closedAt, ...details } = eventPayload(input, input.status)
+  return details
+}
+
+const clubContact = (club) => ({
+  contact_name: club.contact_name || '',
+  contact_whatsapp: club.contact_whatsapp || '',
+  email: club.email || club.contact_email || ''
+})
+
+const isParticipationChange = (from, to) => from !== to && (from === 'not_participating' || to === 'not_participating')
+
+// Campos de un event_club existente que el formulario cambió respecto de lo cargado.
+export function clubChanges(club, loadedClub) {
+  const contact = clubContact(club)
+  if (!loadedClub) return contact
+  const before = clubContact(loadedClub)
+  const changes = Object.fromEntries(Object.entries(contact).filter(([key, value]) => value !== before[key]))
+  if (club.pin !== normalizeClubPin(loadedClub.pin)) changes.pin = club.pin
+  if (isParticipationChange(loadedClub.participation_status, club.participation_status)) changes.status = club.participation_status
+  return changes
+}
+
+async function persistEvent(id, payload, clubs, selectedCodes, currentClubRows, input, { existing, activate, loaded }) {
+  if (existing) unwrap(await db().from('events').update(payload).eq('id', id))
+  else unwrap(await db().from('events').upsert(payload, { onConflict: 'id' }))
 
   if (clubs.length) unwrap(await db().from('clubs').upsert(clubs.map(clubPayload), { onConflict: 'code' }))
 
@@ -218,23 +252,22 @@ async function persistEvent(id, payload, clubs, selectedCodes, currentClubRows, 
     unwrap(await db().from('event_clubs').delete().eq('event_id', id).in('club_code', removedCodes))
   }
 
-  if (clubs.length) {
+  const currentCodes = new Set(currentClubRows.map((row) => Number(row.club_code)))
+  const added = clubs.filter((club) => !currentCodes.has(Number(club.code)))
+  if (added.length) {
     unwrap(
       await db()
         .from('event_clubs')
         .upsert(
-          clubs.map((club) => ({
-            event_id: id,
-            club_code: club.code,
-            status: club.participation_status || 'invited',
-            contact_name: club.contact_name || '',
-            contact_whatsapp: club.contact_whatsapp || '',
-            email: club.email || club.contact_email || '',
-            pin: club.pin
-          })),
+          added.map((club) => ({ event_id: id, club_code: club.code, status: club.participation_status || 'invited', ...clubContact(club), pin: club.pin })),
           { onConflict: 'event_id,club_code' }
         )
     )
+  }
+  const loadedClubs = new Map((loaded?.clubs || []).map((club) => [Number(club.code), club]))
+  for (const club of clubs.filter((item) => currentCodes.has(Number(item.code)))) {
+    const changes = clubChanges(club, loadedClubs.get(Number(club.code)))
+    if (Object.keys(changes).length) unwrap(await db().from('event_clubs').update(changes).eq('event_id', id).eq('club_code', club.code))
   }
 
   unwrap(await db().from('event_events').delete().eq('event_id', id))
@@ -256,7 +289,7 @@ async function persistEvent(id, payload, clubs, selectedCodes, currentClubRows, 
         )
     )
   }
-  if (activate) await generateTokens(id)
+  if (activate && !existing) await generateTokens(id) // existente: lo hace updateEventStatus
 }
 
 export const createEvent = (data) => saveEvent(data, false)
@@ -601,14 +634,14 @@ export async function exportConsolidated(eventId, type = 'principal') {
 export const exportAll = exportConsolidated
 export const exportSupplement = (eventId) => exportConsolidated(eventId, 'supplement')
 
-export async function updateEventStatus(id, status) {
+export async function updateEventStatus(id, status, { via = 'dashboard' } = {}) {
   let from
   try {
     from = unwrap(await db().from('events').select('status').eq('id', id).maybeSingle())?.status
   } catch (error) {
     console.warn('audit_log:', error?.message) // sin estado previo el log sale sin "from"
   }
-  const entry = { action: statusAction(from, status), eventId: id, details: { from, to: status, via: 'dashboard' } }
+  const entry = { action: statusAction(from, status), eventId: id, details: { from, to: status, via } }
   const updates = { status }
   if (status === 'active') updates.opened_at = new Date().toISOString()
   if (['accepting_late', 'closed'].includes(status)) updates.closed_at = new Date().toISOString()

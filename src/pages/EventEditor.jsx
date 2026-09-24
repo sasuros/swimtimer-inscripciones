@@ -38,6 +38,8 @@ const STATUS_LABELS = {
 export default function EventEditor({ eventId, cloneId }) {
   const imported = new URLSearchParams(window.location.search).get('imported') === '1'
   const [form, setForm] = useState(null)
+  // v1.18.0: el evento tal como se cargó; saveEvent solo escribe lo que el formulario cambió.
+  const [loaded, setLoaded] = useState(null)
   const [eventMode, setEventMode] = useState('results')
   const [masterClubs, setMasterClubs] = useState([])
   const [filters, setFilters] = useState({ distance: '', style: '', category: '' })
@@ -71,6 +73,7 @@ export default function EventEditor({ eventId, cloneId }) {
         }
         setEventMode(!source ? 'results' : (source.clubs?.length || source.events?.length) ? 'inscriptions' : 'results')
         setForm({ ...initial, clubs: initial.clubs.map(ensureClubPin) })
+        if (eventId) setLoaded(source)
         setNewClub((current) => ({
           ...current,
           code: String(Math.max(...clubs.map((item) => Number(item.code)), 1) + 1)
@@ -151,7 +154,7 @@ export default function EventEditor({ eventId, cloneId }) {
     }
     setSaving(true)
     try {
-      const saved = await saveEvent(resultsOnly ? { ...form, clubs: [], events: [] } : form, activate)
+      const saved = await saveEvent(resultsOnly ? { ...form, clubs: [], events: [] } : form, activate, loaded)
       window.location.href = `/admin/eventos/${saved.id}`
     } catch (error) {
       setError(error.message)
