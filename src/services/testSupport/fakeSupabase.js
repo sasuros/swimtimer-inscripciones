@@ -110,4 +110,4 @@ export async function seed(options) {
 export const athleteSet = n => Array.from({ length: n }, (_, i) => ({ Ath_no: 5000 + i + 1, Last_name: `Nadador${i}`, First_name: 'X', Team_no: 5, Ath_age: 12 }))
 export const resultSet = n => Array.from({ length: n }, (_, i) => ({ Event_ptr: 1, Ath_no: 5000 + i + 1, ActualSeed_time: '32.50' }))
 export const rosterSet = (n, prefix = 'N') => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, lastName: `${prefix}${i}`, firstName: 'X', sex: 'F', age: 12, events: [] }))
-export const payload = (token, n, prefix = 'N') => ({ token, athletes: athleteSet(n), results: resultSet(n), roster: rosterSet(n, prefix), meta: { club_code: 5, club_name: 'Club Cinco' } })
+export const payload = (token, n, prefix = 'N', pin = '1234') => ({ token, pin, athletes: athleteSet(n), results: resultSet(n), roster: rosterSet(n, prefix), meta: { club_code: 5, club_name: 'Club Cinco' } })

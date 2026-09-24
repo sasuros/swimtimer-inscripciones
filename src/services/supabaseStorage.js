@@ -413,8 +413,8 @@ async function latestInscription(eventId, clubCode, isLate) {
   return unwrap(result)
 }
 
-export async function validateToken(tokenId) {
-  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).validateToken(tokenId)
+export async function validateToken(tokenId, options) {
+  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).validateToken(tokenId, options)
 }
 
 function withoutPin(club) {
@@ -425,8 +425,8 @@ function withoutPins(event) {
   return { ...event, clubs: (event.clubs || []).map(withoutPin) }
 }
 
-export async function submitInscription(payload) {
-  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).submitInscription(payload)
+export async function submitInscription(payload, options) {
+  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).submitInscription(payload, options)
 }
 
 export const submitLateInscription = (tokenId, data) => submitInscription({ ...data, token: tokenId })

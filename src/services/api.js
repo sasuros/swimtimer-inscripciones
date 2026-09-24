@@ -30,10 +30,21 @@ const storage = DEMO_MODE
     }
   : production
 
+// Si hay sesión de admin en este navegador se manda el JWT: el servidor solo lo usa
+// (vista previa sin PIN) si WIZARD_ADMIN_PREVIEW=enabled; si no, lo ignora.
+async function adminAuthHeader() {
+  try {
+    const { data } = supabase ? await supabase.auth.getSession() : { data: { session: null } }
+    return data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+  } catch {
+    return {}
+  }
+}
+
 async function postPublicWizard(path, body, fallbackMessage) {
   const response = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await adminAuthHeader()) },
     body: JSON.stringify(body)
   })
   const data = await response.json()
@@ -41,10 +52,10 @@ async function postPublicWizard(path, body, fallbackMessage) {
   return data
 }
 
-export const validateToken = (token) =>
+export const validateToken = (token, pin) =>
   DEMO_MODE
-    ? Promise.resolve(storage.validateToken(token))
-    : postPublicWizard('/api/validate-token', { token }, 'No se pudo validar el enlace')
+    ? Promise.resolve(storage.validateToken(token, { pin }))
+    : postPublicWizard('/api/validate-token', { token, pin }, 'No se pudo validar el enlace')
 
 export const submitInscription = (payload) =>
   DEMO_MODE

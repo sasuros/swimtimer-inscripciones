@@ -96,7 +96,9 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     return client
   }
 
-  const validateToken = async (tokenId) => {
+  // Acceso completo del enlace (incluye el roster). Nunca sale del servidor sin PIN:
+  // lo filtra validateToken.
+  const fullAccess = async (tokenId) => {
     const magic = await verifyMagicToken(tokenId, adminPassword)
     if (magic) {
       if (!client) return { valid: false }
@@ -154,6 +156,7 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     const current = event.status === 'accepting_late' ? late : normal
     return {
       valid: true,
+      requiresPin: true,
       backendAvailable: true,
       eventId: event.id,
       event: { ...withoutPins(event), date: event.date_start },
@@ -165,26 +168,45 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     }
   }
 
+  // v1.16.0: el PIN se exige en el servidor para v2 y v3. Se compara contra
+  // event_clubs.pin del evento/club de la FILA guardada del token (no del payload).
+  const pinMatches = async (eventId, clubCode, pin) => {
+    if (!/^\d{4}$/.test(String(pin ?? ''))) return false
+    const relation = unwrap(await db().from('event_clubs').select('pin').eq('event_id', eventId).eq('club_code', clubCode).maybeSingle())
+    return Boolean(relation?.pin && relation.pin === String(pin))
+  }
+
+  // Sin PIN válido solo sale lo básico (evento y club) para mostrar la pantalla del PIN:
+  // nada de roster ni de si ya envió.
+  const basicAccess = ({ inscription, normal_inscription, already_submitted, ...rest }) => ({ ...rest, requiresPin: true, pinVerified: false })
+
+  const validateToken = async (tokenId, { pin, admin = false } = {}) => {
+    const access = await fullAccess(tokenId)
+    // Sin fila guardada (o sin backend) no hay datos del servidor que proteger;
+    // además no se puede enviar (submit exige backendAvailable).
+    if (!access.valid || !access.backendAvailable) return access
+    if (admin || (await pinMatches(access.eventId, access.club.code, pin))) return { ...access, pinVerified: true }
+    return basicAccess(access)
+  }
+
   const verifyAccessPin = async (tokenId, pin) => {
-    const magic = await verifyMagicToken(tokenId, adminPassword)
-    if (!magic) return { valid: false }
+    if (!client) return { valid: false }
     const stored = unwrap(
       await db()
         .from('tokens')
-        .select('id')
+        .select('event_id,club_code')
         .eq('id', await tokenKey(tokenId))
-        .eq('token_type', 'v3')
         .maybeSingle()
     )
     if (!stored) return { valid: false }
-    const relation = unwrap(await db().from('event_clubs').select('pin').eq('event_id', magic.e).eq('club_code', magic.c).maybeSingle())
-    return { valid: Boolean(relation?.pin && relation.pin === String(pin)) }
+    return { valid: await pinMatches(stored.event_id, stored.club_code, pin) }
   }
 
-  const submitInscription = async (payload) => {
-    const access = await validateToken(payload.token)
+  const submitInscription = async (payload, { admin = false } = {}) => {
+    const access = await validateToken(payload.token, { pin: payload.pin, admin })
     if (!access.valid) throw new Error('El enlace no es válido')
     if (!access.backendAvailable) throw new Error('No se pudo conectar con Supabase')
+    if (!access.pinVerified) throw new Error('Código de acceso incorrecto o faltante')
     if (['draft', 'closed', 'archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
     const isLate = access.event.status === 'accepting_late'
     // Un solo INSERT ... ON CONFLICT DO UPDATE sobre UNIQUE(event_id, club_code, is_late):

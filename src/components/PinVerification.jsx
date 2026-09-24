@@ -49,8 +49,7 @@ export default function PinVerification({ token, access, onVerified }) {
       const result = await verifyAccessPin(token, digits.join(''))
       if (result.valid) {
         localStorage.removeItem(storageKey)
-        sessionStorage.setItem(`swimtimer-pin-verified:${access.eventId}:${access.club.code}`, '1')
-        onVerified()
+        onVerified(digits.join(''))
         return
       }
       const next = attempts + 1
@@ -63,7 +62,7 @@ export default function PinVerification({ token, access, onVerified }) {
       } else {
         localStorage.setItem(storageKey, JSON.stringify({ attempts: next, lockedUntil: 0 }))
         setAttempts(next)
-        setError('Código incorrecto. Verifica el código que recibiste por correo.')
+        setError('Código incorrecto. Verifica el código que te envió el organizador.')
       }
       setDigits(['', '', '', ''])
       inputs.current[0]?.focus()
@@ -105,7 +104,7 @@ export default function PinVerification({ token, access, onVerified }) {
               />
             ))}
           </div>
-          <p className="field-help mt-3">El código fue enviado a tu correo</p>
+          <p className="field-help mt-3">El organizador te lo envió junto con el enlace</p>
           {error && <p className="mt-4 rounded-lg bg-danger-50 p-3 text-sm font-bold text-danger-700">{error}</p>}
           <button className="btn-primary mt-5 w-full" disabled={checking || locked || digits.some((digit) => !digit)}>
             {checking ? 'Verificando…' : 'Verificar'}

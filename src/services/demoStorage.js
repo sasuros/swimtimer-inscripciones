@@ -242,7 +242,23 @@ function withoutPins(event) {
   return { ...event, clubs: (event.clubs || []).map(withoutPin) }
 }
 
-export function demoValidateToken(token) {
+// v1.16.0: igual que el servidor, sin PIN válido no sale el roster; y enviar exige PIN.
+// El modo "externo" (enlace abierto en otro navegador, sin datos locales) no tiene nada que proteger.
+function demoPinMatches(eventId, clubCode, pin) {
+  if (!/^\d{4}$/.test(String(pin ?? ''))) return false
+  const club = (demoGetEvent(eventId)?.clubs || []).find((item) => Number(item.code) === Number(clubCode))
+  return Boolean(club?.pin && club.pin === String(pin))
+}
+
+export function demoValidateToken(token, { pin } = {}) {
+  const access = demoFullAccess(token)
+  if (!access.valid || !access.localMode) return access
+  if (demoPinMatches(access.eventId, access.club.code, pin)) return { ...access, requiresPin: true, pinVerified: true }
+  const { inscription, normal_inscription, already_submitted, ...basic } = access
+  return { ...basic, requiresPin: true, pinVerified: false }
+}
+
+function demoFullAccess(token) {
   const embedded = decodeDemoToken(token)
   if (embedded) {
     const access = accessFromDemoToken(embedded)
@@ -291,8 +307,9 @@ export function demoValidateToken(token) {
 }
 
 export function demoSubmitInscription(payload) {
-  const access = demoValidateToken(payload.token)
+  const access = demoValidateToken(payload.token, { pin: payload.pin })
   if (!access.valid) throw new Error('El enlace no es válido o caducó')
+  if (access.localMode && !access.pinVerified) throw new Error('Código de acceso incorrecto o faltante')
   if (['draft', 'closed', 'archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
   if (!access.localMode)
     return {
@@ -422,9 +439,7 @@ export function demoUpdateClubPin(eventId, clubCode) {
 
 export function demoVerifyAccessPin(token, pin) {
   const record = read(STORAGE_KEYS.tokens, []).find((item) => item.id === token)
-  return {
-    valid: Boolean(record?.token_type === 'v3' && record.club?.pin === String(pin))
-  }
+  return { valid: Boolean(record && demoPinMatches(record.eventId || LEGACY_EVENT_ID, record.club?.code, pin)) }
 }
 
 export function demoGetInscription(eventId, clubCode) {

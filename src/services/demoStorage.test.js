@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { buildClubFileExport } from '../utils/mmSchema'
-import { demoCloneEvent, demoGetClubInscriptions, demoGetInscription, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoUpdateLandingSettings, demoValidateToken } from './demoStorage'
+import { demoCloneEvent, demoGetClubInscriptions, demoGetInscription, demoDashboard, demoDeleteEvent, demoExportAll, demoGenerateTokens, demoListEvents, demoLogin, demoReviewLate, demoSaveEvent, demoSetClubParticipation, demoSubmitInscription, demoUpdateEventStatus, demoUpdateLandingSettings, demoValidateToken, demoGetEvent, demoVerifyAccessPin } from './demoStorage'
 
 const memory = new Map()
 globalThis.localStorage = {
@@ -9,6 +9,16 @@ globalThis.localStorage = {
   removeItem: key => memory.delete(key),
   clear: () => memory.clear()
 }
+
+// v1.16.0: validar con datos y enviar exigen el PIN del club. Estos helpers lo leen
+// del evento local para que los tests existentes sigan verificando lo mismo.
+const pinFor = (token) => {
+  const record = JSON.parse(localStorage.getItem('swimtimer-demo:tokens') || '[]').find((item) => item.id === token)
+  if (!record) return undefined
+  return (demoGetEvent(record.eventId || 'evt_demo_2025')?.clubs || []).find((club) => Number(club.code) === Number(record.club?.code))?.pin
+}
+const validateWithPin = (token) => demoValidateToken(token, { pin: pinFor(token) })
+const submitWithPin = (payload) => demoSubmitInscription({ ...payload, pin: pinFor(payload.token) })
 
 describe('storage local de la demo', () => {
   beforeEach(() => memory.clear())
@@ -21,13 +31,13 @@ describe('storage local de la demo', () => {
   it('genera, valida, usa y conserva tokens e inscripciones', () => {
     const generated = demoGenerateTokens()
     expect(generated.tokens).toHaveLength(12)
-    const access = demoValidateToken(generated.tokens[0].id)
+    const access = validateWithPin(generated.tokens[0].id)
     expect(access.valid).toBe(true)
     expect(access.already_submitted).toBe(false)
 
-    demoSubmitInscription({ token: generated.tokens[0].id, meta: { club_code: 2 }, athletes: [{ Ath_no: 2001 }], results: [{ Event_ptr: 0 }], roster: [{ id: 'athlete-1' }] })
+    submitWithPin({ token: generated.tokens[0].id, meta: { club_code: 2 }, athletes: [{ Ath_no: 2001 }], results: [{ Event_ptr: 0 }], roster: [{ id: 'athlete-1' }] })
 
-    expect(demoValidateToken(generated.tokens[0].id).already_submitted).toBe(true)
+    expect(validateWithPin(generated.tokens[0].id).already_submitted).toBe(true)
     expect(demoDashboard().counts).toMatchObject({ received: 1, athletes: 1 })
   })
 
@@ -36,10 +46,10 @@ describe('storage local de la demo', () => {
     expect(token.length).toBeLessThan(8000)
     memory.clear()
 
-    const access = demoValidateToken(token)
+    const access = validateWithPin(token)
     expect(access).toMatchObject({ valid: true, localMode: false, eventId: 'evt_demo_2025' })
     expect(access.event.events).toHaveLength(76)
-    const result = demoSubmitInscription({ token, athletes: [{ Ath_no: 2001 }], results: [], meta: {}, roster: [] })
+    const result = submitWithPin({ token, athletes: [{ Ath_no: 2001 }], results: [], meta: {}, roster: [] })
     expect(result).toMatchObject({ success: true, external: true })
     expect(localStorage.getItem('swimtimer-demo:inscriptions')).toBeNull()
   })
@@ -51,7 +61,7 @@ describe('storage local de la demo', () => {
       id: 'AKP-2026-token-v1', eventId: event.id, event, club,
       expires_at: '2099-01-01T00:00:00.000Z'
     }]))
-    expect(demoValidateToken('AKP-2026-token-v1')).toMatchObject({
+    expect(validateWithPin('AKP-2026-token-v1')).toMatchObject({
       valid: true, localMode: true, eventId: event.id
     })
   })
@@ -96,9 +106,9 @@ describe('storage local de la demo', () => {
     const token = demoGenerateTokens().tokens[0].id
     const athlete = { Ath_no: 2001, Last_name: 'Suros', First_name: 'Ana', Ath_Sex: 'F', Birth_date: '2013-05-15', Team_no: 2, Ath_age: 12, Comp_no: 2001 }
     const result = { Event_ptr: 1, Ath_no: 2001, ActSeed_course: 'S', ActualSeed_time: '32.50', ConvSeed_course: 'S', ConvSeed_time: '32.50' }
-    demoSubmitInscription({ token, meta: { club_code: 2 }, athletes: [athlete], results: [result], roster: [{ id: 'normal' }] })
+    submitWithPin({ token, meta: { club_code: 2 }, athletes: [athlete], results: [result], roster: [{ id: 'normal' }] })
     demoUpdateEventStatus('evt_demo_2025', 'accepting_late')
-    const lateResult = demoSubmitInscription({ token, meta: { club_code: 2 }, athletes: [{ ...athlete, First_name: 'Bea' }], results: [result], roster: [{ id: 'late' }] })
+    const lateResult = submitWithPin({ token, meta: { club_code: 2 }, athletes: [{ ...athlete, First_name: 'Bea' }], results: [result], roster: [{ id: 'late' }] })
     expect(lateResult.late).toBe(true)
     expect(demoDashboard().counts.late_pending).toBe(1)
     demoReviewLate('evt_demo_2025', 2, 'approve_all')
@@ -118,7 +128,7 @@ describe('storage local de la demo', () => {
     const athlete = { Ath_no: 2001, Last_name: 'De la Cruz Pérez', First_name: 'María de los Ángeles', Ath_Sex: 'F', Birth_date: '2013-05-15', Team_no: 2, Ath_age: 12, Comp_no: 2001 }
     const result = { Event_ptr: 1, Ath_no: 2001, ActSeed_course: 'S', ActualSeed_time: '32.50', ConvSeed_course: 'S', ConvSeed_time: '32.50' }
     const roster = [{ id: 'r1', lastName: 'De la Cruz Pérez', firstName: 'María de los Ángeles' }]
-    demoSubmitInscription({ token, meta: { club_code: 2, sha256: 'original' }, athletes: [athlete], results: [result], roster })
+    submitWithPin({ token, meta: { club_code: 2, sha256: 'original' }, athletes: [athlete], results: [result], roster })
 
     const complete = await demoExportAll('evt_demo_2025', 'completo')
     expect(complete.athletes[0]).toMatchObject({ Last_name: 'De la Cruz', First_name: 'María Á.', Pref_name: '' })
@@ -140,9 +150,9 @@ describe('storage local de la demo', () => {
     const athletes = n => Array.from({ length: n }, (_, i) => ({ Ath_no: code * 1000 + i + 1, Team_no: code, Last_name: `N${i}`, First_name: 'X', Ath_age: 12 }))
     const results = n => athletes(n).map(athlete => ({ Event_ptr: 1, Ath_no: athlete.Ath_no, ActualSeed_time: '32.50' }))
     const roster = (n, prefix) => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}` }))
-    demoSubmitInscription({ token: first.id, meta: { club_code: code }, athletes: athletes(3), results: results(3), roster: roster(3, 'R') })
+    submitWithPin({ token: first.id, meta: { club_code: code }, athletes: athletes(3), results: results(3), roster: roster(3, 'R') })
     demoUpdateEventStatus('evt_demo_2025', 'accepting_late')
-    demoSubmitInscription({ token: first.id, meta: { club_code: code }, athletes: athletes(2), results: results(2), roster: roster(2, 'T') })
+    submitWithPin({ token: first.id, meta: { club_code: code }, athletes: athletes(2), results: results(2), roster: roster(2, 'T') })
     demoReviewLate('evt_demo_2025', code, 'approve', [code * 1000 + 2])
 
     const club = demoDashboard('evt_demo_2025').clubs.find(item => item.code === code)
@@ -156,7 +166,7 @@ describe('storage local de la demo', () => {
 
     // Club solo-tardía: no tiene regular, pero se ve y abre sin error.
     const other = second.club.code
-    demoSubmitInscription({ token: second.id, meta: { club_code: other }, athletes: [{ Ath_no: other * 1000 + 1, Team_no: other }], results: [], roster: roster(1, 'S') })
+    submitWithPin({ token: second.id, meta: { club_code: other }, athletes: [{ Ath_no: other * 1000 + 1, Team_no: other }], results: [], roster: roster(1, 'S') })
     demoReviewLate('evt_demo_2025', other, 'approve_all')
     const lateOnly = demoDashboard('evt_demo_2025').clubs.find(item => item.code === other)
     expect(lateOnly.status).not.toBe('received')
@@ -166,10 +176,10 @@ describe('storage local de la demo', () => {
 
   it('tras abrir tardías sin envío tardío aún, expone la inscripción normal por separado (no mezclada en `inscription`)', () => {
     const token = demoGenerateTokens().tokens[0].id
-    demoSubmitInscription({ token, meta: { club_code: 2 }, athletes: [{ Ath_no: 2001 }], results: [], roster: [{ id: 'atleta-normal' }] })
+    submitWithPin({ token, meta: { club_code: 2 }, athletes: [{ Ath_no: 2001 }], results: [], roster: [{ id: 'atleta-normal' }] })
     demoUpdateEventStatus('evt_demo_2025', 'accepting_late')
 
-    const access = demoValidateToken(token)
+    const access = validateWithPin(token)
     expect(access.normal_inscription?.roster).toEqual([{ id: 'atleta-normal' }])
     expect(access.already_submitted).toBe(false)
     expect(access.inscription).toBeNull()
@@ -177,9 +187,9 @@ describe('storage local de la demo', () => {
 
   it('excluye clubes que no participan de pendientes y consolidado', async () => {
     const token = demoGenerateTokens().tokens[0].id
-    const access = demoValidateToken(token)
+    const access = validateWithPin(token)
     const athlete = { Ath_no: 2001, Last_name: 'Suros', First_name: 'Ana', Ath_Sex: 'F', Birth_date: '2013-05-15', Team_no: access.club.code, Ath_age: 12, Comp_no: 2001 }
-    demoSubmitInscription({ token, meta: { club_code: access.club.code }, athletes: [athlete], results: [], roster: [] })
+    submitWithPin({ token, meta: { club_code: access.club.code }, athletes: [athlete], results: [], roster: [] })
     demoSetClubParticipation(access.eventId, access.club.code, false)
 
     const dashboard = demoDashboard(access.eventId)
@@ -189,5 +199,30 @@ describe('storage local de la demo', () => {
 
     demoSetClubParticipation(access.eventId, access.club.code, true)
     expect(demoDashboard(access.eventId).clubs.find(club => club.code === access.club.code).status).toBe('received')
+  })
+})
+
+describe('demo: PIN obligatorio igual que el servidor (v1.16.0)', () => {
+  beforeEach(() => memory.clear())
+
+  it('enlace v2 local sin PIN: requiresPin y sin roster; con PIN, completo', () => {
+    const token = demoGenerateTokens().tokens[0].id
+    submitWithPin({ token, meta: { club_code: 2 }, athletes: [{ Ath_no: 2001 }], results: [], roster: [{ id: 'guardado' }] })
+    const basic = demoValidateToken(token)
+    expect(basic).toMatchObject({ valid: true, requiresPin: true, pinVerified: false })
+    expect(basic).not.toHaveProperty('inscription')
+    expect(basic).not.toHaveProperty('already_submitted')
+    expect(validateWithPin(token)).toMatchObject({ pinVerified: true, already_submitted: true })
+  })
+
+  it('demoVerifyAccessPin acepta v2 con el PIN del club', () => {
+    const token = demoGenerateTokens().tokens[0].id
+    expect(demoVerifyAccessPin(token, pinFor(token))).toEqual({ valid: true })
+    expect(demoVerifyAccessPin(token, pinFor(token) === '0000' ? '1111' : '0000')).toEqual({ valid: false })
+  })
+
+  it('enviar sin PIN se rechaza', () => {
+    const token = demoGenerateTokens().tokens[0].id
+    expect(() => demoSubmitInscription({ token, meta: { club_code: 2 }, athletes: [], results: [], roster: [] })).toThrow('Código de acceso')
   })
 })

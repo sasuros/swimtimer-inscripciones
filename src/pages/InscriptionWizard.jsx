@@ -17,23 +17,37 @@ import RegistrationMethodSelector from '../components/RegistrationMethodSelector
 import PinVerification from '../components/PinVerification'
 import { deriveRosterView } from '../utils/wizardRosterView'
 
+// v1.16.0: el PIN se guarda solo en esta pestaña (sessionStorage) y viaja en cada
+// validación y en el envío; el servidor lo verifica siempre.
+const pinKey = (token) => `swimtimer-pin:${token}`
+const readPin = (token) => {
+  try {
+    return sessionStorage.getItem(pinKey(token)) || ''
+  } catch {
+    return ''
+  }
+}
+
 export default function InscriptionWizard() {
   const token = new URLSearchParams(window.location.search).get('t') || ''
-  const access = useToken(token)
+  const [pin, setPin] = useState(() => readPin(token))
+  const access = useToken(token, pin)
+  const acceptPin = (value) => {
+    try {
+      sessionStorage.setItem(pinKey(token), value)
+    } catch {
+      // sin sessionStorage el PIN vive solo en memoria
+    }
+    setPin(value)
+  }
   if (access.loading) return <div className="flex min-h-screen items-center justify-center text-brand-800">Validando invitación…</div>
   if (!access.valid) return <InvalidToken networkError={access.networkError} noToken={access.noToken} />
   if (['draft', 'closed', 'archived'].includes(access.event.status)) return <ClosedEvent event={access.event} />
-  return <VerifiedWizard token={token} access={access} />
+  if (access.requiresPin && !access.pinVerified) return <PinVerification token={token} access={access} onVerified={acceptPin} />
+  return <WizardContent token={token} pin={pin} access={access} />
 }
 
-function VerifiedWizard({ token, access }) {
-  const key = `swimtimer-pin-verified:${access.eventId}:${access.club.code}`
-  const [verified, setVerified] = useState(() => !access.requiresPin || sessionStorage.getItem(key) === '1')
-  if (!verified) return <PinVerification token={token} access={access} onVerified={() => setVerified(true)} />
-  return <WizardContent token={token} access={access} />
-}
-
-function WizardContent({ token, access }) {
+function WizardContent({ token, pin, access }) {
   const { isLate, locked, editableInitial } = deriveRosterView(access)
   const rosterKey = isLate ? `${token}:late` : token
   const [roster, setRoster] = useRoster(rosterKey, editableInitial)
@@ -75,6 +89,7 @@ function WizardContent({ token, access }) {
       })
       const result = await submitInscription({
         token,
+        pin,
         athletes: output.athletes,
         results: output.results,
         meta: output.meta,
