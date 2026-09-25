@@ -6,6 +6,8 @@ export const clubLabel = (club) => club?.abbreviation || club?.short_name || clu
 const swimmers = (n) => `${n} ${n === 1 ? 'nadador' : 'nadadores'}`
 const MAX_NAMES = 5
 
+export const remainingText = (n) => `${n === 1 ? 'Queda' : 'Quedan'} ${n} por revisar`
+
 export function namesList(athletes) {
   const names = athletes.map(athleteName)
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} y ${names.at(-1)}` : names[0] || ''
@@ -21,7 +23,7 @@ export function confirmText(action, athletes, club) {
 export function reviewSuccessText(action, count, club, remaining) {
   const label = clubLabel(club)
   const done = action === 'reject' ? `Rechazaste a ${swimmers(count)} de ${label}.` : action === 'approve_pending' && count > 1 ? `Aprobaste a los ${count} nadadores pendientes de ${label}.` : `Aprobaste a ${swimmers(count)} de ${label}.`
-  return `${done} ${remaining > 0 ? `Quedan ${remaining} por revisar.` : `La tardía de ${label} quedó revisada.`}`
+  return `${done} ${remaining > 0 ? `${remainingText(remaining)}.` : `La tardía de ${label} quedó revisada.`}`
 }
 
 export const lateConflictText = (club) => `La inscripción tardía de ${clubLabel(club)} cambió mientras la revisabas. Ya cargamos la versión actual: revísala y vuelve a aprobar o rechazar.`

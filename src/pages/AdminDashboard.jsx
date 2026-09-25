@@ -15,6 +15,8 @@ import { mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { clubLinkText } from '../utils/messageTemplates'
 import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getClubInscriptions, getDashboard, recordInvitationResults, regenerateClubToken, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
 import { DEMO_MODE } from '../config'
+import { pendingAthletes } from '../services/lateDecision'
+import { reviewSuccessText } from '../utils/lateReviewText'
 
 export default function AdminDashboard({ eventId }) {
   const [data, setData] = useState(null)
@@ -27,6 +29,7 @@ export default function AdminDashboard({ eventId }) {
   const [emailing, setEmailing] = useState(false)
   const [invitationResults, setInvitationResults] = useState([])
   const [reviewing, setReviewing] = useState(false)
+  const [lateNotice, setLateNotice] = useState(null)
   const reviewingRef = useRef(false)
   const load = async () => {
     try {
@@ -83,14 +86,20 @@ export default function AdminDashboard({ eventId }) {
     if (reviewingRef.current) return
     reviewingRef.current = true
     setReviewing(true)
+    const at = Date.now()
     try {
-      await reviewLate(eventId, seen.club.code, action, ids, seen)
+      const updated = await reviewLate(eventId, seen.club.code, action, ids, seen)
+      const count = action === 'approve_pending' ? pendingAthletes(seen).length : ids.length
       await load()
+      setLateNotice({ kind: 'success', text: reviewSuccessText(action, count, seen.club, pendingAthletes(updated).length), at })
     } catch (reviewError) {
-      if (reviewError.status !== 409) throw reviewError
-      // Se recarga la versión actual y el aviso queda visible (load() limpia el error).
-      await load()
-      setError(reviewError.message)
+      if (reviewError.status === 409) {
+        // Se recarga la versión actual y el aviso queda visible (load() limpia el error).
+        await load()
+        setError(reviewError.message)
+        return
+      }
+      setLateNotice({ kind: 'error', text: reviewError.message || 'No se pudo guardar la decisión. No se cambió nada.', at })
     } finally {
       reviewingRef.current = false
       setReviewing(false)
@@ -244,7 +253,7 @@ export default function AdminDashboard({ eventId }) {
         {error && <p className="rounded-lg bg-danger-bg p-3 text-danger-fg">{error}</p>}
         <LiveResultsSettings event={data.event} onSaved={load} />
         <EmailInvitationsPanel clubs={data.clubs} sending={emailing} results={invitationResults} onSendAll={() => sendInvitations(null)} />
-        <LateReviewPanel submissions={data.late || []} onReview={handleReview} busy={reviewing} />
+        <LateReviewPanel submissions={data.late || []} onReview={handleReview} busy={reviewing} notice={lateNotice} />
         <section className="card overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
             <div>

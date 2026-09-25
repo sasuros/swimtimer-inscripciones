@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // v1.18.0 — Revisión de tardías en el tablero real (AdminDashboard + fake de Supabase).
 // Club 5 ("Club Cinco", CIN): tardías Nadador0 (5001), Nadador1 (5002), Nadador2 (5003).
-const gate = vi.hoisted(() => ({ hold: null }))
+const gate = vi.hoisted(() => ({ hold: null, fail: null }))
 vi.mock('../services/api', async () => {
   const storage = await import('../services/supabaseStorage.js')
   const stub = async () => ({ success: true })
@@ -11,6 +11,7 @@ vi.mock('../services/api', async () => {
     ...storage,
     reviewLate: async (...args) => {
       if (gate.hold) await gate.hold
+      if (gate.fail) throw gate.fail
       return storage.reviewLate(...args)
     },
     generateEmailInvitations: stub,
@@ -45,6 +46,7 @@ beforeEach(async () => {
   db.tables.events[0].status = 'accepting_late'
   await wizard.submitInscription(payload(token, 3, 'T'))
   gate.hold = null
+  gate.fail = null
 })
 afterEach(async () => {
   await unmountAll()
@@ -114,7 +116,7 @@ describe('decididos, selección y doble clic', () => {
     expect(checkbox('Nadador2')).toBeTruthy()
     expect(document.querySelector('[data-decision="approved"]').textContent).toContain('Aprobado')
     expect(document.querySelector('[data-decision="rejected"]').textContent).toContain('Rechazado')
-    expect(document.body.textContent).toContain('Quedan 1 por revisar')
+    expect(document.body.textContent).toContain('Queda 1 por revisar')
   })
 
   it('una carga nueva (otra versión) vacía la selección: los Ath_no viejos no viajan', async () => {
@@ -165,5 +167,61 @@ describe('decididos, selección y doble clic', () => {
     expect(lateWrites()).toBe(1)
     expect(lateRow()).toMatchObject({ approved_athletes: [5001], version: 2 })
     expect(button('Aprobar pendientes').disabled).toBe(false)
+  })
+})
+
+describe('BUG #3 — cada acción muestra su resultado y refresca la tarjeta', () => {
+  const notice = () => document.querySelector('[data-notice]')
+  const decideVia = async (name, trigger, yes) => {
+    if (name) await choose(name)
+    await click(button(trigger))
+    await click(button(yes))
+    await settle()
+  }
+
+  it('aprobar uno: "Aprobaste a 1 nadador de CIN" + cuántos quedan, y la tarjeta ya lo muestra aprobado', async () => {
+    await openDashboard()
+    await decideVia('Nadador0', 'Aprobar seleccionados', 'Sí, aprobar')
+    expect(notice().dataset.notice).toBe('success')
+    expect(notice().getAttribute('role')).toBe('status')
+    expect(notice().textContent).toBe('Aprobaste a 1 nadador de CIN. Quedan 2 por revisar.')
+    expect(document.querySelector('[data-decision="approved"]').textContent).toContain('Nadador0')
+    expect(button('Aprobar pendientes (2)')).toBeTruthy()
+  })
+
+  it('rechazar dos: plural', async () => {
+    await openDashboard()
+    await choose('Nadador1')
+    await decideVia('Nadador2', 'Rechazar seleccionados', 'Sí, rechazar')
+    expect(notice().textContent).toBe('Rechazaste a 2 nadadores de CIN. Queda 1 por revisar.')
+  })
+
+  it('la última decisión cierra la tardía: la tarjeta sale y el resultado sigue visible', async () => {
+    await openDashboard()
+    await decideVia(null, 'Aprobar pendientes (3)', 'Sí, aprobar')
+    expect(notice().textContent).toBe('Aprobaste a los 3 nadadores pendientes de CIN. La tardía de CIN quedó revisada.')
+    expect(document.body.textContent).toContain('No quedan tardías por revisar.')
+    expect(button('Club Cinco')).toBeUndefined()
+  })
+
+  it('un fallo que no es conflicto se muestra en rojo (no queda en una promesa sin manejar) y no escribe', async () => {
+    gate.fail = new Error('Sin conexión con el servidor')
+    await openDashboard()
+    await decideVia('Nadador0', 'Aprobar seleccionados', 'Sí, aprobar')
+    expect(notice().dataset.notice).toBe('error')
+    expect(notice().getAttribute('role')).toBe('alert')
+    expect(notice().textContent).toBe('Sin conexión con el servidor')
+    expect(lateWrites()).toBe(0)
+    expect(button('Aprobar pendientes (3)').disabled).toBe(false)
+  })
+
+  it('el éxito siguiente reemplaza al error', async () => {
+    gate.fail = new Error('Sin conexión con el servidor')
+    await openDashboard()
+    await decideVia('Nadador0', 'Aprobar seleccionados', 'Sí, aprobar')
+    gate.fail = null
+    await decideVia('Nadador0', 'Aprobar seleccionados', 'Sí, aprobar')
+    expect(notice().dataset.notice).toBe('success')
+    expect(document.querySelectorAll('[data-notice]')).toHaveLength(1)
   })
 })

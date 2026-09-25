@@ -1,24 +1,39 @@
 import { useState } from 'react'
 import { Check, ChevronDown, X } from 'lucide-react'
 import { athleteDecision, needsReview, pendingAthletes } from '../services/lateDecision'
-import { confirmText } from '../utils/lateReviewText'
+import { confirmText, remainingText } from '../utils/lateReviewText'
 
 // v1.18.0: las decisiones son finales (lateDecision.js). Solo se marcan pendientes, cada
 // decisión pasa por un diálogo que nombra a los nadadores, y mientras una revisión está en
 // vuelo (`busy`) no se puede lanzar otra.
-export default function LateReviewPanel({ submissions, onReview, busy = false }) {
+// `notice` = resultado de la última acción; se ve aunque ya no queden tardías pendientes.
+export default function LateReviewPanel({ submissions, onReview, busy = false, notice = null }) {
   const pending = submissions.filter(needsReview)
-  if (!pending.length) return null
+  if (!pending.length && !notice) return null
   return (
     <section className="card overflow-hidden">
       <div className="border-b p-4">
         <h2 className="font-bold text-warning-fg">Inscripciones tardías pendientes</h2>
-        <p className="text-sm text-ink-muted">{pending.length} {pending.length === 1 ? 'club requiere' : 'clubes requieren'} revisión</p>
+        <p className="text-sm text-ink-muted">{pending.length ? `${pending.length} ${pending.length === 1 ? 'club requiere' : 'clubes requieren'} revisión` : 'No quedan tardías por revisar.'}</p>
       </div>
+      {notice && <LateNotice notice={notice} />}
       {pending.map((item) => (
         <LateRow key={`${item.eventId}-${item.club.code}`} item={item} onReview={onReview} busy={busy} />
       ))}
     </section>
+  )
+}
+
+const NOTICE_STYLE = {
+  success: 'bg-success-bg text-success-fg',
+  error: 'bg-danger-bg text-danger-fg'
+}
+
+function LateNotice({ notice }) {
+  return (
+    <div role={notice.kind === 'success' ? 'status' : 'alert'} data-notice={notice.kind} className={`m-4 rounded-lg p-3 text-sm font-bold ${NOTICE_STYLE[notice.kind]}`}>
+      {notice.text}
+    </div>
   )
 }
 
@@ -54,7 +69,7 @@ function LateRow({ item, onReview, busy }) {
             {item.athletes.length} nadadores · {new Date(item.submitted_at).toLocaleString('es-VE')}
           </p>
         </div>
-        <span className="rounded-full bg-warning-bg px-2 py-1 text-xs text-warning-fg">{decidedCount ? `Quedan ${pending.length} por revisar` : 'Pendiente'}</span>
+        <span className="rounded-full bg-warning-bg px-2 py-1 text-xs text-warning-fg">{decidedCount ? remainingText(pending.length) : 'Pendiente'}</span>
         <ChevronDown className={`size-4 transition ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
