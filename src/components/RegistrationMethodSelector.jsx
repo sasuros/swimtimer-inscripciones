@@ -1,7 +1,7 @@
 import { FileSpreadsheet, PencilLine } from 'lucide-react'
 
 const METHODS = [
-  { id: 'manual', title: 'Registro manual', description: 'Inscribe nadadores uno por uno. Ideal si tienes pocos nadadores.', action: 'Comenzar', Icon: PencilLine },
+  { id: 'manual', title: 'Registro manual', description: 'Inscribe nadadores uno por uno. Ideal si tienes pocos nadadores.', action: 'Agregar nadadores', Icon: PencilLine },
   { id: 'expert', title: 'Registro experto', description: 'Importa todos tus nadadores desde Excel o Google Sheets. Ideal si tienes muchos.', action: 'Importar archivo', Icon: FileSpreadsheet }
 ]
 
