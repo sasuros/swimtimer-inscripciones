@@ -138,7 +138,7 @@ describe('tardías: D1 y aprobaciones', () => {
   })
 
   it('tardía aprobada + re-envío del entrenador (versión vieja o al día) → 409 lateDecided y la aprobación queda intacta', async () => {
-    await reviewLate('evt-1', 5, 'approve_all', [], await seenLate())
+    await reviewLate('evt-1', 5, 'approve_pending', [], await seenLate())
     expect(lateRow()).toMatchObject({ late_status: 'approved', approved_athletes: [5001, 5002], version: 2 })
     expect(clubStatus()).toBe('late_approved')
     for (const body of [stale(payload(token, 3, 'TARDE'), 1), payload(token, 3, 'TARDE')]) {
@@ -169,7 +169,7 @@ describe('tardías: D1 y aprobaciones', () => {
           if (!fired) {
             fired = true
             const then = builder.then
-            builder.then = (resolve, reject) => reviewLate('evt-1', 5, 'approve_all', [], seen).then(() => then(resolve, reject), reject)
+            builder.then = (resolve, reject) => reviewLate('evt-1', 5, 'approve_pending', [], seen).then(() => then(resolve, reject), reject)
           }
           return builder
         }
@@ -201,7 +201,7 @@ describe('admin — reviewLate con la vista del tablero', () => {
     const seen = await seenLate() // el admin ve VIEJO0 (5001) y VIEJO1 (5002)
     await wizard.submitInscription(payload(token, 2, 'NUEVO')) // versión 1 → 2
     const clubWrites = writesTo('event_clubs')
-    for (const [action, ids] of [['approve', [5002]], ['approve_all', []], ['reject', [5001]]]) {
+    for (const [action, ids] of [['approve', [5002]], ['approve_pending', []], ['reject', [5001]]]) {
       await expect(reviewLate('evt-1', 5, action, ids, seen)).rejects.toMatchObject({ status: 409 })
     }
     expect(lateRow()).toMatchObject({ late_status: 'pending', approved_athletes: [], rejected_athletes: [], version: 2 })
@@ -218,7 +218,7 @@ describe('admin — reviewLate con la vista del tablero', () => {
   it('los IDs de "aprobar todos" salen de la vista del tablero, no de una relectura', async () => {
     const seen = await seenLate()
     const reads = db.calls.filter((item) => item.table === 'inscriptions' && item.op === 'select').length
-    await reviewLate('evt-1', 5, 'approve_all', [], seen)
+    await reviewLate('evt-1', 5, 'approve_pending', [], seen)
     expect(db.calls.filter((item) => item.table === 'inscriptions' && item.op === 'select').length).toBe(reads)
     expect(lateRow().approved_athletes).toEqual(seen.athletes.map((athlete) => athlete.Ath_no))
   })

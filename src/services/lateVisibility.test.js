@@ -36,7 +36,7 @@ describe('tardías aprobadas visibles por club (Supabase)', () => {
     const { db, token } = await seed()
     db.tables.events[0].status = 'accepting_late'
     await submitInscription(payload(token, 2, 'T'))
-    await reviewLate('evt-1', 5, 'approve_all', [], await seenLate())
+    await reviewLate('evt-1', 5, 'approve_pending', [], await seenLate())
 
     const club = (await getDashboard('evt-1')).clubs.find((item) => item.code === 5)
     expect(club.status).not.toBe('received')

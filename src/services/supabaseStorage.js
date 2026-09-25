@@ -12,6 +12,7 @@ import { supabase as configuredClient } from './supabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
 import { AUDIT_FIELDS, logAdminAction, statusAction } from './auditLog'
 import { ADMIN_CONFLICT_TEXT, ConflictError } from './concurrency.js'
+import { applyLateDecision, needsReview } from './lateDecision.js'
 
 let client = configuredClient
 
@@ -561,7 +562,7 @@ export async function getDashboard(eventId) {
       received: clubs.filter((club) => club.status === 'received').length,
       pending: clubs.filter((club) => !['received', 'not_participating'].includes(club.status)).length,
       athletes: clubs.reduce((sum, club) => sum + club.athlete_count, 0),
-      late_pending: late.filter((item) => ['pending', 'partially_approved'].includes(item.status)).length
+      late_pending: late.filter(needsReview).length
     },
     timestamps: {
       opened_at: event.opened_at || event.activated_at || event.created_at,
@@ -575,29 +576,17 @@ export async function getDashboard(eventId) {
 // Ath_no de la pantalla): de ahí salen los IDs, las decisiones previas y la versión esperada.
 // No se relee la fila: si cambió desde esa carga, el UPDATE condicional no calza y no se
 // aprueba a nadie que el admin no vio (los Ath_no son posicionales).
+// Semántica de la decisión (final, solo sobre pendientes): lateDecision.js.
 export async function reviewLate(eventId, clubCode, action, athleteIds = [], seen = null) {
   if (!seen || !Number.isInteger(seen.version)) throw new ConflictError(ADMIN_CONFLICT_TEXT, { conflict: true })
-  const athletes = seen.athletes || []
-  const ids = action === 'approve_all' ? athletes.map((athlete) => Number(athlete.Ath_no)) : athleteIds.map(Number)
-  const approved = new Set((seen.approved_athletes || []).map(Number))
-  const rejected = new Set((seen.rejected_athletes || []).map(Number))
-  ids.forEach((id) => {
-    if (action.startsWith('approve')) {
-      approved.add(id)
-      rejected.delete(id)
-    } else {
-      rejected.add(id)
-      approved.delete(id)
-    }
-  })
-  const decided = approved.size + rejected.size
-  const status = approved.size === athletes.length ? 'approved' : rejected.size === athletes.length ? 'rejected' : decided ? 'partially_approved' : 'pending'
+  const decision = applyLateDecision(seen, action, athleteIds)
+  const status = decision.status
   const updated = unwrap(
     await db()
       .from('inscriptions')
       .update({
-        approved_athletes: [...approved],
-        rejected_athletes: [...rejected],
+        approved_athletes: decision.approved_athletes,
+        rejected_athletes: decision.rejected_athletes,
         late_status: status,
         version: seen.version + 1
       })

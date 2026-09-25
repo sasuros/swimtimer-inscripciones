@@ -8,6 +8,7 @@ import { mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/demoToken'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
 import { referenceDateFor } from '../utils/referenceDate'
+import { applyLateDecision, needsReview } from './lateDecision'
 
 const LEGACY_EVENT_ID = 'evt_demo_2025'
 const read = (key, fallback) => {
@@ -407,7 +408,7 @@ export function demoDashboard(eventId = LEGACY_EVENT_ID) {
       received: clubRows.filter((item) => item.status === 'received').length,
       pending: clubRows.filter((item) => !['received', 'not_participating'].includes(item.status)).length,
       athletes: clubRows.reduce((sum, item) => sum + item.athlete_count, 0),
-      late_pending: late.filter((item) => ['pending', 'partially_approved'].includes(item.status)).length
+      late_pending: late.filter(needsReview).length
     },
     timestamps: {
       opened_at: event.activated_at || event.created_at || null,
@@ -464,22 +465,10 @@ export function demoReviewLate(eventId, clubCode, action, athleteIds = []) {
   const key = inscriptionKey(eventId, clubCode)
   const item = all[key]
   if (!item) throw new Error('Inscripción tardía no encontrada')
-  const ids = action === 'approve_all' ? item.athletes.map((athlete) => athlete.Ath_no) : athleteIds.map(Number)
-  const approved = new Set(item.approved_athletes || [])
-  const rejected = new Set(item.rejected_athletes || [])
-  ids.forEach((id) => {
-    if (action.startsWith('approve')) {
-      approved.add(id)
-      rejected.delete(id)
-    } else {
-      rejected.add(id)
-      approved.delete(id)
-    }
-  })
-  const decided = approved.size + rejected.size
-  item.approved_athletes = [...approved]
-  item.rejected_athletes = [...rejected]
-  item.status = approved.size === item.athletes.length ? 'approved' : rejected.size === item.athletes.length ? 'rejected' : decided ? 'partially_approved' : 'pending'
+  const decision = applyLateDecision(item, action, athleteIds)
+  item.approved_athletes = decision.approved_athletes
+  item.rejected_athletes = decision.rejected_athletes
+  item.status = decision.status
   all[key] = item
   write(STORAGE_KEYS.lateInscriptions, all)
   return item

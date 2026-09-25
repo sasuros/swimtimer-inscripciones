@@ -111,7 +111,7 @@ describe('storage local de la demo', () => {
     const lateResult = submitWithPin({ token, meta: { club_code: 2 }, athletes: [{ ...athlete, First_name: 'Bea' }], results: [result], roster: [{ id: 'late' }] })
     expect(lateResult.late).toBe(true)
     expect(demoDashboard().counts.late_pending).toBe(1)
-    demoReviewLate('evt_demo_2025', 2, 'approve_all')
+    demoReviewLate('evt_demo_2025', 2, 'approve_pending')
     const principal = await demoExportAll('evt_demo_2025', 'principal')
     const complete = await demoExportAll('evt_demo_2025', 'completo')
     const supplement = await demoExportAll('evt_demo_2025', 'supplement')
@@ -167,7 +167,7 @@ describe('storage local de la demo', () => {
     // Club solo-tardía: no tiene regular, pero se ve y abre sin error.
     const other = second.club.code
     submitWithPin({ token: second.id, meta: { club_code: other }, athletes: [{ Ath_no: other * 1000 + 1, Team_no: other }], results: [], roster: roster(1, 'S') })
-    demoReviewLate('evt_demo_2025', other, 'approve_all')
+    demoReviewLate('evt_demo_2025', other, 'approve_pending')
     const lateOnly = demoDashboard('evt_demo_2025').clubs.find(item => item.code === other)
     expect(lateOnly.status).not.toBe('received')
     expect(lateOnly).toMatchObject({ athlete_count: 1, late_approved_count: 1 })
