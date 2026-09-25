@@ -1,7 +1,8 @@
 import { athleteName } from '../services/lateDecision'
 
 // v1.18.0 — Textos de la revisión de tardías del admin (confirmación, resultado y conflicto).
-export const clubLabel = (club) => club?.abbreviation || club?.short_name || club?.name || `Club ${club?.code ?? ''}`.trim()
+// Mismo nombre que la tarjeta del panel (item.club.name), no la abreviatura de MM.
+export const clubLabel = (club) => club?.name || club?.short_name || club?.abbreviation || `Club ${club?.code ?? ''}`.trim()
 
 const swimmers = (n) => `${n} ${n === 1 ? 'nadador' : 'nadadores'}`
 const MAX_NAMES = 5

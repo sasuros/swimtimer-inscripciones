@@ -6,8 +6,10 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const mounted = []
 
-export async function mount(element) {
+// `id`: p. ej. 'root', para montar como la app real (index.html).
+export async function mount(element, { id } = {}) {
   const host = document.createElement('div')
+  if (id) host.id = id
   document.body.appendChild(host)
   const root = createRoot(host)
   await act(async () => root.render(element))

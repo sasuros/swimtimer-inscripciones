@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // v1.18.0 — Revisión de tardías en el tablero real (AdminDashboard + fake de Supabase).
-// Club 5 ("Club Cinco", CIN): tardías Nadador0 (5001), Nadador1 (5002), Nadador2 (5003).
+// Club 5 ("Club Cinco", abreviatura CIN; los textos usan el nombre, como la tarjeta): tardías Nadador0 (5001), Nadador1 (5002), Nadador2 (5003).
 const gate = vi.hoisted(() => ({ hold: null, fail: null }))
 vi.mock('../services/api', async () => {
   const storage = await import('../services/supabaseStorage.js')
@@ -58,7 +58,7 @@ describe('diálogo de confirmación', () => {
     await openDashboard()
     await choose('Nadador0')
     await click(button('Aprobar seleccionados'))
-    expect(dialog().textContent).toContain('¿Aprobar a X Nadador0 (CIN)? Esta decisión no se puede cambiar después.')
+    expect(dialog().textContent).toContain('¿Aprobar a X Nadador0 (Club Cinco)? Esta decisión no se puede cambiar después.')
     expect(lateWrites()).toBe(0)
     await click(button('Sí, aprobar'))
     await settle()
@@ -69,7 +69,7 @@ describe('diálogo de confirmación', () => {
     await openDashboard()
     await choose('Nadador1')
     await click(button('Rechazar seleccionados'))
-    expect(dialog().textContent).toContain('¿Rechazar a X Nadador1 (CIN)? Esta decisión no se puede cambiar después.')
+    expect(dialog().textContent).toContain('¿Rechazar a X Nadador1 (Club Cinco)? Esta decisión no se puede cambiar después.')
     const before = structuredClone(lateRow())
     await click(button('Cancelar'))
     await settle()
@@ -82,7 +82,7 @@ describe('diálogo de confirmación', () => {
     await reviewLate('evt-1', 5, 'reject', [5002], (await getDashboard('evt-1')).late[0])
     await openDashboard()
     await click(button('Aprobar pendientes (2)'))
-    expect(dialog().textContent).toContain('¿Aprobar a X Nadador0 y X Nadador2 (CIN)?')
+    expect(dialog().textContent).toContain('¿Aprobar a X Nadador0 y X Nadador2 (Club Cinco)?')
   })
 
   it('con más de 5 pendientes muestra el conteo', async () => {
@@ -93,7 +93,7 @@ describe('diálogo de confirmación', () => {
     await wizard.submitInscription(payload(token, 7, 'T'))
     await openDashboard()
     await click(button('Aprobar pendientes (7)'))
-    expect(dialog().textContent).toContain('¿Aprobar a los 7 nadadores pendientes (CIN)? Esta decisión no se puede cambiar después.')
+    expect(dialog().textContent).toContain('¿Aprobar a los 7 nadadores pendientes (Club Cinco)? Esta decisión no se puede cambiar después.')
   })
 
   it('"Rechazar seleccionados" es rojo y va separado de los botones de aprobar', async () => {
@@ -179,12 +179,12 @@ describe('BUG #3 — cada acción muestra su resultado y refresca la tarjeta', (
     await settle()
   }
 
-  it('aprobar uno: "Aprobaste a 1 nadador de CIN" + cuántos quedan, y la tarjeta ya lo muestra aprobado', async () => {
+  it('aprobar uno: "Aprobaste a 1 nadador de Club Cinco" + cuántos quedan, y la tarjeta ya lo muestra aprobado', async () => {
     await openDashboard()
     await decideVia('Nadador0', 'Aprobar seleccionados', 'Sí, aprobar')
     expect(notice().dataset.notice).toBe('success')
     expect(notice().getAttribute('role')).toBe('status')
-    expect(notice().textContent).toBe('Aprobaste a 1 nadador de CIN. Quedan 2 por revisar.')
+    expect(notice().textContent).toBe('Aprobaste a 1 nadador de Club Cinco. Quedan 2 por revisar.')
     expect(document.querySelector('[data-decision="approved"]').textContent).toContain('Nadador0')
     expect(button('Aprobar pendientes (2)')).toBeTruthy()
   })
@@ -193,13 +193,13 @@ describe('BUG #3 — cada acción muestra su resultado y refresca la tarjeta', (
     await openDashboard()
     await choose('Nadador1')
     await decideVia('Nadador2', 'Rechazar seleccionados', 'Sí, rechazar')
-    expect(notice().textContent).toBe('Rechazaste a 2 nadadores de CIN. Queda 1 por revisar.')
+    expect(notice().textContent).toBe('Rechazaste a 2 nadadores de Club Cinco. Queda 1 por revisar.')
   })
 
   it('la última decisión cierra la tardía: la tarjeta sale y el resultado sigue visible', async () => {
     await openDashboard()
     await decideVia(null, 'Aprobar pendientes (3)', 'Sí, aprobar')
-    expect(notice().textContent).toBe('Aprobaste a los 3 nadadores pendientes de CIN. La tardía de CIN quedó revisada.')
+    expect(notice().textContent).toBe('Aprobaste a los 3 nadadores pendientes de Club Cinco. La tardía de Club Cinco quedó revisada.')
     expect(document.body.textContent).toContain('No quedan tardías por revisar.')
     expect(button('Club Cinco')).toBeUndefined()
   })
@@ -227,7 +227,7 @@ describe('BUG #3 — cada acción muestra su resultado y refresca la tarjeta', (
 })
 
 describe('MEJORA #4 — aviso de conflicto del admin', () => {
-  const CONFLICT = 'La inscripción tardía de CIN cambió mientras la revisabas. Ya cargamos la versión actual: revísala y vuelve a aprobar o rechazar.'
+  const CONFLICT = 'La inscripción tardía de Club Cinco cambió mientras la revisabas. Ya cargamos la versión actual: revísala y vuelve a aprobar o rechazar.'
   const notice = () => document.querySelector('[data-notice]')
   let scrolled
   beforeEach(() => {
@@ -321,5 +321,27 @@ describe('tardías revisadas siguen visibles en "Ver inscripciones"', () => {
     await openDetail()
     expect(states()).toEqual({ T0: 'approved', T1: 'pending', T2: 'pending' })
     expect(document.querySelector('[data-decision="pending"]').textContent).toContain('Pendiente')
+  })
+})
+
+describe('nombre del club = el de la tarjeta (no la abreviatura de MM)', () => {
+  it('diálogo, resultado y conflicto dicen "Club Cinco", como la tarjeta; nunca "CIN"', async () => {
+    Element.prototype.scrollIntoView = () => {}
+    await openDashboard()
+    expect(button('Club Cinco')).toBeTruthy()
+    await choose('Nadador0')
+    await click(button('Aprobar seleccionados'))
+    expect(dialog().textContent).toContain('(Club Cinco)')
+    expect(dialog().textContent).not.toContain('CIN')
+    await click(button('Sí, aprobar'))
+    await settle()
+    expect(document.querySelector('[data-notice]').textContent).toContain('de Club Cinco')
+    await choose('Nadador1')
+    await reviewLate('evt-1', 5, 'reject', [5003], (await getDashboard('evt-1')).late[0])
+    await click(button('Rechazar seleccionados'))
+    await click(button('Sí, rechazar'))
+    await settle()
+    expect(document.querySelector('[data-notice="conflict"]').textContent).toContain('La inscripción tardía de Club Cinco cambió')
+    expect(document.querySelector('[data-notice]').textContent).not.toContain('CIN')
   })
 })

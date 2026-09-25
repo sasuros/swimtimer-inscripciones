@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { clubLabel, confirmText, namesList, reviewSuccessText } from './lateReviewText'
 
-const club = { code: 11, name: 'Club Atlético Caracas', abbreviation: 'CAC' }
+// Caso del preview: la tarjeta muestra el nombre (CAC); la abreviatura de MM es CNCAC.
+const club = { code: 11, name: 'CAC', abbreviation: 'CNCAC' }
 const swimmer = (n) => ({ Ath_no: 11000 + n, First_name: 'Tardía', Last_name: String(n) })
 
 describe('textos de la revisión de tardías', () => {
-  it('club: abreviatura, luego nombre corto, luego nombre', () => {
+  it('club: el mismo nombre que la tarjeta (name), nunca la abreviatura si hay nombre', () => {
     expect(clubLabel(club)).toBe('CAC')
-    expect(clubLabel({ name: 'Club X', short_name: 'X' })).toBe('X')
-    expect(clubLabel({ name: 'Club X' })).toBe('Club X')
+    expect(clubLabel({ name: 'Club X', short_name: 'X', abbreviation: 'CNX' })).toBe('Club X')
+    expect(clubLabel({ abbreviation: 'CNX' })).toBe('CNX')
+    expect(clubLabel({ code: 7 })).toBe('Club 7')
   })
 
   it('confirmación: nombra hasta 5, con más da el conteo', () => {
