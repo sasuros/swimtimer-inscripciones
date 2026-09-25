@@ -73,6 +73,13 @@ describe('"Inscribir nadador" nunca queda mudo', () => {
     expect(html).toMatch(/<button type="submit" class="btn-primary w-full">Inscribir nadador<\/button>/)
   })
 
+  it('con noValidate el navegador ya no frena la fecha fuera de rango: la frena nuestra validación y lleva al campo', () => {
+    const form = { lastName: 'Pérez', firstName: 'Ana', sex: 'F', birthDate: '1986-05-15', selectedEvents: [], times: {} }
+    const errors = validateAthlete(form, [], '2026-12-31', null, [[9, 10], [11, 12]])
+    expect(errors.birthDate).toBe('La edad calculada (40 años) no pertenece a las categorías del evento')
+    expect(firstErrorId(errors, [])).toBe('birthDate')
+  })
+
   it('firstErrorId lleva al primer error en el orden de la pantalla', () => {
     expect(firstErrorId({ firstName: 'x', 'time-3': 'y' }, [3])).toBe('firstName')
     expect(firstErrorId({ duplicate: 'x' }, [])).toBe('lastName')
