@@ -31,6 +31,10 @@ export const pendingAthletes = (late) => (late?.athletes || []).filter((athlete)
 // Tardías viejas (antes de v1.18.0) cerradas con status final siguen fuera del panel.
 export const needsReview = (late) => ['pending', 'partially_approved'].includes(late?.status) && pendingAthletes(late).length > 0
 
+// D1: la tardía ya fue revisada si hay CUALQUIER decisión (no solo por status: una fila
+// vieja o sucia con status 'pending' y decisiones tampoco se puede re-enviar).
+export const hasLateDecision = (late) => Boolean(late) && (late.status !== 'pending' || (late.approved_athletes || []).length + (late.rejected_athletes || []).length > 0)
+
 export function lateStatusFor(total, approvedCount, rejectedCount) {
   if (approvedCount + rejectedCount === 0) return 'pending'
   if (approvedCount === total) return 'approved'

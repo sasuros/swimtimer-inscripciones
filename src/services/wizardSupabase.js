@@ -4,6 +4,7 @@ import { generateClubPin } from '../utils/clubPin.js'
 import { teamIdentity } from '../utils/teamUtils.js'
 import { isShortId } from '../utils/shortId.js'
 import { RateLimitError, checkPinRateLimit, clearPinRateLimit } from './pinRateLimit.js'
+import { hasLateDecision } from './lateDecision.js'
 import { CONFLICT_TEXT, ConflictError, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, sameRoster } from './concurrency.js'
 
 const DEFAULT_WHATSAPP = '584120000000'
@@ -262,7 +263,7 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     if (!Number.isInteger(expectedVersion) || expectedVersion < 0) throw new ConflictError(STALE_CLIENT_SERVER_MESSAGE, { staleClient: true })
     // (a) Tardía ya revisada por el organizador (D1): el entrenador no puede re-enviarla.
     // Si el admin decide DESPUÉS de esta lectura, reviewLate sube la versión y (b) no calza.
-    if (isLate && access.inscription && access.inscription.status !== 'pending') throw new ConflictError(LATE_DECIDED_TEXT, { lateDecided: true })
+    if (isLate && hasLateDecision(access.inscription)) throw new ConflictError(LATE_DECIDED_TEXT, { lateDecided: true })
     const content = {
       token_id: token,
       submitted_at: new Date().toISOString(),

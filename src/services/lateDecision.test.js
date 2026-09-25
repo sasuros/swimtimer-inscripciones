@@ -202,3 +202,13 @@ describe('audit late.reviewed (commit 6): club, conteos, versión y resultado; s
     expect(Object.keys(reviewed()[0].details).sort()).toEqual(['approved', 'rejected', 'version'])
   })
 })
+
+describe('D1 por decisiones, no solo por status (revisión adversarial #1)', () => {
+  beforeEach(() => setup(2))
+
+  it('fila sucia/vieja: late_status pending con decisiones → el entrenador tampoco puede re-enviar', async () => {
+    Object.assign(lateRow(), { late_status: 'pending', approved_athletes: [A], rejected_athletes: [B] })
+    await expect(wizard.submitInscription(payload(token, 2, 'OTRO'))).rejects.toMatchObject({ status: 409, message: LATE_DECIDED_TEXT })
+    expect(lateRow()).toMatchObject({ approved_athletes: [A], rejected_athletes: [B] })
+  })
+})

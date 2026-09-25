@@ -17,6 +17,7 @@ import RegistrationMethodSelector from '../components/RegistrationMethodSelector
 import PinVerification from '../components/PinVerification'
 import { deriveRosterView } from '../utils/wizardRosterView'
 import { lateReviewView } from '../utils/clubInscriptionView'
+import { hasLateDecision } from '../services/lateDecision'
 import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
 import { AlreadySubmittedNotice, ConflictPanel } from '../components/WizardNotices'
 
@@ -61,7 +62,7 @@ function WizardContent({ token, pin, access }) {
   const serverVersion = access.inscription?.version ?? 0
   const [roster, setRoster, draft] = useRoster(rosterKey, editableInitial, legacyKey, serverVersion)
   // D1: una tardía que el organizador ya revisó no se puede re-enviar desde aquí.
-  const lateDecided = isLate && Boolean(access.inscription) && access.inscription.status !== 'pending'
+  const lateDecided = isLate && hasLateDecision(access.inscription)
   const [conflict, setConflict] = useState(null)
   const sendingRef = useRef(false)
   const validationRoster = isLate ? [...locked, ...roster] : roster
