@@ -1,5 +1,5 @@
 import { categoryForAge, calculateAge } from './ageCalculator'
-import { validateTime } from './timeParser'
+import { formatWizardTime, validateTime } from './timeParser'
 
 export function validateAthlete(form, roster, referenceDate, editingId = null, categories) {
   const errors = {}
@@ -13,7 +13,8 @@ export function validateAthlete(form, roster, referenceDate, editingId = null, c
   if (duplicate) errors.duplicate = 'Ya inscribiste a un nadador con este nombre y apellido'
   if (!form.selectedEvents.length) errors.events = 'Selecciona al menos un evento'
   form.selectedEvents.forEach(index => {
-    const error = validateTime(form.times[index] || '')
+    // v1.19.0: se valida lo que se va a guardar ("12530" aún sin blur ya es 1:25.30).
+    const error = validateTime(formatWizardTime(form.times[index] || ''))
     if (error) errors[`time-${index}`] = error
   })
   return errors
