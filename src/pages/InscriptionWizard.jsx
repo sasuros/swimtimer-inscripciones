@@ -16,6 +16,7 @@ import QuickEntryMode from '../components/QuickEntryMode'
 import RegistrationMethodSelector from '../components/RegistrationMethodSelector'
 import PinVerification from '../components/PinVerification'
 import { deriveRosterView } from '../utils/wizardRosterView'
+import { lateReviewView } from '../utils/clubInscriptionView'
 import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
 import { AlreadySubmittedNotice, ConflictPanel } from '../components/WizardNotices'
 
@@ -153,20 +154,28 @@ function WizardContent({ token, pin, access }) {
         {lateDecided && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm font-bold text-warning-800">{LATE_DECIDED_TEXT}</div>}
         {isLate && locked.length > 0 && (
           <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
-            <strong>Ya enviaste tu inscripción regular con {locked.length} {locked.length === 1 ? 'nadador' : 'nadadores'}.</strong> Está abajo, solo para consultar. Agrega abajo a quienes quieras inscribir por la vía tardía.
+            <strong>Ya enviaste tu inscripción regular con {locked.length} {locked.length === 1 ? 'nadador' : 'nadadores'}.</strong> Está abajo, solo para consultar.{!lateDecided && ' Agrega abajo a quienes quieras inscribir por la vía tardía.'}
           </div>
         )}
         {isLate && locked.length > 0 && <RosterPanel roster={locked} readOnly title="Ya inscritos (inscripción regular)" />}
         <AlreadySubmittedNotice isLate={isLate} alreadySubmitted={access.already_submitted} rosterCount={roster.length} conflict={conflict} lateDecided={lateDecided} />
-        <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
-        {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
-        {entryMethod && (
-          <button type="button" className="text-sm font-bold text-brand-700 hover:underline" onClick={changeMethod}>
-            ← Cambiar método
-          </button>
+        {lateDecided ? (
+          // D1 completo: la tardía que el organizador ya revisó es solo lectura, con la lista
+          // del SERVIDOR (no el borrador local) y el estado de cada nadador.
+          <RosterPanel roster={lateReviewView(access.inscription).rows} readOnly title="Nadadores nuevos para tardías" />
+        ) : (
+          <>
+            <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
+            {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
+            {entryMethod && (
+              <button type="button" className="text-sm font-bold text-brand-700 hover:underline" onClick={changeMethod}>
+                ← Cambiar método
+              </button>
+            )}
+            {entryMethod === 'manual' && <AthleteForm roster={validationRoster} referenceDate={access.event.reference_date} eventConfig={access.event} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} />}
+            {entryMethod === 'expert' && <QuickEntryMode referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} roster={validationRoster} onImport={(items) => setRoster((current) => [...current, ...items])} />}
+          </>
         )}
-        {entryMethod === 'manual' && <AthleteForm roster={validationRoster} referenceDate={access.event.reference_date} eventConfig={access.event} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} />}
-        {entryMethod === 'expert' && <QuickEntryMode referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} roster={validationRoster} onImport={(items) => setRoster((current) => [...current, ...items])} />}
       </main>
       <BrandFooter />
       {roster.length > 0 && !lateDecided && (
