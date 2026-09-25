@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeClubInscriptions } from './clubInscriptionView'
+import { lateReviewView, mergeClubInscriptions } from './clubInscriptionView'
 
 // Arma una inscripción con la forma real: roster[i] ↔ athletes[i], Ath_no = club*1000 + i + 1.
 const inscription = (names, { eventsPerAthlete = 1, ...extra } = {}) => {
@@ -66,5 +66,23 @@ describe('mergeClubInscriptions', () => {
     const snapshot = JSON.stringify([regular, lateInscription])
     expect(mergeClubInscriptions(regular, lateInscription).lateApprovedCount).toBe(1)
     expect(JSON.stringify([regular, lateInscription])).toBe(snapshot)
+  })
+})
+
+describe('lateReviewView (v1.18.0)', () => {
+  const athletes = [{ Ath_no: 7001, Last_name: 'A', First_name: 'X' }, { Ath_no: 7002, Last_name: 'B', First_name: 'Y' }, { Ath_no: 7003, Last_name: 'C', First_name: 'Z' }]
+  const roster = [{ id: 'r1', lastName: 'A' }, { id: 'r2', lastName: 'B' }, { id: 'r3', lastName: 'C' }]
+
+  it('todos los nadadores con su estado, cruzando roster↔athletes por posición', () => {
+    const view = lateReviewView({ athletes, roster, approved_athletes: [7003], rejected_athletes: [7001] })
+    expect(view.rows.map((row) => [row.lastName, row.decision])).toEqual([['A', 'rejected'], ['B', 'pending'], ['C', 'approved']])
+    expect(view.decided).toBe(2)
+  })
+
+  it('sin tardía o sin decisiones: decided = 0; sin roster usa los datos de athletes', () => {
+    expect(lateReviewView(null)).toEqual({ rows: [], decided: 0 })
+    const view = lateReviewView({ athletes, roster: [], approved_athletes: [], rejected_athletes: [] })
+    expect(view.decided).toBe(0)
+    expect(view.rows[1]).toMatchObject({ id: 'late-7002', lastName: 'B', firstName: 'Y', events: [] })
   })
 })

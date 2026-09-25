@@ -4,7 +4,7 @@ import { DEMO_ADMIN_PASSWORD, DEMO_WHATSAPP, STORAGE_KEYS } from '../config'
 import { standardEventTemplate } from '../utils/eventTemplate'
 import { teamIdentity } from '../utils/teamUtils'
 import { buildConsolidatedExport } from '../utils/mmSchema'
-import { mergeClubInscriptions } from '../utils/clubInscriptionView'
+import { lateReviewView, mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/demoToken'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
 import { referenceDateFor } from '../utils/referenceDate'
@@ -387,6 +387,7 @@ export function demoDashboard(eventId = LEGACY_EVENT_ID) {
       athlete_count: participating ? view.athleteCount : 0,
       inscription_count: participating ? view.resultCount : 0,
       late_approved_count: participating ? view.lateApprovedCount : 0,
+      late_reviewed_count: participating ? lateReviewView(lateMap[inscriptionKey(event.id, club.code)]).decided : 0,
       submitted_at: participating ? inscription?.submitted_at || null : null,
       token: token?.id || null,
       expires_at: token?.expires_at || null

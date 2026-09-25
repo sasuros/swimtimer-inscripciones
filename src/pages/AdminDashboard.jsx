@@ -4,6 +4,7 @@ import AdminHeader from '../components/AdminHeader'
 import CloseRegistrationModal from '../components/CloseRegistrationModal'
 import ExportMenu from '../components/ExportMenu'
 import LateReviewPanel from '../components/LateReviewPanel'
+import LateReviewedSection from '../components/LateReviewedSection'
 import LinkDistributionModal from '../components/LinkDistributionModal'
 import DeleteEventModal from '../components/DeleteEventModal'
 import EmailInvitationsPanel from '../components/EmailInvitationsPanel'
@@ -377,7 +378,7 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
             {club.invitation_sent_at ? 'Reenviar invitación' : 'Enviar invitación'}
           </button>
         )}
-        {(club.status === 'received' || club.late_approved_count > 0) && (
+        {(club.status === 'received' || club.late_approved_count > 0 || club.late_reviewed_count > 0) && (
           <button className="btn-secondary text-xs" onClick={() => onOpenDetail(club)}>
             Ver inscripciones
           </button>
@@ -453,15 +454,7 @@ function Detail({ club, regular, late, onClose }) {
           </button>
         </div>
         <DetailRoster roster={view.regularRoster} />
-        {view.lateApprovedRoster.length > 0 && (
-          <div className="mt-6">
-            <h3 className="flex items-center gap-2 font-bold text-warning-fg">
-              Tardías aprobadas
-              <span className="rounded-full bg-warning-bg px-2 py-0.5 text-xs">{view.lateApprovedRoster.length}</span>
-            </h3>
-            <DetailRoster roster={view.lateApprovedRoster} late />
-          </div>
-        )}
+        <LateReviewedSection late={late} />
         <div className="mt-5 flex flex-wrap gap-2">
           {regular && (
             <button className="btn-primary inline-flex items-center gap-2" onClick={async () => downloadJson(await buildClubFileExport(regular), `inscripcion-${regular.meta.club_code}.json`)}>
@@ -478,11 +471,11 @@ function Detail({ club, regular, late, onClose }) {
     </div>
   )
 }
-function DetailRoster({ roster, late = false }) {
+function DetailRoster({ roster }) {
   return (
     <div className="mt-3 space-y-3">
       {roster.map((athlete) => (
-        <div key={athlete.id} className={`rounded-lg border p-3 ${late ? 'border-warning-fg/30 bg-warning-bg' : 'bg-surface-alt'}`}>
+        <div key={athlete.id} className="rounded-lg border bg-surface-alt p-3">
           <p className="font-bold">
             {athlete.lastName}, {athlete.firstName} · {athlete.sex} · {athlete.age} años
           </p>

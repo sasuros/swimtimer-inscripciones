@@ -1,7 +1,7 @@
 import { DEMO_ADMIN_PASSWORD, DEMO_WHATSAPP } from '../config'
 import { encodeDemoToken } from '../utils/demoToken'
 import { buildConsolidatedExport } from '../utils/mmSchema'
-import { mergeClubInscriptions } from '../utils/clubInscriptionView'
+import { lateReviewView, mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
 import { createMagicToken } from '../utils/magicToken'
@@ -542,6 +542,7 @@ export async function getDashboard(eventId) {
       athlete_count: excluded ? 0 : view.athleteCount,
       inscription_count: excluded ? 0 : view.resultCount,
       late_approved_count: excluded ? 0 : view.lateApprovedCount,
+      late_reviewed_count: excluded ? 0 : lateReviewView(latestLate.get(Number(club.code))).decided,
       submitted_at: excluded ? null : inscription?.submitted_at || null,
       // v1.17.0: el enlace que ve y copia el admin es el corto (el largo sigue válido).
       token: token?.short_id || token?.token_value || null

@@ -286,3 +286,40 @@ describe('MEJORA #4 — aviso de conflicto del admin', () => {
     expect(document.body.textContent).not.toContain('cambió mientras la revisabas')
   })
 })
+
+describe('tardías revisadas siguen visibles en "Ver inscripciones"', () => {
+  const decideAll = async (approve, reject) => {
+    if (approve.length) await reviewLate('evt-1', 5, 'approve', approve, (await getDashboard('evt-1')).late[0])
+    if (reject.length) await reviewLate('evt-1', 5, 'reject', reject, (await getDashboard('evt-1')).late[0])
+  }
+  const openDetail = async () => {
+    await mount(<AdminDashboard eventId="evt-1" />)
+    await settle()
+    await click(button('Ver inscripciones'))
+    await settle()
+  }
+  const states = () => Object.fromEntries([...document.querySelectorAll('[data-decision]')].map((row) => [row.textContent.match(/T\d/)[0], row.dataset.decision]))
+
+  it('T14: una tardía mixta decidida sale de pendientes y aparece en revisadas con los dos estados', async () => {
+    await decideAll([5001, 5003], [5002])
+    await openDetail()
+    expect(document.body.textContent).not.toContain('Inscripciones tardías pendientes')
+    expect(document.body.textContent).toContain('Tardías revisadas')
+    expect(states()).toEqual({ T0: 'approved', T1: 'rejected', T2: 'approved' })
+    expect(document.querySelector('[data-decision="rejected"]').textContent).toContain('Rechazado')
+    expect(document.querySelector('[data-decision="approved"]').textContent).toContain('Aprobado')
+  })
+
+  it('club solo con tardía y todos rechazados: el botón aparece y ningún rechazado desaparece', async () => {
+    await decideAll([], [5001, 5002, 5003])
+    await openDetail()
+    expect(states()).toEqual({ T0: 'rejected', T1: 'rejected', T2: 'rejected' })
+  })
+
+  it('revisión en curso: los pendientes se ven como "Pendiente"', async () => {
+    await decideAll([5001], [])
+    await openDetail()
+    expect(states()).toEqual({ T0: 'approved', T1: 'pending', T2: 'pending' })
+    expect(document.querySelector('[data-decision="pending"]').textContent).toContain('Pendiente')
+  })
+})
