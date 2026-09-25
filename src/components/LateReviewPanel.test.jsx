@@ -225,3 +225,64 @@ describe('BUG #3 — cada acción muestra su resultado y refresca la tarjeta', (
     expect(document.querySelectorAll('[data-notice]')).toHaveLength(1)
   })
 })
+
+describe('MEJORA #4 — aviso de conflicto del admin', () => {
+  const CONFLICT = 'La inscripción tardía de CIN cambió mientras la revisabas. Ya cargamos la versión actual: revísala y vuelve a aprobar o rechazar.'
+  const notice = () => document.querySelector('[data-notice]')
+  let scrolled
+  beforeEach(() => {
+    scrolled = []
+    Element.prototype.scrollIntoView = function () {
+      scrolled.push(this)
+    }
+  })
+  const conflictOn = async (otherTab) => {
+    await openDashboard()
+    await choose('Nadador0')
+    await otherTab()
+    await click(button('Aprobar seleccionados'))
+    await click(button('Sí, aprobar'))
+    await settle()
+  }
+
+  it('rojo fuerte dentro de la tarjeta, texto veraz con el club, scroll y foco; sin el banner genérico', async () => {
+    await conflictOn(async () => reviewLate('evt-1', 5, 'reject', [5002], (await getDashboard('evt-1')).late[0]))
+    expect(notice().dataset.notice).toBe('conflict')
+    expect(notice().textContent).toBe(CONFLICT)
+    expect(notice().className).toContain('bg-danger-solid')
+    expect(notice().getAttribute('role')).toBe('alert')
+    expect(notice().closest('section').textContent).toContain('Inscripciones tardías pendientes')
+    expect(scrolled).toContain(notice())
+    expect(document.activeElement).toBe(notice())
+    expect(document.body.textContent).not.toContain('Recarga para ver la versión actual')
+  })
+
+  it('se ve aunque otra pestaña ya haya decidido toda la tardía (la tarjeta del club ya no está)', async () => {
+    await conflictOn(async () => reviewLate('evt-1', 5, 'approve_pending', [], (await getDashboard('evt-1')).late[0]))
+    expect(notice().textContent).toBe(CONFLICT)
+    expect(button('Club Cinco')).toBeUndefined()
+  })
+
+  it('un segundo conflicto vuelve a hacer scroll y foco', async () => {
+    await conflictOn(async () => reviewLate('evt-1', 5, 'reject', [5002], (await getDashboard('evt-1')).late[0]))
+    const first = notice()
+    await reviewLate('evt-1', 5, 'reject', [5003], (await getDashboard('evt-1')).late[0])
+    await choose('Nadador0')
+    await click(button('Aprobar seleccionados'))
+    await click(button('Sí, aprobar'))
+    await settle()
+    expect(notice()).not.toBe(first)
+    expect(scrolled).toHaveLength(2)
+    expect(document.activeElement).toBe(notice())
+  })
+
+  it('se oculta cuando la acción siguiente sale bien', async () => {
+    await conflictOn(async () => reviewLate('evt-1', 5, 'reject', [5002], (await getDashboard('evt-1')).late[0]))
+    await choose('Nadador0')
+    await click(button('Aprobar seleccionados'))
+    await click(button('Sí, aprobar'))
+    await settle()
+    expect(notice().dataset.notice).toBe('success')
+    expect(document.body.textContent).not.toContain('cambió mientras la revisabas')
+  })
+})

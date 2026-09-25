@@ -16,7 +16,7 @@ import { clubLinkText } from '../utils/messageTemplates'
 import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getClubInscriptions, getDashboard, recordInvitationResults, regenerateClubToken, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
 import { DEMO_MODE } from '../config'
 import { pendingAthletes } from '../services/lateDecision'
-import { reviewSuccessText } from '../utils/lateReviewText'
+import { lateConflictText, reviewSuccessText } from '../utils/lateReviewText'
 
 export default function AdminDashboard({ eventId }) {
   const [data, setData] = useState(null)
@@ -94,9 +94,9 @@ export default function AdminDashboard({ eventId }) {
       setLateNotice({ kind: 'success', text: reviewSuccessText(action, count, seen.club, pendingAthletes(updated).length), at })
     } catch (reviewError) {
       if (reviewError.status === 409) {
-        // Se recarga la versión actual y el aviso queda visible (load() limpia el error).
+        // No se escribió nada. El tablero ya recargó la versión actual: el aviso lo dice así.
         await load()
-        setError(reviewError.message)
+        setLateNotice({ kind: 'conflict', text: lateConflictText(seen.club), at })
         return
       }
       setLateNotice({ kind: 'error', text: reviewError.message || 'No se pudo guardar la decisión. No se cambió nada.', at })

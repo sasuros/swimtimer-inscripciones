@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, ChevronDown, X } from 'lucide-react'
 import { athleteDecision, needsReview, pendingAthletes } from '../services/lateDecision'
 import { confirmText, remainingText } from '../utils/lateReviewText'
+import { revealAlert } from '../utils/revealAlert'
 
 // v1.18.0: las decisiones son finales (lateDecision.js). Solo se marcan pendientes, cada
 // decisión pasa por un diálogo que nombra a los nadadores, y mientras una revisión está en
@@ -16,7 +17,7 @@ export default function LateReviewPanel({ submissions, onReview, busy = false, n
         <h2 className="font-bold text-warning-fg">Inscripciones tardías pendientes</h2>
         <p className="text-sm text-ink-muted">{pending.length ? `${pending.length} ${pending.length === 1 ? 'club requiere' : 'clubes requieren'} revisión` : 'No quedan tardías por revisar.'}</p>
       </div>
-      {notice && <LateNotice notice={notice} />}
+      {notice && <LateNotice key={notice.at} notice={notice} />}
       {pending.map((item) => (
         <LateRow key={`${item.eventId}-${item.club.code}`} item={item} onReview={onReview} busy={busy} />
       ))}
@@ -26,12 +27,19 @@ export default function LateReviewPanel({ submissions, onReview, busy = false, n
 
 const NOTICE_STYLE = {
   success: 'bg-success-bg text-success-fg',
-  error: 'bg-danger-bg text-danger-fg'
+  error: 'bg-danger-bg text-danger-fg',
+  conflict: 'bg-danger-solid text-white'
+}
+
+// El conflicto se revela (scroll + foco): el admin suele estar abajo, en la fila del club.
+const revealOnMount = (node) => {
+  if (node) revealAlert(node)
 }
 
 function LateNotice({ notice }) {
+  const conflict = notice.kind === 'conflict'
   return (
-    <div role={notice.kind === 'success' ? 'status' : 'alert'} data-notice={notice.kind} className={`m-4 rounded-lg p-3 text-sm font-bold ${NOTICE_STYLE[notice.kind]}`}>
+    <div ref={conflict ? revealOnMount : undefined} tabIndex={conflict ? -1 : undefined} role={notice.kind === 'success' ? 'status' : 'alert'} data-notice={notice.kind} className={`m-4 scroll-mt-4 rounded-lg p-3 text-sm font-bold outline-none ${NOTICE_STYLE[notice.kind]}`}>
       {notice.text}
     </div>
   )
