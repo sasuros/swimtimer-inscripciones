@@ -4,6 +4,7 @@
 
 const STATUSES = ['draft', 'active', 'accepting_late', 'closed', 'archived']
 const VIAS = ['editor', 'dashboard']
+const COUNT_KEYS = ['approved', 'rejected', 'version']
 
 // Nombres de campo que puede registrar event.details_updated.
 export const AUDIT_FIELDS = ['name', 'date_start', 'date_end', 'venue', 'deadline', 'course', 'notes', 'drive_url', 'is_live', 'show_on_landing', 'organizer', 'organizer_whatsapp', 'imported_from', 'clubs', 'pruebas']
@@ -26,6 +27,10 @@ export function pickSafe(details = {}) {
   if (STATUSES.includes(details.to)) safe.to = details.to
   if (VIAS.includes(details.via)) safe.via = details.via
   if (Array.isArray(details.campos)) safe.campos = [...new Set(details.campos.filter((field) => AUDIT_FIELDS.includes(field)))].sort()
+  // late.reviewed (v1.18.0): solo conteos y versión, enteros ≥ 0. Nunca nombres ni Ath_no.
+  COUNT_KEYS.forEach((key) => {
+    if (Number.isInteger(details[key]) && details[key] >= 0) safe[key] = details[key]
+  })
   return safe
 }
 

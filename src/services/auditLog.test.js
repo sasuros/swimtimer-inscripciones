@@ -21,6 +21,11 @@ describe('statusAction: nombre de la acción según el cambio de estado', () => 
 })
 
 describe('pickSafe: lista blanca de claves y valores', () => {
+  it('late.reviewed: approved/rejected/version solo como enteros ≥ 0', () => {
+    expect(pickSafe({ approved: 2, rejected: 0, version: 7 })).toEqual({ approved: 2, rejected: 0, version: 7 })
+    expect(pickSafe({ approved: -1, rejected: 1.5, version: '7', athletes: [5001], names: ['Ana'] })).toEqual({})
+  })
+
   it('conserva solo from/to/via/campos válidos', () => {
     expect(pickSafe({ from: 'closed', to: 'active', via: 'editor', campos: ['venue', 'drive_url', 'venue'] })).toEqual({ from: 'closed', to: 'active', via: 'editor', campos: ['drive_url', 'venue'] })
   })

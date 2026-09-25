@@ -12,7 +12,7 @@ import { supabase as configuredClient } from './supabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
 import { AUDIT_FIELDS, logAdminAction, statusAction } from './auditLog'
 import { ADMIN_CONFLICT_TEXT, ConflictError } from './concurrency.js'
-import { applyLateDecision, needsReview } from './lateDecision.js'
+import { applyLateDecision, needsReview, pendingAthletes } from './lateDecision.js'
 
 let client = configuredClient
 
@@ -578,31 +578,44 @@ export async function getDashboard(eventId) {
 // No se relee la fila: si cambió desde esa carga, el UPDATE condicional no calza y no se
 // aprueba a nadie que el admin no vio (los Ath_no son posicionales).
 // Semántica de la decisión (final, solo sobre pendientes): lateDecision.js.
+// Audit late.reviewed: club, conteos intentados (aprobados/rechazados), versión y resultado.
 export async function reviewLate(eventId, clubCode, action, athleteIds = [], seen = null) {
-  if (!seen || !Number.isInteger(seen.version)) throw new ConflictError(ADMIN_CONFLICT_TEXT, { conflict: true })
-  const decision = applyLateDecision(seen, action, athleteIds)
-  const status = decision.status
-  const updated = unwrap(
-    await db()
-      .from('inscriptions')
-      .update({
-        approved_athletes: decision.approved_athletes,
-        rejected_athletes: decision.rejected_athletes,
-        late_status: status,
-        version: seen.version + 1
-      })
-      .eq('event_id', eventId)
-      .eq('club_code', clubCode)
-      .eq('is_late', true)
-      .eq('version', seen.version)
-      .select()
-  )
-  if (!updated?.length) throw new ConflictError(ADMIN_CONFLICT_TEXT, { conflict: true })
+  const audit = (outcome, version) => logAdminAction(client, { action: 'late.reviewed', eventId, clubCode, details: { ...attemptedCounts(seen, action, athleteIds), version }, outcome })
+  let decision, updated
+  try {
+    if (!seen || !Number.isInteger(seen.version)) throw new ConflictError(ADMIN_CONFLICT_TEXT, { conflict: true })
+    decision = applyLateDecision(seen, action, athleteIds)
+    updated = unwrap(
+      await db()
+        .from('inscriptions')
+        .update({
+          approved_athletes: decision.approved_athletes,
+          rejected_athletes: decision.rejected_athletes,
+          late_status: decision.status,
+          version: seen.version + 1
+        })
+        .eq('event_id', eventId)
+        .eq('club_code', clubCode)
+        .eq('is_late', true)
+        .eq('version', seen.version)
+        .select()
+    )
+    if (!updated?.length) throw new ConflictError(ADMIN_CONFLICT_TEXT, { conflict: true })
+  } catch (error) {
+    await audit('failure', seen?.version)
+    throw error
+  }
+  await audit('success', seen.version + 1)
   // Efecto secundario solo si la decisión se escribió de verdad.
-  if (status === 'approved') {
+  if (decision.status === 'approved') {
     unwrap(await db().from('event_clubs').update({ status: 'late_approved' }).eq('event_id', eventId).eq('club_code', clubCode))
   }
   return inscriptionFromRow(updated[0])
+}
+
+function attemptedCounts(seen, action, athleteIds) {
+  const count = action === 'approve_pending' ? pendingAthletes(seen).length : new Set((athleteIds || []).map(Number)).size
+  return action === 'reject' ? { approved: 0, rejected: count } : { approved: count, rejected: 0 }
 }
 
 export const approveLateAthletes = (eventId, clubCode, athleteIds, seen) => reviewLate(eventId, clubCode, 'approve', athleteIds, seen)

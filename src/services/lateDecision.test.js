@@ -166,3 +166,39 @@ describe('lateStatusFor / needsReview (puras)', () => {
     expect(() => applyLateDecision({ athletes: [{ Ath_no: '5001' }], approved_athletes: ['5001'] }, 'reject', [5001])).toThrow(/no se pueden cambiar/)
   })
 })
+
+describe('audit late.reviewed (commit 6): club, conteos, versión y resultado; sin nombres', () => {
+  beforeEach(() => setup(3))
+  const reviewed = () => db.tables.audit_log.filter((row) => row.action === 'late.reviewed')
+
+  it('éxito: conteos de esta decisión y la versión nueva', async () => {
+    await review('reject', [B, C])
+    expect(reviewed()).toEqual([expect.objectContaining({ action: 'late.reviewed', event_id: 'evt-1', club_code: 5, outcome: 'success', details: { approved: 0, rejected: 2, version: 2 } })])
+    await review('approve_pending')
+    expect(reviewed()[1]).toMatchObject({ outcome: 'success', details: { approved: 1, rejected: 0, version: 3 } })
+  })
+
+  it('conflicto (409) y decisión ya tomada (422): failure con la versión sobre la que se intentó', async () => {
+    const stale = await seenLate()
+    await review('approve', [A])
+    await expect(reviewLate('evt-1', 5, 'reject', [B], stale)).rejects.toMatchObject({ status: 409 })
+    await expect(review('reject', [A])).rejects.toMatchObject({ status: 422 })
+    expect(reviewed().map((row) => [row.outcome, row.details])).toEqual([
+      ['success', { approved: 1, rejected: 0, version: 2 }],
+      ['failure', { approved: 0, rejected: 1, version: 1 }],
+      ['failure', { approved: 0, rejected: 1, version: 2 }]
+    ])
+  })
+
+  it('sin vista (llamada vieja): failure sin versión', async () => {
+    await expect(reviewLate('evt-1', 5, 'approve', [A])).rejects.toMatchObject({ status: 409 })
+    expect(reviewed()).toEqual([expect.objectContaining({ outcome: 'failure', details: { approved: 1, rejected: 0 } })])
+  })
+
+  it('ningún nombre ni Ath_no viaja al audit', async () => {
+    await review('approve', [A, B])
+    const json = JSON.stringify(reviewed())
+    expect(json).not.toMatch(/Nadador|5001|5002|"X"/)
+    expect(Object.keys(reviewed()[0].details).sort()).toEqual(['approved', 'rejected', 'version'])
+  })
+})
