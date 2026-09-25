@@ -17,6 +17,7 @@ import RegistrationMethodSelector from '../components/RegistrationMethodSelector
 import PinVerification from '../components/PinVerification'
 import { deriveRosterView } from '../utils/wizardRosterView'
 import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
+import { AlreadySubmittedNotice, ConflictPanel } from '../components/WizardNotices'
 
 // v1.16.0: el PIN se guarda solo en esta pestaña (sessionStorage) y viaja en cada
 // validación y en el envío; el servidor lo verifica siempre.
@@ -122,7 +123,9 @@ function WizardContent({ token, pin, access }) {
     } catch (error) {
       if (error.status === 409) {
         // No se escribió nada. Se vuelve al formulario con el aviso (y la lista intacta).
-        setConflict(error.lateDecided ? { text: LATE_DECIDED_TEXT } : error.staleClient ? { text: STALE_CLIENT_TEXT, reload: 'Recargar la página', keepDraft: true } : { text: CONFLICT_TEXT, reload: 'Cargar la versión más reciente' })
+        // `at` remonta el panel en cada rechazo: vuelve a hacer scroll y foco.
+        const at = Date.now()
+        setConflict(error.lateDecided ? { text: LATE_DECIDED_TEXT, at } : error.staleClient ? { text: STALE_CLIENT_TEXT, reload: 'Recargar la página', keepDraft: true, at } : { text: CONFLICT_TEXT, reload: 'Cargar la versión más reciente', at })
         setScreen('form')
       } else {
         window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`)
@@ -145,16 +148,7 @@ function WizardContent({ token, pin, access }) {
           </div>
         )}
         <EventStatusBanner event={access.event} />
-        {conflict && (
-          <div role="alert" className="rounded-xl bg-danger-50 p-4 text-sm text-danger-700">
-            <p className="font-bold">{conflict.text}</p>
-            {conflict.reload && (
-              <button type="button" className="btn-primary mt-3" onClick={conflict.keepDraft ? () => window.location.reload() : reloadLatest}>
-                {conflict.reload}
-              </button>
-            )}
-          </div>
-        )}
+        {conflict && <ConflictPanel key={conflict.at} conflict={conflict} onReload={conflict.keepDraft ? () => window.location.reload() : reloadLatest} />}
         {draft.replaced && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm text-warning-800">{ROSTER_REPLACED_TEXT}</div>}
         {lateDecided && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm font-bold text-warning-800">{LATE_DECIDED_TEXT}</div>}
         {isLate && locked.length > 0 && (
@@ -163,20 +157,7 @@ function WizardContent({ token, pin, access }) {
           </div>
         )}
         {isLate && locked.length > 0 && <RosterPanel roster={locked} readOnly title="Ya inscritos (inscripción regular)" />}
-        {isLate && access.already_submitted && (
-          <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
-            <strong>Ya enviaste una inscripción tardía.</strong> Puedes agregar más, corregir algo, y volver a enviar cuando quieras.
-          </div>
-        )}
-        {!isLate && access.already_submitted && (roster.length > 0 ? (
-          <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
-            <strong>Tus nadadores ya están cargados abajo.</strong> Puedes agregar los que falten, corregir algo, y volver a enviar cuando quieras. ¿Necesitas agregar más después? Vuelve a abrir este mismo enlace.
-          </div>
-        ) : (
-          <div className="rounded-xl bg-warning-50 p-4 text-sm text-warning-800">
-            <strong>Ya enviaste una inscripción para este club.</strong> Si no ves tus nadadores abajo, agrégalos y vuelve a enviar.
-          </div>
-        ))}
+        <AlreadySubmittedNotice isLate={isLate} alreadySubmitted={access.already_submitted} rosterCount={roster.length} conflict={conflict} lateDecided={lateDecided} />
         <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
         {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
         {entryMethod && (
