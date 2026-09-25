@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Archive, Clipboard, ExternalLink, KeyRound, Mail, Pencil, Printer, QrCode, RefreshCw, Send, Trash2 } from 'lucide-react'
 import AdminHeader from '../components/AdminHeader'
 import CloseRegistrationModal from '../components/CloseRegistrationModal'
@@ -26,6 +26,8 @@ export default function AdminDashboard({ eventId }) {
   const [toast, setToast] = useState('')
   const [emailing, setEmailing] = useState(false)
   const [invitationResults, setInvitationResults] = useState([])
+  const [reviewing, setReviewing] = useState(false)
+  const reviewingRef = useRef(false)
   const load = async () => {
     try {
       const result = await getDashboard(eventId)
@@ -75,18 +77,24 @@ export default function AdminDashboard({ eventId }) {
     }
     setDistributionOpen(true)
   }
-  // v1.18.0: `seen` es la tardía de esta misma carga del tablero (IDs + versión).
-  const handleReview = async (clubCode, action, ids, seen) => {
+  // v1.18.0: `seen` es la tardía de esta misma carga del tablero (IDs + versión). Una sola
+  // revisión en vuelo: el ref frena el doble clic antes de que el botón se deshabilite.
+  const handleReview = async (seen, action, ids) => {
+    if (reviewingRef.current) return
+    reviewingRef.current = true
+    setReviewing(true)
     try {
-      await reviewLate(eventId, clubCode, action, ids, seen)
+      await reviewLate(eventId, seen.club.code, action, ids, seen)
+      await load()
     } catch (reviewError) {
       if (reviewError.status !== 409) throw reviewError
       // Se recarga la versión actual y el aviso queda visible (load() limpia el error).
       await load()
       setError(reviewError.message)
-      return
+    } finally {
+      reviewingRef.current = false
+      setReviewing(false)
     }
-    await load()
   }
   const toggleParticipation = async (club) => {
     await setClubParticipation(eventId, club.code, club.status === 'not_participating')
@@ -236,7 +244,7 @@ export default function AdminDashboard({ eventId }) {
         {error && <p className="rounded-lg bg-danger-bg p-3 text-danger-fg">{error}</p>}
         <LiveResultsSettings event={data.event} onSaved={load} />
         <EmailInvitationsPanel clubs={data.clubs} sending={emailing} results={invitationResults} onSendAll={() => sendInvitations(null)} />
-        <LateReviewPanel submissions={data.late || []} onReview={handleReview} />
+        <LateReviewPanel submissions={data.late || []} onReview={handleReview} busy={reviewing} />
         <section className="card overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
             <div>
