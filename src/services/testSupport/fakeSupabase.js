@@ -5,6 +5,7 @@ import { __setSupabaseClient } from '../supabaseStorage'
 import { tokenKey } from '../wizardSupabase.js'
 
 const INSCRIPTIONS_UNIQUE = ['event_id', 'club_code', 'is_late']
+const DRAFTS_KEY = ['event_id', 'club_code', 'is_late', 'author_key'] // v1.21.0: PK de inscription_drafts
 
 // Fake de Supabase que modela lo que importa para el envío:
 // - UNIQUE(event_id, club_code, is_late) en inscriptions (activable, como la migración).
@@ -13,7 +14,7 @@ const INSCRIPTIONS_UNIQUE = ['event_id', 'club_code', 'is_late']
 // - barrier: las primeras N escrituras sobre inscriptions esperan a juntarse y salen a la vez,
 //   para simular dos envíos que llegan al mismo tiempo (doble click / dos pestañas).
 export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = {}) {
-  const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], inscriptions: [], audit_log: [], pin_attempts: [] }
+  const tables = { events: [], clubs: [], event_clubs: [], event_events: [], tokens: [], inscriptions: [], audit_log: [], pin_attempts: [], inscription_drafts: [] }
   const calls = []
   let nextId = 1
   let clock = Date.parse('2026-10-01T12:00:00Z')
@@ -61,6 +62,7 @@ export function createFakeSupabase({ uniqueInscriptions = true, barrier = 0 } = 
       const enforceUnique = table === 'inscriptions' && uniqueInscriptions
       if (state.op === 'insert') {
         if (enforceUnique && state.payload.some((row) => rows.some((existing) => sameKey(existing, row, INSCRIPTIONS_UNIQUE)))) return { data: null, error: uniqueViolation }
+        if (table === 'inscription_drafts' && state.payload.some((row) => rows.some((existing) => sameKey(existing, row, DRAFTS_KEY)))) return { data: null, error: { message: 'duplicate key value violates unique constraint "inscription_drafts_pkey"', code: '23505' } }
         const inserted = state.payload.map(newRow)
         rows.push(...inserted)
         return shape(inserted)

@@ -174,3 +174,29 @@ CREATE TABLE IF NOT EXISTS pin_attempts (
 );
 CREATE INDEX IF NOT EXISTS pin_attempts_key_idx ON pin_attempts(ip_key, token_key, created_at);
 ALTER TABLE pin_attempts ENABLE ROW LEVEL SECURITY;
+
+-- Borrador de la inscripción en el servidor (v1.21.0). Nunca es una inscripción: el consolidado,
+-- el tablero y "Ver inscripciones" solo leen `inscriptions`. Solo la service role lee el roster y
+-- escribe; el admin ve existencia, fecha y cantidad (privilegio por columna) y puede borrar.
+CREATE TABLE IF NOT EXISTS inscription_drafts (
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  club_code INTEGER NOT NULL REFERENCES clubs(code),
+  is_late BOOLEAN NOT NULL DEFAULT FALSE,
+  author_key TEXT NOT NULL,                       -- correo del v3 ('em'), o 'link' para el v2
+  roster JSONB NOT NULL DEFAULT '[]',
+  athlete_count INTEGER NOT NULL DEFAULT 0,       -- lo calcula el servidor; es lo único que ve el admin
+  base_version INTEGER NOT NULL DEFAULT 0,        -- inscriptions.version sobre la que se editó (0 = sin fila)
+  rev INTEGER NOT NULL DEFAULT 1,                 -- sube +1 en cada guardado; decide local vs servidor
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),  -- hora del servidor
+  PRIMARY KEY (event_id, club_code, is_late, author_key)
+);
+CREATE INDEX IF NOT EXISTS idx_inscription_drafts_event ON inscription_drafts(event_id);
+ALTER TABLE inscription_drafts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON inscription_drafts FROM anon, authenticated;
+GRANT SELECT (event_id, club_code, is_late, athlete_count, updated_at) ON inscription_drafts TO authenticated;
+GRANT DELETE ON inscription_drafts TO authenticated;
+GRANT ALL ON inscription_drafts TO service_role;
+DROP POLICY IF EXISTS drafts_admin_select ON inscription_drafts;
+DROP POLICY IF EXISTS drafts_admin_delete ON inscription_drafts;
+CREATE POLICY drafts_admin_select ON inscription_drafts FOR SELECT TO authenticated USING (true);
+CREATE POLICY drafts_admin_delete ON inscription_drafts FOR DELETE TO authenticated USING (true);

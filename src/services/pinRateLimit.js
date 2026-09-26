@@ -46,3 +46,22 @@ export async function clearPinRateLimit(client, ipKey, tokenKey) {
     console.warn('[pin-rate-limit] no se pudo resetear el contador:', error?.message || error)
   }
 }
+
+// v1.21.0 — Solo lectura: ¿el par ya está bloqueado? No registra ningún intento. Lo usa el
+// guardado del borrador para que un PIN correcto no consuma cupo, sin abrir un atajo para
+// adivinar el PIN: con el par bloqueado se rechaza aunque el PIN sea correcto, igual que
+// verify-pin (el intento siguiente sería el número PIN_MAX_ATTEMPTS + 1). Falla abierto.
+export async function pinRateLimitStatus(client, ipKey, tokenKey, { now = Date.now() } = {}) {
+  try {
+    const since = new Date(now - PIN_WINDOW_MS).toISOString()
+    const recent = await client.from('pin_attempts').select('created_at').eq('ip_key', ipKey).eq('token_key', tokenKey).gte('created_at', since)
+    if (recent.error) throw recent.error
+    const attempts = recent.data || []
+    if (attempts.length < PIN_MAX_ATTEMPTS) return { limited: false }
+    const oldest = Math.min(...attempts.map((row) => Date.parse(row.created_at)))
+    return { limited: true, retryAfter: Math.max(1, Math.ceil((oldest + PIN_WINDOW_MS - now) / 1000)) }
+  } catch (error) {
+    console.warn('[pin-rate-limit] sin control de intentos (falla abierto):', error?.message || error)
+    return { limited: false }
+  }
+}

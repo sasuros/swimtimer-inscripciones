@@ -38,3 +38,10 @@ const stable = (value) => {
 
 // Mismo roster = mismo contenido y mismo orden (el orden define los Ath_no posicionales).
 export const sameRoster = (a, b) => stable(a || []) === stable(b || [])
+
+// v1.21.0 — Borrador en el servidor. El indicador es chico y nunca es un error: si el
+// guardado en línea falla, el trabajo sigue guardado en este navegador.
+export const DRAFT_SAVED_LOCAL_TEXT = 'Guardado en este dispositivo'
+export const DRAFT_SAVED_ONLINE_TEXT = 'Guardado en línea'
+export const DRAFT_CONFLICT_TEXT = 'Guardado en este dispositivo · hay cambios más nuevos en otro dispositivo'
+export const DRAFT_STALE_TEXT = 'La inscripción de tu club cambió; este borrador se basa en una versión anterior.'

@@ -3,12 +3,23 @@ import { verifyMagicToken } from '../utils/magicToken.js'
 import { generateClubPin } from '../utils/clubPin.js'
 import { teamIdentity } from '../utils/teamUtils.js'
 import { isShortId } from '../utils/shortId.js'
-import { RateLimitError, checkPinRateLimit, clearPinRateLimit } from './pinRateLimit.js'
+import { RateLimitError, checkPinRateLimit, clearPinRateLimit, pinRateLimitStatus } from './pinRateLimit.js'
 import { hasLateDecision } from './lateDecision.js'
-import { CONFLICT_TEXT, ConflictError, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, sameRoster } from './concurrency.js'
+import { CONFLICT_TEXT, ConflictError, DRAFT_CONFLICT_TEXT, DRAFT_STALE_TEXT, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, sameRoster } from './concurrency.js'
 import { isRegistrationOpen, notOpenText } from '../utils/registrationStatus.js'
 
 const DEFAULT_WHATSAPP = ''
+
+// v1.21.0 — Borrador en el servidor (tabla inscription_drafts). Nunca es una inscripción:
+// el consolidado, el tablero y "Ver inscripciones" solo leen `inscriptions`.
+export const DRAFTS_TABLE = 'inscription_drafts'
+export const MAX_DRAFT_ATHLETES = 500
+export const MAX_DRAFT_BYTES = 256 * 1024
+// Autor del borrador: el correo del enlace v3, o 'link' para el v2 (lo comparten quienes
+// comparten el enlace). No depende del token: rotar el enlace no deja huérfano el borrador.
+export const draftAuthorKey = (access) => access.authorizedEmail || 'link'
+
+const httpError = (status, message, details = {}) => Object.assign(new Error(message), { status, ...details })
 
 export const unwrap = (result, message = 'No se pudo completar la operación') => {
   if (result.error) throw new Error(result.error.message || message)
@@ -223,7 +234,7 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
     return row?.token_value || null
   }
 
-  const validateToken = async (tokenId, { pin, admin = false, ip } = {}) => {
+  const checkAccess = async (tokenId, { pin, admin = false, ip } = {}) => {
     const token = await resolveToken(tokenId)
     if (!token) return { valid: false }
     const access = await fullAccess(token)
@@ -242,6 +253,32 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
     // Bloqueado: 200 con lo básico (sin roster) para que la pantalla del PIN muestre el aviso.
     if (check.rateLimited) return { ...basicAccess(access), rateLimited: true, retryAfter: check.retryAfter }
     return basicAccess(access)
+  }
+
+  // v1.21.0: el borrador del autor viaja solo con PIN verificado. Nunca en la vista previa
+  // del admin (el admin no ve el contenido de un borrador). Sin la tabla: draft null.
+  const readDraft = async (access) => {
+    try {
+      const result = await db()
+        .from(DRAFTS_TABLE)
+        .select('roster,base_version,rev')
+        .eq('event_id', access.eventId)
+        .eq('club_code', access.club.code)
+        .eq('is_late', access.event.status === 'accepting_late')
+        .eq('author_key', draftAuthorKey(access))
+        .maybeSingle()
+      if (result.error) throw result.error
+      return result.data || null
+    } catch (error) {
+      console.warn('[borrador] no se pudo leer:', error?.message || error)
+      return null
+    }
+  }
+
+  const validateToken = async (tokenId, options = {}) => {
+    const access = await checkAccess(tokenId, options)
+    if (!access.pinVerified || options.admin) return access
+    return { ...access, draft: await readDraft(access) }
   }
 
   const verifyAccessPin = async (tokenId, pin, { ip } = {}) => {
@@ -265,7 +302,7 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
     // Token largo canónico: se usa para validar, para token_id y para used_at.
     const token = await resolveToken(payload.token)
     if (!token) throw new Error('El enlace no es válido')
-    const access = await validateToken(token, { pin: payload.pin, admin, ip })
+    const access = await checkAccess(token, { pin: payload.pin, admin, ip })
     if (access.rateLimited) throw new RateLimitError(access.retryAfter)
     if (!access.valid) throw new Error('El enlace no es válido')
     if (!access.backendAvailable) throw new Error('No se pudo conectar con Supabase')
@@ -337,6 +374,7 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
         .eq('club_code', access.club.code)
     ])
     updates.forEach((result) => unwrap(result))
+    await purgeClubDrafts(key)
     return {
       success: true,
       late: isLate,
@@ -348,5 +386,78 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
     }
   }
 
-  return { validateToken, verifyAccessPin, submitInscription }
+  // v1.21.0: al enviar con éxito se borran los borradores del club (de todos sus autores)
+  // para ese tipo de inscripción: quedaron basados en una versión vieja. Best-effort.
+  const purgeClubDrafts = async (key) => {
+    try {
+      const result = await db().from(DRAFTS_TABLE).delete().eq('event_id', key.event_id).eq('club_code', key.club_code).eq('is_late', key.is_late)
+      if (result.error) throw result.error
+    } catch (error) {
+      console.warn('[borrador] no se pudo purgar al enviar:', error?.message || error)
+    }
+  }
+
+  // v1.21.0 — Guardar el borrador del entrenador. Solo con PIN correcto y evento abierto.
+  // Un PIN correcto NO registra intento ni consume cupo; uno incorrecto cuenta como en
+  // verify-pin; con el par (IP + token) bloqueado se rechaza aunque el PIN sea correcto.
+  // La vista previa del admin no cuenta: sin PIN no se guarda.
+  // Escritura condicional por rev: nunca pisa un guardado más nuevo (409 draftConflict).
+  // Rechaza un borrador basado en una versión de la inscripción ya superada (409 staleBase).
+  const saveDraft = async (payload = {}, { ip } = {}) => {
+    const token = await resolveToken(payload.token)
+    if (!token) throw httpError(400, 'El enlace no es válido')
+    const access = await fullAccess(token)
+    if (!access.valid || !access.backendAvailable) throw httpError(400, 'El enlace no es válido')
+    if (!isRegistrationOpen(access.event.status)) throw httpError(409, notOpenText(access.event.status), { closed: true })
+    const roster = payload.roster
+    if (!Array.isArray(roster)) throw httpError(400, 'Borrador inválido')
+    if (roster.length > MAX_DRAFT_ATHLETES || JSON.stringify(roster).length > MAX_DRAFT_BYTES) throw httpError(413, 'El borrador es demasiado grande')
+    const baseVersion = Number(payload.base_version)
+    const expectedRev = Number(payload.expected_rev)
+    if (!Number.isInteger(baseVersion) || baseVersion < 0 || !Number.isInteger(expectedRev) || expectedRev < 0) throw httpError(400, 'Borrador inválido')
+
+    const key = await tokenKey(token)
+    if (ip) {
+      const status = await pinRateLimitStatus(db(), ip, key)
+      if (status.limited) throw new RateLimitError(status.retryAfter)
+    }
+    if (!(await pinMatches(access.eventId, access.club.code, payload.pin))) {
+      if (ip) {
+        const limit = await checkPinRateLimit(db(), ip, key)
+        if (limit.limited) throw new RateLimitError(limit.retryAfter)
+      }
+      throw httpError(401, 'Código de acceso incorrecto o faltante')
+    }
+
+    const isLate = access.event.status === 'accepting_late'
+    if (isLate && hasLateDecision(access.inscription)) throw new ConflictError(LATE_DECIDED_TEXT, { lateDecided: true })
+    const currentVersion = access.inscription?.version ?? 0
+    if (currentVersion > baseVersion) throw new ConflictError(DRAFT_STALE_TEXT, { staleBase: true, currentVersion })
+
+    const draftKey = { event_id: access.eventId, club_code: access.club.code, is_late: isLate, author_key: draftAuthorKey(access) }
+    const fields = { roster, athlete_count: roster.length, base_version: baseVersion, updated_at: new Date().toISOString() }
+    let row = null
+    if (expectedRev === 0) {
+      const inserted = await db().from(DRAFTS_TABLE).insert({ ...draftKey, ...fields, rev: 1 }).select('rev').single()
+      if (inserted.error && inserted.error.code !== '23505') unwrap(inserted)
+      row = inserted.error ? null : inserted.data
+    } else {
+      const updated = unwrap(
+        await db()
+          .from(DRAFTS_TABLE)
+          .update({ ...fields, rev: expectedRev + 1 })
+          .eq('event_id', draftKey.event_id)
+          .eq('club_code', draftKey.club_code)
+          .eq('is_late', draftKey.is_late)
+          .eq('author_key', draftKey.author_key)
+          .eq('rev', expectedRev)
+          .select('rev')
+      )
+      row = updated?.[0] || null
+    }
+    if (!row) throw new ConflictError(DRAFT_CONFLICT_TEXT, { draftConflict: true })
+    return { saved: true, rev: row.rev }
+  }
+
+  return { validateToken, verifyAccessPin, submitInscription, saveDraft }
 }
