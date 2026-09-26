@@ -20,6 +20,22 @@ describe('mensajes con PIN (v1.16.0)', () => {
     expect(emailInvitation(event, url).body).toContain(`${url}\n\n${line}\n\n`)
   })
 
+  // v1.19.1: WhatsApp y el recordatorio por mailto, completos en tú (voz del proyecto desde v1.8.2).
+  it('WhatsApp y correo hablan en tú, sin formas de usted', () => {
+    const whatsapp = whatsappInvitation(event, url, '1234')
+    const email = emailInvitation(event, url, '1234').body
+    expect(whatsapp).toContain('Hola, te saluda la organización de Copa Test.')
+    expect(whatsapp).toContain('para tu equipo.')
+    expect(whatsapp).toContain('Abre este enlace para inscribir a tus nadadores:')
+    expect(whatsapp).toContain('Si tienes cualquier duda, escríbele a Org por este mismo número.')
+    expect(email).toContain('Hola, entrenador:')
+    expect(email).toContain('Entra al siguiente enlace para inscribir a tus nadadores:')
+    expect(email).toContain('Saludos,\nOrg\n')
+    for (const text of [whatsapp, email]) {
+      expect(text).not.toMatch(/\busted\b|\ble saluda\b|\bsu equipo\b|\bsus nadadores\b|\bAbra\b|\bIngrese\b|\bcontactar\b|\bEstimado\b|\bAtentamente\b/i)
+    }
+  })
+
   it('sin PIN no agregan la línea', () => {
     expect(whatsappInvitation(event, url)).not.toContain('PIN')
     expect(emailInvitation(event, url).body).not.toContain('PIN')
