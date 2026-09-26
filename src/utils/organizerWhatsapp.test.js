@@ -7,11 +7,11 @@ import { DEMO_WHATSAPP } from '../config'
 // v1.19.2: el botón "Contactar por WhatsApp" salía con 584120000000 (relleno).
 describe('número de WhatsApp del organizador', () => {
   it('un número real se devuelve limpio, listo para wa.me', () => {
-    expect(organizerWhatsapp('584142022123')).toBe('584142022123')
-    expect(organizerWhatsapp('+58 414-202.2123')).toBe('584142022123')
+    expect(organizerWhatsapp('584149990123')).toBe('584149990123')
+    expect(organizerWhatsapp('+58 414-999.0123')).toBe('584149990123')
   })
 
-  it.each([['vacío', ''], ['null', null], ['undefined', undefined], ['relleno de antes', '584120000000'], ['placeholder del editor', '584121234567'], ['muy corto', '12345'], ['muy largo', '5841420221231234']])('%s → sin botón (null)', (_name, value) => {
+  it.each([['vacío', ''], ['null', null], ['undefined', undefined], ['relleno de antes', '584120000000'], ['placeholder del editor', '584121234567'], ['muy corto', '12345'], ['muy largo', '5841499901231234']])('%s → sin botón (null)', (_name, value) => {
     expect(organizerWhatsapp(value)).toBeNull()
   })
 

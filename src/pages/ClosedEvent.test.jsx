@@ -17,8 +17,8 @@ describe('botones de contacto de la pantalla cerrada (v1.19.2)', () => {
   const render = (organizer_whatsapp) => renderToStaticMarkup(<ClosedEvent event={{ ...event, organizer_whatsapp }} />)
 
   it('con un número real hay WhatsApp y correo', () => {
-    const html = render('584142022123')
-    expect(html).toContain('href="https://wa.me/584142022123?text=')
+    const html = render('584149990123')
+    expect(html).toContain('href="https://wa.me/584149990123?text=')
     expect(html).toContain('Enviar correo')
   })
 

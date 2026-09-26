@@ -3,7 +3,7 @@ import { shortenAthlete, shortFirstName, shortLastName } from './shortName'
 
 describe('shortLastName', () => {
   it.each([
-    ['Caceres Benitez', 'Caceres'],
+    ['Rondón Salcedo', 'Rondón'],
     ['De la Cruz Pérez', 'De la Cruz'],
     ['Del Valle Rodríguez', 'Del Valle'],
     ['DE LA CRUZ PEREZ', 'DE LA CRUZ'],
@@ -12,7 +12,7 @@ describe('shortLastName', () => {
     ['San Martín López', 'San Martín'],
     ['Santa Cruz', 'Santa Cruz'],
     ['Suros', 'Suros'],
-    ['  Caceres    Benitez ', 'Caceres'],
+    ['  Rondón    Salcedo ', 'Rondón'],
     ['De', 'De']
   ])('%s → %s', (input, expected) => expect(shortLastName(input)).toBe(expected))
 
@@ -26,8 +26,8 @@ describe('shortLastName', () => {
 
 describe('shortFirstName', () => {
   it.each([
-    ['Jadiel Zahir', 'Jadiel Z.'],
-    ['JADIEL ZAHIR', 'JADIEL Z.'],
+    ['Tomás Elías', 'Tomás E.'],
+    ['TOMÁS ELÍAS', 'TOMÁS E.'],
     ['Ana María', 'Ana M.'],
     ['María de los Ángeles', 'María Á.'],
     ['Ana', 'Ana'],

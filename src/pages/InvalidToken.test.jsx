@@ -6,15 +6,15 @@ import InvalidToken, { INVALID_LINK_TEXT } from './InvalidToken'
 // expiró", sin orientar. Texto genérico que cubre ambos casos + contacto global.
 describe('pantalla de enlace no válido', () => {
   it('orienta: no válido o reemplazado, revisar el último correo o escribir al organizador', () => {
-    const html = renderToStaticMarkup(<InvalidToken whatsapp="584142022123" />)
+    const html = renderToStaticMarkup(<InvalidToken whatsapp="584149990123" />)
     expect(INVALID_LINK_TEXT).toBe('Este enlace no es válido o fue reemplazado por uno más reciente. Revisa el último correo de invitación o escríbele al organizador.')
     expect(html).toContain(INVALID_LINK_TEXT)
     expect(html).not.toContain('ya expiró')
   })
 
   it('con un número real hay WhatsApp y correo globales', () => {
-    const html = renderToStaticMarkup(<InvalidToken whatsapp="584142022123" />)
-    expect(html).toContain('href="https://wa.me/584142022123?text=')
+    const html = renderToStaticMarkup(<InvalidToken whatsapp="584149990123" />)
+    expect(html).toContain('href="https://wa.me/584149990123?text=')
     expect(html).toContain('href="mailto:albertosuros@yahoo.com?')
   })
 
@@ -25,10 +25,10 @@ describe('pantalla de enlace no válido', () => {
   })
 
   it('sin conexión y sin enlace mantienen su texto, con los mismos botones', () => {
-    const offline = renderToStaticMarkup(<InvalidToken networkError whatsapp="584142022123" />)
+    const offline = renderToStaticMarkup(<InvalidToken networkError whatsapp="584149990123" />)
     expect(offline).toContain('No pudimos conectar')
     expect(offline).not.toContain(INVALID_LINK_TEXT)
-    const missing = renderToStaticMarkup(<InvalidToken noToken whatsapp="584142022123" />)
+    const missing = renderToStaticMarkup(<InvalidToken noToken whatsapp="584149990123" />)
     expect(missing).toContain('Solicita al organizador el enlace único de tu club')
     expect(missing).toContain('Enviar correo')
   })
