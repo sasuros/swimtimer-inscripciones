@@ -1,7 +1,10 @@
 import { supabase } from './services/supabase'
 
 export const DEMO_MODE = !supabase
-export const DEMO_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'swimtimer2025'
+// v1.20.1: clave de firma de los enlaces v3, sin valor por defecto (falla cerrado).
+export const MAGIC_SIGNING_KEY = import.meta.env.VITE_ADMIN_PASSWORD || ''
+// Solo modo demo local (sin Supabase): no firma nada y se muestra en pantalla.
+export const DEMO_LOGIN_PASSWORD = 'demo'
 // v1.19.2: sin la variable, vacío (antes un número de relleno que se guardaba en los eventos).
 export const DEMO_WHATSAPP = import.meta.env.VITE_ALBERTO_WHATSAPP || ''
 

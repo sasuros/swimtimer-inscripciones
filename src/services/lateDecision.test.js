@@ -10,7 +10,7 @@ const { payload, seed } = await import('./testSupport/fakeSupabase.js')
 const { createSupabaseWizardStorage } = await import('./wizardSupabase.js')
 const { LATE_DECIDED_TEXT } = await import('./concurrency.js')
 const { applyLateDecision, lateStatusFor, needsReview } = await import('./lateDecision.js')
-const { DEMO_ADMIN_PASSWORD } = await import('../config.js')
+const { MAGIC_SIGNING_KEY } = await import('../config.js')
 
 const [A, B, C] = [5001, 5002, 5003]
 let db, token, wizard
@@ -28,7 +28,7 @@ const unchanged = async (action, ids) => {
 
 const setup = async (n) => {
   ;({ db, token } = await seed())
-  wizard = createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD })
+  wizard = createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY })
   mocks.client = { from: db.from }
   db.tables.events[0].status = 'accepting_late'
   await wizard.submitInscription(payload(token, n, 'T'))

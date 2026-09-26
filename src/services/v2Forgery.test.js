@@ -4,7 +4,7 @@ import { createFakeSupabase, payload } from './testSupport/fakeSupabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
 import { decodeDemoToken } from '../utils/demoToken'
 import { teamIdentity } from '../utils/teamUtils'
-import { DEMO_ADMIN_PASSWORD } from '../config'
+import { MAGIC_SIGNING_KEY } from '../config'
 
 afterEach(() => __setSupabaseClient(null))
 
@@ -24,7 +24,7 @@ async function scenario() {
   __setSupabaseClient(db)
   await generateTokens('evt-1') // enlaces v2 reales, como "Copiar enlace"
 
-  const wizard = createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD })
+  const wizard = createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY })
   const tokenOf = (code) => db.tables.tokens.find((row) => row.club_code === code && row.token_type === 'v2').token_value
   // La víctima ya envió su roster (datos ficticios).
   await wizard.submitInscription(payload(tokenOf(7), 2, 'VICTIMA', '7777'))

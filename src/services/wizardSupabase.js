@@ -96,7 +96,11 @@ export async function latestInscription(client, eventId, clubCode, isLate) {
   return unwrap(result)
 }
 
-export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer2025', whatsapp = DEFAULT_WHATSAPP } = {}) {
+export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = DEFAULT_WHATSAPP } = {}) {
+  // v1.20.1: sin clave de firma por defecto. Falla cerrado (503 en /api).
+  if (typeof adminPassword !== 'string' || !adminPassword.trim()) {
+    throw Object.assign(new Error('Servidor mal configurado'), { status: 503 })
+  }
   const db = () => {
     if (!client) throw new Error('Supabase no configurado')
     return client

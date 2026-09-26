@@ -10,7 +10,7 @@ const { default: verifyHandler } = await import('../../api/verify-pin.js')
 const { __setSupabaseClient, generateTokens } = await import('./supabaseStorage.js')
 const { payload, seed } = await import('./testSupport/fakeSupabase.js')
 const { createSupabaseWizardStorage } = await import('./wizardSupabase.js')
-const { DEMO_ADMIN_PASSWORD } = await import('../config.js')
+const { MAGIC_SIGNING_KEY } = await import('../config.js')
 
 const response = () => ({
   statusCode: 0,
@@ -38,7 +38,7 @@ beforeEach(async () => {
   const { db } = await seed()
   await generateTokens('evt-1')
   v2 = db.tables.tokens.find((row) => row.token_type === 'v2' && row.club_code === 5).token_value
-  await createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD }).submitInscription(payload(v2, 2, 'PREVIO'))
+  await createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY }).submitInscription(payload(v2, 2, 'PREVIO'))
   // Sesión de Supabase: solo "jwt-admin" es un usuario válido.
   mocks.client = { from: db.from, auth: { getUser: async (jwt) => (jwt === 'jwt-admin' ? { data: { user: { id: 'admin' } }, error: null } : { data: { user: null }, error: { message: 'JWT inválido' } }) } }
 })

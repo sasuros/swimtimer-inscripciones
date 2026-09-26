@@ -15,7 +15,7 @@ const { default: AdminDashboard } = await import('../pages/AdminDashboard.jsx')
 const { __setSupabaseClient, getDashboard, reviewLate } = await import('../services/supabaseStorage.js')
 const { payload, seed } = await import('../services/testSupport/fakeSupabase.js')
 const { createSupabaseWizardStorage } = await import('../services/wizardSupabase.js')
-const { DEMO_ADMIN_PASSWORD } = await import('../config.js')
+const { MAGIC_SIGNING_KEY } = await import('../config.js')
 const { button, click, mount, settle, unmountAll } = await import('../services/testSupport/dom.js')
 
 const sheet = () => document.getElementById('print-roster')
@@ -23,7 +23,7 @@ const lines = () => [...sheet().querySelectorAll('p.font-bold')].map((p) => p.te
 
 beforeEach(async () => {
   const { db, token } = await seed()
-  const wizard = createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD })
+  const wizard = createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY })
   await wizard.submitInscription(payload(token, 13, 'R'))
   db.tables.events[0].status = 'accepting_late'
   await wizard.submitInscription(payload(token, 3, 'T'))

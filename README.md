@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-La app queda disponible normalmente en `http://localhost:5173`. Sin `VITE_SUPABASE_URL`, activa automáticamente el modo demo. El panel está en `/admin/eventos` y la contraseña predeterminada es `swimtimer2025`.
+La app queda disponible normalmente en `http://localhost:5173`. Sin `VITE_SUPABASE_URL`, activa automáticamente el modo demo. El panel está en `/admin/eventos` y en modo demo la clave es `demo`.
 
 ## Configurar Supabase (producción)
 
@@ -21,7 +21,7 @@ La app queda disponible normalmente en `http://localhost:5173`. Sin `VITE_SUPABA
    - `VITE_SUPABASE_URL`: URL del proyecto.
    - `VITE_SUPABASE_ANON_KEY`: clave pública anon.
    - `SUPABASE_SERVICE_ROLE_KEY`: service role key privada, sin prefijo `VITE_`. Cargarla en **Production** y **Preview**; la usan solo las funciones serverless del wizard público.
-   - `VITE_ADMIN_PASSWORD`: secreto de firma para enlaces mágicos; no es el login del admin en producción.
+   - `VITE_ADMIN_PASSWORD`: secreto de firma para enlaces mágicos; no es el login del admin en producción. Obligatoria en **Production** y **Preview**: si falta o está vacía, `/api` responde 503 "Servidor mal configurado" (no hay clave por defecto).
    - `VITE_ALBERTO_WHATSAPP`: número con código de país, sin `+`.
    - `RESEND_API_KEY`: clave privada de Resend, sin prefijo `VITE_`.
 6. Crear o invitar el usuario administrador en **Supabase → Authentication → Users**. El panel usa Supabase Auth con correo y contraseña.

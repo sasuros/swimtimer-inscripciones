@@ -1,4 +1,4 @@
-import { DEMO_ADMIN_PASSWORD, DEMO_WHATSAPP } from '../config'
+import { DEMO_WHATSAPP, MAGIC_SIGNING_KEY } from '../config'
 import { encodeDemoToken } from '../utils/demoToken'
 import { buildConsolidatedExport } from '../utils/mmSchema'
 import { lateReviewView, mergeClubInscriptions } from '../utils/clubInscriptionView'
@@ -425,7 +425,7 @@ export async function generateEmailInvitations(eventId, clubCodes = null) {
   const clubs = event.clubs.filter((club) => club.email && club.participation_status !== 'not_participating' && (!selected || selected.has(Number(club.code))))
   const invitations = await Promise.all(
     clubs.map(async (club) => {
-      const tokenValue = await createMagicToken({ eventId, clubCode: club.code, email: club.email }, DEMO_ADMIN_PASSWORD)
+      const tokenValue = await createMagicToken({ eventId, clubCode: club.code, email: club.email }, MAGIC_SIGNING_KEY)
       return {
         club,
         tokenValue,
@@ -456,7 +456,7 @@ export async function updateClubPin(eventId, clubCode) {
 }
 
 export async function verifyAccessPin(tokenId, pin) {
-  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).verifyAccessPin(tokenId, pin)
+  return createSupabaseWizardStorage({ client, adminPassword: MAGIC_SIGNING_KEY, whatsapp: DEMO_WHATSAPP }).verifyAccessPin(tokenId, pin)
 }
 
 export async function recordInvitationResults(eventId, results) {
@@ -488,7 +488,7 @@ async function latestInscription(eventId, clubCode, isLate) {
 }
 
 export async function validateToken(tokenId, options) {
-  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).validateToken(tokenId, options)
+  return createSupabaseWizardStorage({ client, adminPassword: MAGIC_SIGNING_KEY, whatsapp: DEMO_WHATSAPP }).validateToken(tokenId, options)
 }
 
 function withoutPin(club) {
@@ -500,7 +500,7 @@ function withoutPins(event) {
 }
 
 export async function submitInscription(payload, options) {
-  return createSupabaseWizardStorage({ client, adminPassword: DEMO_ADMIN_PASSWORD, whatsapp: DEMO_WHATSAPP }).submitInscription(payload, options)
+  return createSupabaseWizardStorage({ client, adminPassword: MAGIC_SIGNING_KEY, whatsapp: DEMO_WHATSAPP }).submitInscription(payload, options)
 }
 
 export const submitLateInscription = (tokenId, data) => submitInscription({ ...data, token: tokenId })
@@ -674,8 +674,3 @@ export async function reincorporateClub(eventId, clubCode) {
 }
 
 export const setClubParticipation = (eventId, clubCode, participates) => (participates ? reincorporateClub(eventId, clubCode) : markClubNotParticipating(eventId, clubCode))
-
-export function adminLogin(password) {
-  if (password !== DEMO_ADMIN_PASSWORD) throw new Error('Contraseña incorrecta')
-  return { token: `supabase-admin-${Date.now()}` }
-}

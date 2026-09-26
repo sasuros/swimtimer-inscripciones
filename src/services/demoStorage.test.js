@@ -25,7 +25,7 @@ describe('storage local de la demo', () => {
 
   it('protege el panel con la clave demo', () => {
     expect(() => demoLogin('incorrecta')).toThrow('Contraseña incorrecta')
-    expect(demoLogin('swimtimer2025').token).toMatch(/^demo-admin-/)
+    expect(demoLogin('demo').token).toMatch(/^demo-admin-/)
   })
 
   it('genera, valida, usa y conserva tokens e inscripciones', () => {

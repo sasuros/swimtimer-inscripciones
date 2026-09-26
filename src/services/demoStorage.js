@@ -1,6 +1,6 @@
 import clubs from '../data/clubs.json'
 import eventData from '../data/events.json'
-import { DEMO_ADMIN_PASSWORD, DEMO_WHATSAPP, STORAGE_KEYS } from '../config'
+import { DEMO_LOGIN_PASSWORD, DEMO_WHATSAPP, STORAGE_KEYS } from '../config'
 import { standardEventTemplate } from '../utils/eventTemplate'
 import { teamIdentity } from '../utils/teamUtils'
 import { buildConsolidatedExport } from '../utils/mmSchema'
@@ -62,7 +62,7 @@ export function ensureDemoData() {
 }
 
 export function demoLogin(password) {
-  if (password !== DEMO_ADMIN_PASSWORD) throw new Error('Contraseña incorrecta')
+  if (password !== DEMO_LOGIN_PASSWORD) throw new Error('Contraseña incorrecta')
   return { token: `demo-admin-${Date.now()}` }
 }
 

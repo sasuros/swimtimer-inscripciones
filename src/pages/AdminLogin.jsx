@@ -3,7 +3,7 @@ import ErrorMessage from '../components/ErrorMessage'
 import Logo from '../components/Logo'
 import { adminLogin } from '../services/api'
 import { supabase } from '../services/supabase'
-import { DEMO_ADMIN_PASSWORD, DEMO_MODE } from '../config'
+import { DEMO_LOGIN_PASSWORD, DEMO_MODE } from '../config'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
@@ -44,7 +44,7 @@ export default function AdminLogin() {
         <p className="mt-1 text-ink-muted">Acceso privado de SWIMTIMER</p>
         {DEMO_MODE && (
           <p className="mt-4 rounded-lg bg-brand-bg p-3 text-sm text-ink-strong">
-            <strong>Demostración local:</strong> la clave es <code>{DEMO_ADMIN_PASSWORD}</code>
+            <strong>Demostración local:</strong> la clave es <code>{DEMO_LOGIN_PASSWORD}</code>
           </p>
         )}
         {!DEMO_MODE && (

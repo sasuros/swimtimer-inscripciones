@@ -14,7 +14,7 @@ const { __setSupabaseClient, getDashboard, reviewLate } = await import('../servi
 const { payload, seed } = await import('../services/testSupport/fakeSupabase.js')
 const { createSupabaseWizardStorage } = await import('../services/wizardSupabase.js')
 const { LATE_DECIDED_TEXT } = await import('../services/concurrency.js')
-const { DEMO_ADMIN_PASSWORD } = await import('../config.js')
+const { MAGIC_SIGNING_KEY } = await import('../config.js')
 const { mount, settle, unmountAll } = await import('../services/testSupport/dom.js')
 
 let db, token
@@ -30,7 +30,7 @@ const lateSection = () => [...document.querySelectorAll('section')].find((sectio
 
 beforeEach(async () => {
   ;({ db, token } = await seed())
-  state.wizard = createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD })
+  state.wizard = createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY })
   db.tables.events[0].status = 'accepting_late'
   await state.wizard.submitInscription(payload(token, 3, 'T'))
   localStorage.clear()

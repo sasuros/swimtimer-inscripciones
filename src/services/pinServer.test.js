@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { __setSupabaseClient, generateTokens } from './supabaseStorage'
 import { payload, seed } from './testSupport/fakeSupabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
-import { DEMO_ADMIN_PASSWORD } from '../config'
+import { MAGIC_SIGNING_KEY } from '../config'
 
 afterEach(() => __setSupabaseClient(null))
 
@@ -11,7 +11,7 @@ async function setup() {
   const { db, token: v3 } = await seed()
   await generateTokens('evt-1') // enlace v2 largo, como los ya distribuidos
   const v2 = db.tables.tokens.find((row) => row.token_type === 'v2' && row.club_code === 5).token_value
-  const wizard = createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD })
+  const wizard = createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY })
   await wizard.submitInscription(payload(v2, 2, 'PREVIO')) // ya hay un roster guardado
   return { db, wizard, v2, v3 }
 }

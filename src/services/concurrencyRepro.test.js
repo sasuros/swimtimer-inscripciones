@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { __setSupabaseClient, getEvent, saveEvent, setClubParticipation, updateClubPin, updateEventStatus } from './supabaseStorage'
 import { payload, seed } from './testSupport/fakeSupabase'
 import { createSupabaseWizardStorage } from './wizardSupabase.js'
-import { DEMO_ADMIN_PASSWORD } from '../config'
+import { MAGIC_SIGNING_KEY } from '../config'
 
 // v1.18.0 — Síntoma C (pestaña vieja del editor de eventos), versión mínima: en un evento
 // existente el editor no escribe status/opened_at/closed_at, y en los event_clubs
@@ -39,7 +39,7 @@ describe('C — reproducción de la Fase 0: pestaña vieja del editor', () => {
   it('el club ya envió (status submitted); el editor viejo guarda → NO debe volver a "invited"', async () => {
     const { db, token } = await seed()
     const staleForm = await getEvent('evt-1')
-    await createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD }).submitInscription(payload(token, 1, 'X'))
+    await createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY }).submitInscription(payload(token, 1, 'X'))
     await editorSave(staleForm, { venue: 'Piscina nueva' })
     expect(clubRow(db).status).toBe('submitted')
   })

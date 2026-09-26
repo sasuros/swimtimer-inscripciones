@@ -1,6 +1,6 @@
 // Fake de Supabase compartido por los tests de integración del adaptador (no se usa en la app).
 import { createMagicToken } from '../../utils/magicToken'
-import { DEMO_ADMIN_PASSWORD } from '../../config'
+import { MAGIC_SIGNING_KEY } from '../../config'
 import { __setSupabaseClient } from '../supabaseStorage'
 import { tokenKey } from '../wizardSupabase.js'
 
@@ -109,7 +109,7 @@ export async function seed(options) {
   db.tables.events.push({ id: 'evt-1', name: 'Copa Test', date_start: '2026-10-01', date_end: null, venue: '', reference_date: '2026-12-31', course: 'S', status: 'active', organizer_whatsapp: '584120000000', imported_from: {}, created_at: '2026-09-01T00:00:00Z' })
   db.tables.clubs.push({ code: 5, name: 'Club Cinco', short_name: 'C5', abbreviation: 'CIN' })
   db.tables.event_clubs.push({ event_id: 'evt-1', club_code: 5, status: 'invited', contact_name: '', contact_whatsapp: '', email: 'club5@test.com', pin: '1234', invitation_sent_at: null, invitation_error: '' })
-  const token = await createMagicToken({ eventId: 'evt-1', clubCode: 5, email: 'club5@test.com' }, DEMO_ADMIN_PASSWORD)
+  const token = await createMagicToken({ eventId: 'evt-1', clubCode: 5, email: 'club5@test.com' }, MAGIC_SIGNING_KEY)
   db.tables.tokens.push({ id: await tokenKey(token), token_value: token, token_type: 'v3', event_id: 'evt-1', club_code: 5, created_at: '2026-09-01T00:00:00Z', used_at: null })
   __setSupabaseClient(db)
   return { db, token }

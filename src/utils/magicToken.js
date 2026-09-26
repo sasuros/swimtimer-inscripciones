@@ -11,6 +11,8 @@ const fromBase64Url = value => {
 }
 
 async function signature(value, password) {
+  // v1.20.1: nunca firmar ni verificar con una clave vacía.
+  if (typeof password !== 'string' || !password.trim()) throw new Error('Falta la clave de firma de los enlaces')
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(password),
     { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']

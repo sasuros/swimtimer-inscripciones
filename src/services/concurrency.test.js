@@ -11,7 +11,7 @@ const { __setSupabaseClient, getDashboard, reviewLate } = await import('./supaba
 const { payload, seed } = await import('./testSupport/fakeSupabase.js')
 const { createSupabaseWizardStorage } = await import('./wizardSupabase.js')
 const { CONFLICT_TEXT, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, STALE_CLIENT_TEXT } = await import('./concurrency.js')
-const { DEMO_ADMIN_PASSWORD } = await import('../config.js')
+const { MAGIC_SIGNING_KEY } = await import('../config.js')
 
 const names = (row) => (row?.roster || []).map((athlete) => athlete.lastName)
 const stale = (body, version) => ({ ...body, expected_version: version })
@@ -44,7 +44,7 @@ beforeEach(async () => {
   process.env.VITE_SUPABASE_URL = 'https://fake.supabase.co'
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-fake'
   ;({ db, token } = await seed())
-  wizard = createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD })
+  wizard = createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY })
   mocks.client = { from: db.from, auth: { getUser: async () => ({ data: { user: null }, error: { message: 'no' } }) } }
 })
 afterEach(() => __setSupabaseClient(null))
@@ -122,7 +122,7 @@ describe('doble click / reintento', () => {
 
   it('primer envío doble (sin fila) idéntico → ambos éxito, una fila en versión 1', async () => {
     const seeded = await seed({ barrier: 2 }) // los dos INSERT llegan juntos a la base
-    const first = createSupabaseWizardStorage({ client: seeded.db, adminPassword: DEMO_ADMIN_PASSWORD })
+    const first = createSupabaseWizardStorage({ client: seeded.db, adminPassword: MAGIC_SIGNING_KEY })
     const body = stale(payload(seeded.token, 2, 'X'), 0)
     const results = await Promise.all([first.submitInscription(body), first.submitInscription(body)])
     expect(results.every((result) => result.success && result.version === 1)).toBe(true)
@@ -176,7 +176,7 @@ describe('tardías: D1 y aprobaciones', () => {
         return builder
       }
     }
-    const racingWizard = createSupabaseWizardStorage({ client: racing, adminPassword: DEMO_ADMIN_PASSWORD })
+    const racingWizard = createSupabaseWizardStorage({ client: racing, adminPassword: MAGIC_SIGNING_KEY })
     // El entrenador tiene la versión 1 (pendiente): pasa (a), pero el admin aprueba antes de (b).
     await expect(racingWizard.submitInscription(payload(token, 3, 'OTRA'))).rejects.toMatchObject({ status: 409, details: { conflict: true, currentVersion: 2 } })
     expect(fired).toBe(true)

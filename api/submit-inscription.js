@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createSupabaseWizardStorage } from '../src/services/wizardSupabase.js'
 import { isAdminPreview } from './_adminAuth.js'
 import { clientIpKey } from './_clientIp.js'
+import { requireSigningSecret } from './_signingSecret.js'
 
 const json = (res, status, payload) => res.status(status).json(payload)
 
@@ -15,7 +16,7 @@ function createServerClient() {
 function createServerWizardStorage(client) {
   return createSupabaseWizardStorage({
     client,
-    adminPassword: process.env.VITE_ADMIN_PASSWORD || 'swimtimer2025',
+    adminPassword: requireSigningSecret(),
     whatsapp: process.env.VITE_ALBERTO_WHATSAPP || ''
   })
 }
@@ -30,6 +31,7 @@ export default async function handler(req, res) {
     const admin = await isAdminPreview(req, client)
     return json(res, 200, await createServerWizardStorage(client).submitInscription({ token, pin, athletes, results, roster, meta, expected_version }, { admin, ip: clientIpKey(req) }))
   } catch (error) {
+    if (error.status === 503) return json(res, 503, { error: error.message })
     if (error.status === 429) return json(res, 429, { error: error.message, retryAfter: error.retryAfter })
     // v1.18.0: conflicto de versión (sin escribir nada): conflict / lateDecided / staleClient.
     if (error.status === 409) return json(res, 409, { error: error.message, ...error.details })

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createSupabaseWizardStorage } from '../src/services/wizardSupabase.js'
 import { isAdminPreview } from './_adminAuth.js'
 import { clientIpKey } from './_clientIp.js'
+import { requireSigningSecret } from './_signingSecret.js'
 
 const json = (res, status, payload) => res.status(status).json(payload)
 
@@ -15,7 +16,7 @@ function createServerClient() {
 function createServerWizardStorage(client) {
   return createSupabaseWizardStorage({
     client,
-    adminPassword: process.env.VITE_ADMIN_PASSWORD || 'swimtimer2025',
+    adminPassword: requireSigningSecret(),
     whatsapp: process.env.VITE_ALBERTO_WHATSAPP || ''
   })
 }
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
     const admin = await isAdminPreview(req, client)
     return json(res, 200, await createServerWizardStorage(client).validateToken(token, { pin, admin, ip: clientIpKey(req) }))
   } catch (error) {
+    if (error.status === 503) return json(res, 503, { error: error.message })
     return json(res, 500, { error: error.message || 'No se pudo validar el token' })
   }
 }

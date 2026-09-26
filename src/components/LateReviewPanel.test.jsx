@@ -27,7 +27,7 @@ const { default: LateReviewPanel } = await import('./LateReviewPanel.jsx')
 const { __setSupabaseClient, getDashboard, reviewLate } = await import('../services/supabaseStorage.js')
 const { payload, seed } = await import('../services/testSupport/fakeSupabase.js')
 const { createSupabaseWizardStorage } = await import('../services/wizardSupabase.js')
-const { DEMO_ADMIN_PASSWORD } = await import('../config.js')
+const { MAGIC_SIGNING_KEY } = await import('../config.js')
 const { button, checkbox, click, dialog, mount, settle, unmountAll } = await import('../services/testSupport/dom.js')
 
 let db, token, wizard
@@ -42,7 +42,7 @@ const choose = (name) => click(checkbox(name))
 
 beforeEach(async () => {
   ;({ db, token } = await seed())
-  wizard = createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD })
+  wizard = createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY })
   db.tables.events[0].status = 'accepting_late'
   await wizard.submitInscription(payload(token, 3, 'T'))
   gate.hold = null
@@ -89,7 +89,7 @@ describe('diálogo de confirmación', () => {
     await unmountAll()
     ;({ db, token } = await seed())
     db.tables.events[0].status = 'accepting_late'
-    wizard = createSupabaseWizardStorage({ client: db, adminPassword: DEMO_ADMIN_PASSWORD })
+    wizard = createSupabaseWizardStorage({ client: db, adminPassword: MAGIC_SIGNING_KEY })
     await wizard.submitInscription(payload(token, 7, 'T'))
     await openDashboard()
     await click(button('Aprobar pendientes (7)'))
