@@ -61,7 +61,7 @@ const eventPayload = (input, status) => ({
   show_on_landing: input.show_on_landing !== false,
   status,
   organizer: input.organizer || 'Alberto Surós',
-  organizer_whatsapp: input.organizer_whatsapp || DEMO_WHATSAPP,
+  organizer_whatsapp: input.organizer_whatsapp || '',
   imported_from: input.imported_from || {},
   opened_at: status === 'active' ? input.opened_at || input.activated_at || new Date().toISOString() : input.opened_at || input.activated_at || null,
   closed_at: input.closed_at || null
