@@ -32,6 +32,16 @@ export const withoutPin = (club) => {
 export const COACH_EVENT_FIELDS = ['name', 'status', 'deadline', 'reference_date', 'events', 'organizer', 'organizer_whatsapp']
 export const coachEvent = (event) => Object.fromEntries(COACH_EVENT_FIELDS.filter((field) => field in (event || {})).map((field) => [field, event[field]]))
 
+// Sin PIN válido solo sale lo básico (evento y club) para mostrar la pantalla del PIN.
+// v1.21.0: lista BLANCA (antes se quitaban campos por nombre): un campo nuevo del acceso
+// completo (roster, borrador…) nunca viaja sin PIN por olvido.
+export const BASIC_ACCESS_FIELDS = ['valid', 'requiresPin', 'backendAvailable', 'eventId', 'event', 'club', 'authorizedEmail', 'whatsapp']
+export const basicAccess = (access) => ({
+  ...Object.fromEntries(BASIC_ACCESS_FIELDS.filter((field) => field in (access || {})).map((field) => [field, access[field]])),
+  requiresPin: true,
+  pinVerified: false
+})
+
 export const inscriptionFromRow = (row, club = null) => ({
   id: row.id,
   eventId: row.event_id,
@@ -202,10 +212,6 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
     if (match && ip) await clearPinRateLimit(db(), ip, key)
     return { match }
   }
-
-  // Sin PIN válido solo sale lo básico (evento y club) para mostrar la pantalla del PIN:
-  // nada de roster ni de si ya envió.
-  const basicAccess = ({ inscription, normal_inscription, already_submitted, ...rest }) => ({ ...rest, requiresPin: true, pinVerified: false })
 
   // v1.17.0: un enlace corto es solo un alias de URL de una fila de `tokens`. Se
   // traduce al token largo ANTES de cualquier lógica (PIN incluido); los largos pasan
