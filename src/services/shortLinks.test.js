@@ -153,13 +153,13 @@ describe('v3 (correo) con su propio corto', () => {
     await expect(validateToken(short)).resolves.toEqual({ valid: false })
   })
 
-  it('reenviar el correo rota su corto (como el largo)', async () => {
+  // v1.20.2: antes reenviar rotaba el corto; ahora lo conserva (resendInvitation.test.js).
+  it('reenviar el correo conserva su corto (y el largo)', async () => {
     await setup()
     const [first] = await generateEmailInvitations('evt-1', [5])
-    await new Promise((resolve) => setTimeout(resolve, 2)) // iat distinto
+    await new Promise((resolve) => setTimeout(resolve, 2)) // un token nuevo tendría otro iat
     const [second] = await generateEmailInvitations('evt-1', [5])
-    expect(second.token).not.toBe(first.token)
-    await expect(validateToken(first.token)).resolves.toEqual({ valid: false })
-    expect((await validateToken(second.token)).valid).toBe(true)
+    expect(second.token).toBe(first.token)
+    expect((await validateToken(first.token)).valid).toBe(true)
   })
 })

@@ -4,7 +4,7 @@ import { buildConsolidatedExport } from '../utils/mmSchema'
 import { lateReviewView, mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { parseMeetManagerConfig } from '../utils/meetManagerImport'
 import { teamIdentity } from '../utils/teamUtils'
-import { createMagicToken } from '../utils/magicToken'
+import { createMagicToken, verifyMagicToken } from '../utils/magicToken'
 import { ensureClubPin, generateClubPin, normalizeClubPin } from '../utils/clubPin'
 import { generateShortId } from '../utils/shortId'
 import { referenceDateFor } from '../utils/referenceDate'
@@ -419,16 +419,28 @@ export async function getTokensForEvent(eventId) {
   return unwrap(await db().from('tokens').select('*').eq('event_id', eventId).eq('token_type', 'v2'))
 }
 
+// v1.20.2: el v3 guardado se reutiliza si el servidor lo seguiría aceptando: firma válida
+// con la clave actual y mismo correo, con la misma comparación que wizardSupabase (fullAccess).
+// Los v3 no vencen: ni verifyMagicToken ni el servidor miran iat.
+async function reusableMagicRow(row, club) {
+  if (!row) return false
+  const magic = await verifyMagicToken(row.token_value, MAGIC_SIGNING_KEY)
+  return Boolean(magic && magic.e === row.event_id && Number(magic.c) === Number(club.code) && String(club.email || '').toLowerCase() === magic.em)
+}
+
 export async function generateEmailInvitations(eventId, clubCodes = null) {
   const event = await getEvent(eventId)
   const selected = clubCodes ? new Set(clubCodes.map(Number)) : null
   const clubs = event.clubs.filter((club) => club.email && club.participation_status !== 'not_participating' && (!selected || selected.has(Number(club.code))))
+  const stored = clubs.length ? unwrap(await db().from('tokens').select('*').eq('event_id', eventId).eq('token_type', 'v3')) : []
+  const storedByClub = new Map(stored.map((row) => [Number(row.club_code), row]))
   const invitations = await Promise.all(
     clubs.map(async (club) => {
+      const current = storedByClub.get(Number(club.code))
+      if (await reusableMagicRow(current, club)) return { club, row: current, reused: true }
       const tokenValue = await createMagicToken({ eventId, clubCode: club.code, email: club.email }, MAGIC_SIGNING_KEY)
       return {
         club,
-        tokenValue,
         row: {
           id: await tokenKey(tokenValue),
           token_value: tokenValue,
@@ -441,11 +453,14 @@ export async function generateEmailInvitations(eventId, clubCodes = null) {
       }
     })
   )
-  // Cada envío crea un v3 nuevo (como hasta ahora) con su propio enlace corto.
-  if (invitations.length) await upsertWithFreshShortIds(invitations.map((item) => item.row))
+  // "Reenviar" manda el mismo enlace (largo y corto): el del correo anterior sigue sirviendo.
+  // Solo se crea un v3 nuevo si no había, si cambió el correo o si la firma ya no valida.
+  const fresh = invitations.filter((item) => !item.reused).map((item) => item.row)
+  if (fresh.length) await upsertWithFreshShortIds(fresh)
+  await ensureShortIds(invitations.filter((item) => item.reused).map((item) => item.row))
   return invitations.map(({ club, row }) => ({
     club,
-    token: row.short_id
+    token: row.short_id || row.token_value
   }))
 }
 
