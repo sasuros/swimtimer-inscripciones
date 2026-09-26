@@ -25,6 +25,21 @@ export const NO_TIME = '00.00'
 // Piso de plausibilidad: más rápido que esto es casi seguro un error de tipeo.
 // Por debajo del récord mundial en todas las pruebas. Ajustable aquí y solo aquí.
 export const SECONDS_PER_25M_FLOOR = 10
+// Techo: más lento que esto por cada 25 m es casi seguro un error (p. ej. dígitos de más).
+// Solo aviso ámbar, no bloquea. Ajustable aquí y solo aquí.
+export const SECONDS_PER_25M_CEILING = 180
+
+// Error de formato del wizard, en el idioma de su instrucción ("escribe solo números").
+// El CSV del modo experto sigue con los textos de validateTime.
+export const WIZARD_FORMAT_ERROR = 'Ese tiempo no se entiende. Escribe solo números: 12530 = 1:25.30 · 3058 = 30.58.'
+
+// Mismas reglas que validateTime; cambia solo el texto de los errores de formato (sin
+// centésimas o fuera de SS.CC / MM:SS.CC). Vacío y segundos ≥ 60 conservan su mensaje.
+export function validateWizardTime(value) {
+  const error = validateTime(value)
+  if (!error || !value) return error
+  return /\.\d$/.test(value) || !TIME_REGEX.test(value) ? WIZARD_FORMAT_ERROR : error
+}
 
 // Entrada del wizard, con teclado de solo dígitos. Invariante: todo lo que formatTimeInput
 // ya deja válido sale IDÉNTICO (separadores, 4 a 6 dígitos, "0000" → "00.00"). Solo se
@@ -44,13 +59,15 @@ export function timeToSeconds(value) {
   return Number(minutes) * 60 + Number(seconds)
 }
 
-// Aviso (no bloquea) si el tiempo es más rápido que el piso para la distancia. El NT no avisa.
+// Aviso (no bloquea) si el tiempo es más rápido que el piso o más lento que el techo para la
+// distancia. El NT no avisa.
 // Si el tiempo salió de 1 a 3 dígitos y agregarle "00" da una lectura válida y plausible,
 // la sugiere: "158" (1.58) → "15800" (1:58.00).
 export function plausibilityWarning(value, distance) {
   const seconds = timeToSeconds(value)
   const meters = Number(distance)
   if (!seconds || !meters) return ''
+  if (seconds > (meters / 25) * SECONDS_PER_25M_CEILING) return `¿Seguro? ${value} es muy lento para ${meters} m. Revisa el tiempo.`
   if (seconds >= (meters / 25) * SECONDS_PER_25M_FLOOR) return ''
   const base = `¿Seguro? ${value} s es muy rápido para ${meters} m.`
   const typed = value.replace(/\D/g, '').replace(/^0+/, '')

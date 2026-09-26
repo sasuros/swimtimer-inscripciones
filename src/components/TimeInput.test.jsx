@@ -37,9 +37,10 @@ describe('TimeInput', () => {
   })
 
   it('sin blur ni intento no hay error aunque el valor sea inválido; con showError sí', () => {
-    expect(render('1:7')).not.toContain('El formato debe ser')
+    expect(render('1:7')).not.toContain('Ese tiempo no se entiende')
     expect(render('1:7')).not.toContain('input-error')
-    expect(render('1:7', true)).toContain('El formato debe ser')
+    expect(render('1:7', true)).toContain('Ese tiempo no se entiende. Escribe solo números: 12530 = 1:25.30 · 3058 = 30.58.')
+    expect(render('1:7', true)).not.toContain('El formato debe ser')
     expect(render('1:7', true)).toContain('input-error')
   })
 

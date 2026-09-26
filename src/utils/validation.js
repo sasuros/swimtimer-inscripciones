@@ -1,5 +1,5 @@
 import { categoryForAge, calculateAge } from './ageCalculator'
-import { formatWizardTime, validateTime } from './timeParser'
+import { formatWizardTime, validateWizardTime } from './timeParser'
 
 export function validateAthlete(form, roster, referenceDate, editingId = null, categories) {
   const errors = {}
@@ -14,7 +14,7 @@ export function validateAthlete(form, roster, referenceDate, editingId = null, c
   if (!form.selectedEvents.length) errors.events = 'Selecciona al menos un evento'
   form.selectedEvents.forEach(index => {
     // v1.19.0: se valida lo que se va a guardar ("12530" aún sin blur ya es 1:25.30).
-    const error = validateTime(formatWizardTime(form.times[index] || ''))
+    const error = validateWizardTime(formatWizardTime(form.times[index] || ''))
     if (error) errors[`time-${index}`] = error
   })
   return errors

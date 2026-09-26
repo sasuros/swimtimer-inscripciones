@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NO_TIME, SECONDS_PER_25M_FLOOR, formatTimeInput, formatWizardTime, plausibilityWarning, timeToSeconds, validateTime } from './timeParser'
+import { NO_TIME, SECONDS_PER_25M_CEILING, SECONDS_PER_25M_FLOOR, WIZARD_FORMAT_ERROR, formatTimeInput, formatWizardTime, plausibilityWarning, timeToSeconds, validateTime, validateWizardTime } from './timeParser'
 import { parseQuickEntry } from './quickEntry'
 
 // v1.19.0 — Tiempos en el móvil.
@@ -125,5 +125,66 @@ describe('advertencia de plausibilidad (avisa, no bloquea)', () => {
     expect(timeToSeconds('30.58')).toBeCloseTo(30.58)
     expect(timeToSeconds('00.00')).toBe(0)
     expect(timeToSeconds('abc')).toBeNull()
+  })
+})
+
+describe('v1.19.0 ajustes — mensaje de formato del wizard (el CSV no cambia)', () => {
+  it('texto exacto', () => {
+    expect(WIZARD_FORMAT_ERROR).toBe('Ese tiempo no se entiende. Escribe solo números: 12530 = 1:25.30 · 3058 = 30.58.')
+  })
+
+  it.each(['1:7', 'abc', '32.5', '1:25.3', '1.2.3', '12:3456.00'])('"%s" → mensaje del wizard', (value) => {
+    expect(validateWizardTime(value)).toBe(WIZARD_FORMAT_ERROR)
+  })
+
+  it('vacío y segundos ≥ 60 conservan su mensaje; lo válido no tiene error', () => {
+    expect(validateWizardTime('')).toBe('Escribe el tiempo de inscripción')
+    expect(validateWizardTime('1:65.30')).toBe('Los segundos deben estar entre 00 y 59')
+    expect(validateWizardTime('1:25.30')).toBe('')
+    expect(validateWizardTime(NO_TIME)).toBe('')
+  })
+
+  it('validateTime (CSV del modo experto) sigue con sus textos', () => {
+    expect(validateTime('1:7')).toBe('El formato debe ser MM:SS.CC o SS.CC — ejemplo: 1:25.30')
+    expect(validateTime('32.5')).toContain('centésimas')
+    const [row] = parseQuickEntry('Perez,Ana,F,10/03/2014,50m Libre,1:7', { referenceDate: '2026-12-31', events: [{ event_ptr: 1, distance: 50, style: 'Libre', age_lo: 11, age_hi: 12, sex: 'F' }] })
+    expect(row.errors.join(' ')).toContain('El formato debe ser')
+    expect(row.errors.join(' ')).not.toContain('Ese tiempo no se entiende')
+  })
+})
+
+describe('v1.19.0 ajustes — techo de plausibilidad (aviso, no bloquea)', () => {
+  it('constante única: 3:00 por cada 25 m', () => {
+    expect(SECONDS_PER_25M_CEILING).toBe(180)
+  })
+
+  it('caso real: 58:08.44 en 25 m → texto exacto', () => {
+    expect(plausibilityWarning('58:08.44', 25)).toBe('¿Seguro? 58:08.44 es muy lento para 25 m. Revisa el tiempo.')
+  })
+
+  it.each([
+    ['3:00.00', 25, false],
+    ['3:00.01', 25, true],
+    ['6:00.00', 50, false],
+    ['6:00.01', 50, true],
+    ['12:00.00', 100, false],
+    ['12:00.01', 100, true],
+    ['24:00.00', 200, false],
+    ['24:00.01', 200, true]
+  ])('%s en %i m → avisa: %s', (value, meters, warns) => {
+    const text = plausibilityWarning(value, meters)
+    expect(text.includes('muy lento')).toBe(warns)
+    if (warns) expect(text).toBe(`¿Seguro? ${value} es muy lento para ${meters} m. Revisa el tiempo.`)
+  })
+
+  it('el NT no lo dispara; un tiempo normal tampoco; el piso sigue igual', () => {
+    expect(plausibilityWarning(NO_TIME, 25)).toBe('')
+    expect(plausibilityWarning('32.50', 50)).toBe('')
+    expect(plausibilityWarning('1:25.30', 100)).toBe('')
+    expect(plausibilityWarning('5.00', 50)).toContain('muy rápido')
+  })
+
+  it('es aviso: el tiempo sigue siendo válido (no bloquea)', () => {
+    expect(validateWizardTime('58:08.44')).toBe('')
   })
 })

@@ -1,17 +1,32 @@
 import ErrorMessage from './ErrorMessage'
-import { NO_TIME, formatWizardTime, plausibilityWarning, validateTime } from '../utils/timeParser'
+import { NO_TIME, formatWizardTime, plausibilityWarning, validateTime, validateWizardTime } from '../utils/timeParser'
 
 // v1.19.0: teclado de solo dígitos en el móvil (inputMode numeric, SIN pattern: en la PC
 // "1:25.30" tiene que seguir entrando sin que el navegador lo frene). Mientras se escribe
 // no se reformatea el campo (en iOS mueve el cursor): la ayuda es la vista previa. Al
 // salir del campo se formatea y recién ahí se muestra el error (showError lo decide el
 // formulario: blur de este campo o intento de inscribir).
+// Al tocar el campo se selecciona todo: lo que se escriba REEMPLAZA el valor (caso real:
+// sobre "58:08.44" se tipearon dígitos y quedó "58:08.4480584"). En iOS select() en el focus
+// es inestable (el toque que sigue deshace la selección): setSelectionRange diferido.
+export function selectAllOnFocus(event) {
+  const input = event.target
+  setTimeout(() => {
+    if (document.activeElement !== input) return
+    try {
+      input.setSelectionRange(0, input.value.length)
+    } catch {
+      input.select?.()
+    }
+  }, 0)
+}
+
 export default function TimeInput({ event, value, onChange, onBlur, showError }) {
   const id = `time-${event.eventIndex}`
   const raw = value || ''
   const saved = formatWizardTime(raw)
   const valid = raw !== '' && !validateTime(saved)
-  const error = showError ? validateTime(saved) : ''
+  const error = showError ? validateWizardTime(saved) : ''
   const warning = valid ? plausibilityWarning(saved, event.distance) : ''
   return (
     <div>
@@ -22,6 +37,7 @@ export default function TimeInput({ event, value, onChange, onBlur, showError })
           className={`input flex-1 font-mono ${error ? 'input-error' : valid && !warning ? 'border-success-800' : ''}`}
           value={raw}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={selectAllOnFocus}
           onBlur={(e) => {
             onChange(formatWizardTime(e.target.value))
             onBlur?.()
