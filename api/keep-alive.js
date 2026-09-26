@@ -1,3 +1,21 @@
+import { createClient } from '@supabase/supabase-js'
+import { purgeStaleDrafts } from '../src/services/draftPurge.js'
+
+// v1.21.0: además purga los borradores viejos. Aislado: si la purga falla (o falta la
+// service role), keep-alive responde igual que siempre.
+async function purgeDrafts() {
+  try {
+    const supabaseUrl = (process.env.VITE_SUPABASE_URL || '').trim()
+    const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
+    if (!supabaseUrl || !serviceRoleKey) return 'skipped'
+    await purgeStaleDrafts(createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } }))
+    return 'ok'
+  } catch (error) {
+    console.warn('[keep-alive] purga de borradores:', error?.message || error)
+    return 'failed'
+  }
+}
+
 export default async function handler(req, res) {
   try {
     const supabaseUrl = (process.env.VITE_SUPABASE_URL || '').trim()
@@ -20,6 +38,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       alive: response.ok,
+      drafts_purge: await purgeDrafts(),
       timestamp: new Date().toISOString()
     })
   } catch (error) {

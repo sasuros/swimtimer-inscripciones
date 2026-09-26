@@ -539,8 +539,32 @@ export async function getClubInscriptions(eventId, clubCode) {
   return { regular: regular ? inscriptionFromRow(regular) : null, late: late ? inscriptionFromRow(late) : null }
 }
 
+// v1.21.0 — Borradores del evento para el tablero: SOLO existencia, fecha y cantidad (las
+// columnas que la base deja leer al admin). Nunca el roster. Sin la tabla: ninguno.
+const DRAFT_ADMIN_COLUMNS = 'club_code,is_late,athlete_count,updated_at'
+export async function getDraftSummaries(eventId) {
+  try {
+    const result = await db().from('inscription_drafts').select(DRAFT_ADMIN_COLUMNS).eq('event_id', eventId)
+    if (result.error) throw result.error
+    return (result.data || []).map((row) => ({ club_code: Number(row.club_code), is_late: Boolean(row.is_late), athlete_count: Number(row.athlete_count) || 0, updated_at: row.updated_at }))
+  } catch (error) {
+    console.warn('[borrador] no se pudieron leer los borradores:', error?.message || error)
+    return []
+  }
+}
+
+// Purga de los borradores de un evento (al archivarlo). Best-effort: nunca frena la acción.
+async function purgeEventDrafts(eventId) {
+  try {
+    const result = await db().from('inscription_drafts').delete().eq('event_id', eventId)
+    if (result.error) throw result.error
+  } catch (error) {
+    console.warn('[borrador] no se pudo purgar al archivar:', error?.message || error)
+  }
+}
+
 export async function getDashboard(eventId) {
-  const [event, tokens, rows] = await Promise.all([getEvent(eventId), getTokensForEvent(eventId), getInscriptionsForEvent(eventId)])
+  const [event, tokens, rows, drafts] = await Promise.all([getEvent(eventId), getTokensForEvent(eventId), getInscriptionsForEvent(eventId), getDraftSummaries(eventId)])
   await ensureShortIds(tokens)
   const latestNormal = new Map()
   rows.filter((row) => !row.is_late).forEach((row) => latestNormal.set(Number(row.club_code), row))
@@ -552,9 +576,14 @@ export async function getDashboard(eventId) {
     const token = tokenByClub.get(Number(club.code))
     const excluded = club.participation_status === 'not_participating'
     const view = mergeClubInscriptions(inscription, latestLate.get(Number(club.code)))
+    // Un borrador nunca cuenta como recibido ni suma nadadores: solo cambia 'sent'/'missing'
+    // por 'draft' (sigue pendiente) y agrega la línea "Borrador sin enviar".
+    const clubDrafts = excluded ? [] : drafts.filter((draft) => draft.club_code === Number(club.code))
+    const latestDraft = clubDrafts.reduce((latest, draft) => (!latest || draft.updated_at > latest.updated_at ? draft : latest), null)
     return {
       ...club,
-      status: excluded ? 'not_participating' : inscription ? 'received' : token ? 'sent' : 'missing',
+      status: excluded ? 'not_participating' : inscription ? 'received' : clubDrafts.some((draft) => !draft.is_late) ? 'draft' : token ? 'sent' : 'missing',
+      draft: latestDraft ? { athlete_count: latestDraft.athlete_count, updated_at: latestDraft.updated_at, is_late: latestDraft.is_late } : null,
       athlete_count: excluded ? 0 : view.athleteCount,
       inscription_count: excluded ? 0 : view.resultCount,
       late_approved_count: excluded ? 0 : view.lateApprovedCount,
@@ -667,6 +696,7 @@ export async function updateEventStatus(id, status, { via = 'dashboard' } = {}) 
   try {
     unwrap(await db().from('events').update(updates).eq('id', id))
     if (status === 'active') await generateTokens(id)
+    if (status === 'archived') await purgeEventDrafts(id)
   } catch (error) {
     await logAdminAction(client, { ...entry, outcome: 'failure' })
     throw error

@@ -311,7 +311,7 @@ function LiveResultsSettings({ event, onSaved }) {
   return <section className="card p-4 sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-extrabold uppercase tracking-[.18em] text-brand-fg">Publicación</p><h2 className="mt-1 text-xl font-extrabold">Resultados en vivo</h2></div><span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider text-white ${isLive === 'live' ? 'live-badge' : isLive === 'upcoming' ? 'bg-info-solid' : 'bg-slate-500'}`}>{isLive === 'live' && <span className="live-dot" />}{stateLabel}</span></div><div className="mt-5 grid gap-5 lg:grid-cols-[1fr_18rem]"><label><span className="label">Link de Google Drive *</span><input type="url" className="input" value={driveUrl} onChange={e => setDriveUrl(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." /><span className="field-help">La carpeta donde subes los HTML de resultados de Hy-Tek</span></label><label><span className="label">Estado público</span><select className="input" value={isLive} onChange={e => setIsLive(e.target.value)}><option value="upcoming">PRÓXIMAMENTE</option><option value="live">EN VIVO</option><option value="finished">FINALIZADO</option></select><span className="field-help">Controla el badge que se muestra en la landing pública</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center"><button className="btn-primary" disabled={saving} onClick={save}>{saving ? 'Guardando…' : 'Guardar cambios'}</button><a className="btn-secondary text-center" href="/" target="_blank" rel="noreferrer">Abrir landing pública</a><button className="btn-secondary inline-flex items-center justify-center gap-2" disabled={generatingQr} onClick={downloadQr}><QrCode className="size-4" />{generatingQr ? 'Generando QR…' : 'Descargar QR'}</button><span className={`text-sm font-semibold ${message === 'Cambios guardados' ? 'text-success-fg' : 'text-danger-fg'}`}>{message}</span></div><p className="mt-3 text-xs text-ink-muted">Vista previa: swimtimer-oficial.vercel.app</p></section>
 }
 
-function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEmail, onRevoke, onToggle, onRegeneratePin, onRegenerateToken }) {
+export function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEmail, onRevoke, onToggle, onRegeneratePin, onRegenerateToken }) {
   const inactive = club.status === 'not_participating'
   if (inactive)
     return (
@@ -355,6 +355,7 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
           )}
         </p>
         <EmailStatus club={club} />
+        <DraftStatus draft={club.draft} />
         <p className="mt-2">
           {club.athlete_count || '—'} nadadores · {club.inscription_count || '—'} inscripciones{club.submitted_at ? ` · Envío: ${new Date(club.submitted_at).toLocaleString('es-VE')}` : ''}
         </p>
@@ -412,6 +413,12 @@ function Timestamp({ label, value }) {
     </div>
   )
 }
+// v1.21.0: el admin ve que existe un borrador, cuándo y cuántos nadadores. Nunca el contenido.
+export function DraftStatus({ draft }) {
+  if (!draft) return null
+  const count = `${draft.athlete_count} ${draft.athlete_count === 1 ? 'nadador' : 'nadadores'}`
+  return <p className="mt-1 text-xs text-ink-subtle">📝 {draft.is_late ? 'Borrador de tardía sin enviar' : 'Borrador sin enviar'} · {count} · {new Date(draft.updated_at).toLocaleString('es-VE')}</p>
+}
 function EmailStatus({ club }) {
   if (club.invitation_error) return <p className="mt-1 text-xs text-danger-fg">📧 Error: {club.invitation_error}</p>
   if (club.invitation_sent_at) return <p className="mt-1 text-xs text-success-fg">📧 Invitación enviada · {new Date(club.invitation_sent_at).toLocaleString('es-VE')}</p>
@@ -427,10 +434,11 @@ function StatusBadge({ status }) {
   }
   return <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${status === 'active' ? 'bg-success-solid text-white' : status === 'accepting_late' ? 'bg-warning-solid text-white' : 'bg-surface-strong text-ink'}`}>{labels[status] || status}</span>
 }
-function ClubStatus({ status }) {
+export function ClubStatus({ status }) {
   const map = {
     received: ['bg-success-solid text-white', '● Recibida'],
     sent: ['bg-warning-bg text-warning-fg', '● Con enlace'],
+    draft: ['bg-surface-alt text-ink-strong', '● En borrador'],
     missing: ['bg-danger-bg text-danger-fg', '● Sin enlace'],
     not_participating: ['bg-surface-strong text-ink', '● No participa']
   }
