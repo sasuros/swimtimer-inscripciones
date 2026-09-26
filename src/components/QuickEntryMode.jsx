@@ -9,14 +9,24 @@ const EXAMPLES = [
   ['Torres', 'Ana', 'F', '10/08/2015', '25m Pecho', '28.90']
 ]
 const HEADERS = ['Apellido', 'Nombre', 'Sexo', 'Fecha Nac.', 'Evento', 'Tiempo']
+// v1.20.0: lo que acepta el CSV tolerante (quickEntry.js).
 const NOTES = [
   'Si un nadador tiene varios eventos, repítelo en varias filas (una fila por cada evento)',
-  'El sexo puede ser F o M',
-  'La fecha puede ser DD/MM/AAAA o AAAA-MM-DD',
-  'El tiempo puede ser SS.CC o MM:SS.CC (centésimas obligatorias)',
-  'Los nombres de eventos deben coincidir con los del evento: 25m Crawl, 50m Espalda, 25m Pecho, etc.',
-  'Puedes copiar desde Excel o Google Sheets y pegar directamente'
+  'Sexo: F o M (también sirve Femenino, Mujer, Masculino, Hombre o H)',
+  'Fecha de nacimiento: día/mes/año, por ejemplo 05/03/2017 o 5-3-2017 (también AAAA-MM-DD)',
+  'Tiempo: SS.CC o MM:SS.CC con centésimas, con punto o coma (32.56 o 32,56). Si no tiene tiempo, escribe NT',
+  'Evento: distancia y estilo, por ejemplo 25m Crawl, 25 Libre o 50 mts Espalda. Descarga la lista de eventos para ver los de este torneo',
+  'Con encabezado (Apellido, Nombre, Sexo, Fecha Nac., Evento, Tiempo) las columnas pueden ir en cualquier orden',
+  'Puedes copiar desde Excel o Google Sheets y pegar aquí, o guardar desde Excel como CSV'
 ]
+
+// v1.20.0: un .xlsx no se lee todavía (después del evento). Mientras, qué hacer.
+export const EXCEL_FILE_TEXT = 'Ese archivo es de Excel. Guárdalo como CSV (Archivo → Guardar como → "CSV UTF-8 (delimitado por comas)") y cárgalo aquí.'
+export function fileProblem(name = '') {
+  if (/\.(xlsx|xlsm|xls|ods|numbers)$/i.test(name)) return EXCEL_FILE_TEXT
+  if (!/\.(csv|txt|tsv)$/i.test(name)) return 'Elige un archivo .csv, .txt o .tsv'
+  return ''
+}
 
 export default function QuickEntryMode({ referenceDate, eventConfig, club, roster, onImport }) {
   const [text, setText] = useState('')
@@ -31,7 +41,8 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
 
   const loadFile = file => {
     if (!file) return
-    if (!/\.(csv|txt|tsv)$/i.test(file.name)) { setFileInfo({ error: 'Elige un archivo .csv, .txt o .tsv' }); return }
+    const problem = fileProblem(file.name)
+    if (problem) { setFileInfo({ error: problem }); return }
     const reader = new FileReader()
     reader.onload = () => {
       const content = decodeCsvBytes(reader.result)
@@ -75,8 +86,8 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
     <div className={`mt-6 cursor-pointer rounded-xl border-2 border-dashed p-5 text-center transition ${dragging ? 'border-brand-600 bg-brand-50' : 'border-slate-300 bg-slate-50'}`} onClick={() => fileInput.current?.click()} onDragEnter={event => { event.preventDefault(); setDragging(true) }} onDragOver={event => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); loadFile(event.dataTransfer.files[0]) }}>
       <Upload className="mx-auto size-8 text-brand-600" />
       <p className="mt-2 font-bold text-brand-800">Arrastra tu archivo CSV aquí o haz click para seleccionar</p>
-      <p className="mt-1 text-sm text-slate-500">Archivos permitidos: .csv, .txt y .tsv</p>
-      <input ref={fileInput} className="hidden" type="file" accept=".csv,.txt,.tsv,text/csv,text/plain,text/tab-separated-values" onChange={event => { loadFile(event.target.files?.[0]); event.target.value = '' }} />
+      <p className="mt-1 text-sm text-slate-500">Archivos permitidos: .csv, .txt y .tsv. Si tienes un Excel (.xlsx), guárdalo antes como CSV.</p>
+      <input ref={fileInput} className="hidden" type="file" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv,text/plain,text/tab-separated-values" onChange={event => { loadFile(event.target.files?.[0]); event.target.value = '' }} />
       <button type="button" className="btn-secondary mt-3 inline-flex items-center gap-2" onClick={event => { event.stopPropagation(); fileInput.current?.click() }}><Upload className="size-4" />Cargar archivo CSV</button>
     </div>
     {fileInfo && <p className={`mt-2 text-sm font-semibold ${fileInfo.error ? 'text-danger-700' : 'text-[#059669]'}`}>{fileInfo.error || `Archivo cargado: ${fileInfo.name} (${fileInfo.count} ${fileInfo.count === 1 ? 'fila detectada' : 'filas detectadas'})`}</p>}
