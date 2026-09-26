@@ -25,10 +25,12 @@ export const withoutPin = (club) => {
   return safe
 }
 
-export const withoutPins = (event) => ({
-  ...event,
-  clubs: (event.clubs || []).map(withoutPin)
-})
+// v1.20.1: lista blanca del evento que viaja al entrenador. Solo lo que el wizard lee:
+// name (Header, PIN, planilla, JSON), status (pantallas y tardías), deadline (banner),
+// reference_date y events (edad y pruebas), organizer y organizer_whatsapp (contacto).
+// Nunca clubs (contactos de los demás clubes) ni columnas internas (notes, imported_from…).
+export const COACH_EVENT_FIELDS = ['name', 'status', 'deadline', 'reference_date', 'events', 'organizer', 'organizer_whatsapp']
+export const coachEvent = (event) => Object.fromEntries(COACH_EVENT_FIELDS.filter((field) => field in (event || {})).map((field) => [field, event[field]]))
 
 export const inscriptionFromRow = (row, club = null) => ({
   id: row.id,
@@ -133,7 +135,7 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
         requiresPin: true,
         backendAvailable: true,
         eventId: event.id,
-        event: { ...withoutPins(event), date: event.date_start },
+        event: coachEvent(event),
         club: withoutPin(club),
         authorizedEmail: magic.em,
         whatsapp: event.organizer_whatsapp || whatsapp,
@@ -170,7 +172,7 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
       requiresPin: true,
       backendAvailable: true,
       eventId: event.id,
-      event: { ...withoutPins(event), date: event.date_start },
+      event: coachEvent(event),
       club: withoutPin(club),
       whatsapp: event.organizer_whatsapp || whatsapp,
       already_submitted: Boolean(current),
