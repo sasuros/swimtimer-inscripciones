@@ -410,7 +410,8 @@ export async function regenerateClubToken(eventId, clubCode) {
   const event = await getEvent(eventId)
   const club = event.clubs.find((item) => Number(item.code) === Number(clubCode))
   const row = await buildTokenRow(event, club)
-  // "Crear enlace nuevo": rota también el enlace corto (el anterior deja de funcionar).
+  // "Crear enlace nuevo": rota el v2 y su corto (el anterior deja de funcionar).
+  // El v3 del correo no se toca: se rota con "Revocar acceso" + "Enviar invitación".
   await upsertWithFreshShortIds([row])
   return { success: true, token: row.short_id }
 }

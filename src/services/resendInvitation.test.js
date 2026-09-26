@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { __setSupabaseClient, generateEmailInvitations, generateTokens, regenerateClubToken, revokeMagicInvitation, submitInscription, validateToken } from './supabaseStorage'
 import { payload, seed } from './testSupport/fakeSupabase'
 import { tokenKey } from './wizardSupabase.js'
 import { createMagicToken } from '../utils/magicToken'
 import { isShortId } from '../utils/shortId'
+import { NEW_LINK_CONFIRM, NEW_LINK_HELP, RESEND_HELP } from '../utils/messageTemplates'
 import { MAGIC_SIGNING_KEY } from '../config'
 
 afterEach(() => {
@@ -128,5 +130,38 @@ describe('cuándo sí se crea un enlace nuevo del correo', () => {
     expect(v3Row(db).token_value).not.toBe(before.token_value)
     expect(await isValid(first.token)).toBe(false)
     expect(await isValid(second.token)).toBe(true)
+  })
+})
+
+describe('"Crear enlace nuevo" solo rota el enlace de WhatsApp y Copiar', () => {
+  // El v2 largo es determinista (encodeDemoToken no lleva iat ni nonce): hoy solo rota el
+  // corto. Pendiente fuera de v1.20.2; este test no fija el comportamiento del largo.
+  it('rota el corto del v2 y deja el v3 del correo intacto y válido', async () => {
+    const { db } = await seed()
+    await generateTokens('evt-1')
+    const [invitation] = await generateEmailInvitations('evt-1', [5])
+    const v2Before = snapshot(v2Row(db))
+    const v3Before = snapshot(v3Row(db))
+
+    const { token: rotated } = await regenerateClubToken('evt-1', 5)
+    expect(rotated).toBe(v2Row(db).short_id)
+    expect(rotated).not.toBe(v2Before.short_id)
+    await expect(validateToken(v2Before.short_id)).resolves.toEqual({ valid: false })
+    expect(await isValid(rotated)).toBe(true)
+
+    expect(snapshot(v3Row(db))).toEqual(v3Before)
+    expect(await isValid(invitation.token)).toBe(true)
+  })
+})
+
+describe('textos de ayuda de los botones del tablero', () => {
+  it('Reenviar y Crear enlace nuevo dicen qué enlace cambia', () => {
+    expect(RESEND_HELP).toBe('Reenvía el mismo enlace. El del correo anterior sigue funcionando.')
+    expect(NEW_LINK_HELP).toBe('Cambia el enlace de WhatsApp y Copiar. No cambia el del correo.')
+    expect(NEW_LINK_CONFIRM).toContain('El enlace del correo no cambia.')
+    const source = readFileSync(new URL('../pages/AdminDashboard.jsx', import.meta.url), 'utf8')
+    expect(source).toContain('title={club.invitation_sent_at ? RESEND_HELP : undefined}')
+    expect(source).toContain('title={NEW_LINK_HELP}')
+    expect(source).toContain('window.confirm(NEW_LINK_CONFIRM)')
   })
 })

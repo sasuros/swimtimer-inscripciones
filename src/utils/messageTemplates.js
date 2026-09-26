@@ -16,6 +16,12 @@ export function emailInvitation(event, url, pin) {
   return { subject, body }
 }
 
+// v1.20.2: ayuda de los botones del tablero. Reenviar no rota el enlace del correo;
+// "Crear enlace nuevo" solo rota el de WhatsApp y Copiar (v2).
+export const RESEND_HELP = 'Reenvía el mismo enlace. El del correo anterior sigue funcionando.'
+export const NEW_LINK_HELP = 'Cambia el enlace de WhatsApp y Copiar. No cambia el del correo.'
+export const NEW_LINK_CONFIRM = 'Esto crea un enlace nuevo de WhatsApp y Copiar para este club. El anterior dejará de servir. El enlace del correo no cambia. ¿Continuar?'
+
 // Línea de un club: "Club: URL · PIN: 1234". La usan "Copiar enlace" y "Copiar todos".
 export function clubLinkText(club, url) {
   return `${club.name}: ${url}${club.pin ? ` · PIN: ${club.pin}` : ''}`

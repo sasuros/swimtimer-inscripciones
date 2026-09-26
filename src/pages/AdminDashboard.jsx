@@ -13,7 +13,7 @@ import { downloadJson } from '../utils/download'
 import { downloadEventQr } from '../utils/eventQr'
 import { buildClubFileExport } from '../utils/mmSchema'
 import { mergeClubInscriptions } from '../utils/clubInscriptionView'
-import { clubLinkText } from '../utils/messageTemplates'
+import { NEW_LINK_CONFIRM, NEW_LINK_HELP, RESEND_HELP, clubLinkText } from '../utils/messageTemplates'
 import { deleteEvent, exportAll, generateEmailInvitations, generateTokens, getClubInscriptions, getDashboard, recordInvitationResults, regenerateClubToken, reviewLate, revokeMagicInvitation, sendInvitationEmails, setClubParticipation, updateEventStatus, updateClubPin, updateLandingSettings } from '../services/api'
 import { DEMO_MODE } from '../config'
 import { pendingAthletes } from '../services/lateDecision'
@@ -116,7 +116,7 @@ export default function AdminDashboard({ eventId }) {
     await load()
   }
   const regenerateToken = async (club) => {
-    if (!window.confirm('Esto crea un enlace nuevo para este club. El enlace anterior que tenía dejará de servir. ¿Continuar?')) return
+    if (!window.confirm(NEW_LINK_CONFIRM)) return
     await regenerateClubToken(eventId, club.code)
     await load()
   }
@@ -373,7 +373,7 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
           </>
         )}
         {club.email && (
-          <button className="btn-secondary inline-flex items-center justify-center gap-1 text-xs" disabled={emailing} onClick={() => onEmail(club)}>
+          <button className="btn-secondary inline-flex items-center justify-center gap-1 text-xs" disabled={emailing} title={club.invitation_sent_at ? RESEND_HELP : undefined} onClick={() => onEmail(club)}>
             <Mail className="size-3" />
             {club.invitation_sent_at ? 'Reenviar invitación' : 'Enviar invitación'}
           </button>
@@ -384,7 +384,7 @@ function ClubLinkCard({ club, eventId, emailing, url, onCopy, onOpenDetail, onEm
           </button>
         )}
         {url && (
-          <button className="inline-flex items-center justify-center gap-1 text-xs font-semibold text-ink-muted hover:underline" title="Crea un enlace nuevo para este club; el anterior deja de funcionar" onClick={() => onRegenerateToken(club)}>
+          <button className="inline-flex items-center justify-center gap-1 text-xs font-semibold text-ink-muted hover:underline" title={NEW_LINK_HELP} onClick={() => onRegenerateToken(club)}>
             <RefreshCw className="size-3" />
             Crear enlace nuevo
           </button>
