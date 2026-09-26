@@ -51,6 +51,11 @@
   .field-help { @apply mt-1 block text-xs font-medium; color: rgb(var(--help)); }
   .step-number { @apply inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white; background: #047857; }
   .input { @apply w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-ink outline-none transition focus:border-brand-fg focus:ring-2 focus:ring-brand-bg; color-scheme: light; }
+  /* v1.19.0: en iOS Safari el <input type="date"> nativo tiene un ancho mínimo propio y se salía
+     del borde de la tarjeta. Mismo ancho que los demás campos; min-height = alto de .input
+     (sin appearance, iOS lo colapsa cuando está vacío). */
+  .input-date { min-width: 0; max-width: 100%; box-sizing: border-box; display: block; -webkit-appearance: none; appearance: none; min-height: 2.875rem; }
+  .input-date::-webkit-date-and-time-value { text-align: left; }
   .input-error { @apply border-danger-fg bg-danger-bg pr-10 focus:border-danger-fg focus:ring-danger-bg; }
   .btn-primary { @apply rounded-lg bg-brand-600 px-4 py-2.5 font-bold uppercase text-white transition disabled:cursor-not-allowed disabled:bg-slate-400; letter-spacing: .5px; }
   .btn-primary:hover:not(:disabled) { background: #065f46; }
