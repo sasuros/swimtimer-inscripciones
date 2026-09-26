@@ -18,17 +18,14 @@ import PinVerification from '../components/PinVerification'
 import { deriveRosterView } from '../utils/wizardRosterView'
 import { lateReviewView } from '../utils/clubInscriptionView'
 import { hasLateDecision } from '../services/lateDecision'
-import { CONFLICT_TEXT, DRAFT_CONFLICT_TEXT, DRAFT_SAVED_LOCAL_TEXT, DRAFT_SAVED_ONLINE_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
-import { AlreadySubmittedNotice, ConflictPanel, LateRegularNotice } from '../components/WizardNotices'
+import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
+import { AlreadySubmittedNotice, ConflictPanel, DraftStatusNotice, LateRegularNotice } from '../components/WizardNotices'
 import { isRegistrationOpen } from '../utils/registrationStatus'
 import { DEMO_MODE } from '../config'
 
 // v1.16.0: el PIN se guarda solo en esta pestaña (sessionStorage) y viaja en cada
 // validación, en el envío y (v1.21.0) en el guardado del borrador; el servidor lo verifica
 // siempre. Nunca va a localStorage ni dentro del borrador.
-
-// v1.21.0: indicador chico del borrador. Nunca es un error.
-export const DRAFT_STATUS_TEXT = { local: DRAFT_SAVED_LOCAL_TEXT, online: DRAFT_SAVED_ONLINE_TEXT, conflict: DRAFT_CONFLICT_TEXT }
 const pinKey = (token) => `swimtimer-pin:${token}`
 const readPin = (token) => {
   try {
@@ -175,11 +172,7 @@ function WizardContent({ token, pin, access }) {
         ) : (
           <>
             <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
-            {draft.status && (
-              <p role="status" className="text-xs text-slate-500" data-draft-status={draft.status}>
-                {DRAFT_STATUS_TEXT[draft.status]}
-              </p>
-            )}
+            <DraftStatusNotice status={draft.status} />
             {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
             {entryMethod && (
               <button type="button" className="text-sm font-bold text-brand-700 hover:underline" onClick={changeMethod}>

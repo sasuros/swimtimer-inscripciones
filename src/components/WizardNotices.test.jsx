@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { AlreadySubmittedNotice, ConflictPanel, LateRegularNotice, revealOnMount } from './WizardNotices'
+import { readFileSync } from 'node:fs'
+import { AlreadySubmittedNotice, ConflictPanel, DraftStatusNotice, LateRegularNotice, revealOnMount } from './WizardNotices'
 import { revealAlert } from '../utils/revealAlert'
-import { CONFLICT_TEXT, LATE_DECIDED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
+import { CONFLICT_TEXT, DRAFT_CONFLICT_NOTICE_TEXT, DRAFT_SAVED_LOCAL_TEXT, DRAFT_SAVED_ONLINE_TEXT, LATE_DECIDED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
 
 const element = () => ({ scrollIntoView: vi.fn(), focus: vi.fn() })
 const win = (reduce) => ({ matchMedia: () => ({ matches: reduce }) })
@@ -94,5 +95,32 @@ describe('tardías: aviso de la inscripción regular frente al panel de conflict
     expect(render({ lockedCount: 1 })).toContain('con 1 nadador.')
     expect(render({ isLate: false })).toBe('')
     expect(render({ lockedCount: 0 })).toBe('')
+  })
+})
+
+// v1.21.0: el choque de borradores pasaba desapercibido como texto gris chico.
+describe('estado del borrador', () => {
+  const AMBER = 'rounded-xl bg-warning-50 p-4 text-sm text-warning-800'
+
+  it('choque con otro dispositivo: aviso ámbar visible con el mismo estilo que los avisos del wizard', () => {
+    const html = renderToStaticMarkup(<DraftStatusNotice status="conflict" />)
+    expect(DRAFT_CONFLICT_NOTICE_TEXT).toBe('Otro dispositivo guardó cambios más nuevos. Recarga la página para verlos antes de seguir; lo que agregaste aquí sigue guardado en este dispositivo.')
+    expect(html).toContain(DRAFT_CONFLICT_NOTICE_TEXT)
+    expect(html).toContain('role="alert"')
+    expect(html).toContain(`class="${AMBER}"`)
+    expect(html).not.toContain('text-xs')
+    // Mismas clases que el aviso "Alguien actualizó…" que ya existía en el wizard.
+    expect(readFileSync(new URL('../pages/InscriptionWizard.jsx', import.meta.url), 'utf8')).toContain(`className="${AMBER}">{ROSTER_REPLACED_TEXT}`)
+  })
+
+  it('los estados normales siguen discretos', () => {
+    for (const [status, text] of [['local', DRAFT_SAVED_LOCAL_TEXT], ['online', DRAFT_SAVED_ONLINE_TEXT]]) {
+      const html = renderToStaticMarkup(<DraftStatusNotice status={status} />)
+      expect(html).toContain(text)
+      expect(html).toContain('role="status"')
+      expect(html).toContain('class="text-xs text-slate-500"')
+      expect(html).not.toContain('bg-warning-50')
+    }
+    expect(renderToStaticMarkup(<DraftStatusNotice status={null} />)).toBe('')
   })
 })

@@ -1,4 +1,5 @@
 import { revealAlert } from '../utils/revealAlert'
+import { DRAFT_CONFLICT_NOTICE_TEXT, DRAFT_SAVED_LOCAL_TEXT, DRAFT_SAVED_ONLINE_TEXT } from '../services/concurrency'
 
 // Referencia estable: React la llama al montar el panel (y con null al desmontarlo). Cada
 // conflicto nuevo remonta el panel (key), así que cada uno vuelve a hacer scroll y foco.
@@ -17,6 +18,25 @@ export function ConflictPanel({ conflict, onReload }) {
         </button>
       )}
     </div>
+  )
+}
+
+// v1.21.0: estado del borrador. Los normales son discretos (texto gris chico); el choque con
+// otro dispositivo es un aviso ámbar, con el mismo estilo que los avisos del wizard.
+export function DraftStatusNotice({ status }) {
+  if (status === 'conflict') {
+    return (
+      <div role="alert" data-draft-status="conflict" className="rounded-xl bg-warning-50 p-4 text-sm text-warning-800">
+        {DRAFT_CONFLICT_NOTICE_TEXT}
+      </div>
+    )
+  }
+  const text = { local: DRAFT_SAVED_LOCAL_TEXT, online: DRAFT_SAVED_ONLINE_TEXT }[status]
+  if (!text) return null
+  return (
+    <p role="status" className="text-xs text-slate-500" data-draft-status={status}>
+      {text}
+    </p>
   )
 }
 

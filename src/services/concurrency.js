@@ -44,4 +44,7 @@ export const sameRoster = (a, b) => stable(a || []) === stable(b || [])
 export const DRAFT_SAVED_LOCAL_TEXT = 'Guardado en este dispositivo'
 export const DRAFT_SAVED_ONLINE_TEXT = 'Guardado en línea'
 export const DRAFT_CONFLICT_TEXT = 'Guardado en este dispositivo · hay cambios más nuevos en otro dispositivo'
+// Aviso ámbar visible (no el texto gris): en la prueba real el choque pasaba desapercibido.
+export const DRAFT_CONFLICT_NOTICE_TEXT =
+  'Otro dispositivo guardó cambios más nuevos. Recarga la página para verlos antes de seguir; lo que agregaste aquí sigue guardado en este dispositivo.'
 export const DRAFT_STALE_TEXT = 'La inscripción de tu club cambió; este borrador se basa en una versión anterior.'
