@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, useState } from 'react'
 import TimeInput from './TimeInput'
 import { validateAthlete } from '../utils/validation'
@@ -17,13 +17,21 @@ const input = () => document.getElementById('time-3')
 afterEach(unmountAll)
 
 describe('al tocar el campo se selecciona todo (lo que se escriba reemplaza)', () => {
+  // v1.19.1: act() async de React 18 se resuelve con un setImmediate real; con la máquina cargada
+  // el setTimeout(0) del diferido corría antes y "todavía no" fallaba (1 de cada ~4 corridas en
+  // paralelo). Con setTimeout falso, el diferido corre solo cuando el test lo pide.
   it('focus → selección 0..largo, diferida (no en el mismo tick)', async () => {
     await mount(<Harness initial="58:08.44" />)
     input().setSelectionRange(8, 8)
-    await act(async () => input().focus())
-    expect([input().selectionStart, input().selectionEnd]).toEqual([8, 8]) // todavía no: es diferida
-    await settle()
-    expect([input().selectionStart, input().selectionEnd]).toEqual([0, 8])
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      await act(async () => input().focus())
+      expect([input().selectionStart, input().selectionEnd]).toEqual([8, 8]) // todavía no: es diferida
+      await act(async () => vi.runOnlyPendingTimers())
+      expect([input().selectionStart, input().selectionEnd]).toEqual([0, 8])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('con todo seleccionado, lo tipeado reemplaza: "58:08.44" + "12530" → "12530" (no "58:08.4412530")', async () => {
