@@ -8,7 +8,7 @@ import { hasLateDecision } from './lateDecision.js'
 import { CONFLICT_TEXT, ConflictError, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, sameRoster } from './concurrency.js'
 import { isRegistrationOpen, notOpenText } from '../utils/registrationStatus.js'
 
-const DEFAULT_WHATSAPP = '584120000000'
+const DEFAULT_WHATSAPP = ''
 
 export const unwrap = (result, message = 'No se pudo completar la operación') => {
   if (result.error) throw new Error(result.error.message || message)

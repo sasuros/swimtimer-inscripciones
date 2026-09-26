@@ -16,7 +16,7 @@ function createServerWizardStorage(client) {
   return createSupabaseWizardStorage({
     client,
     adminPassword: process.env.VITE_ADMIN_PASSWORD || 'swimtimer2025',
-    whatsapp: process.env.VITE_ALBERTO_WHATSAPP || '584120000000'
+    whatsapp: process.env.VITE_ALBERTO_WHATSAPP || ''
   })
 }
 
