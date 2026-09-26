@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { ChevronDown, Download, FileSpreadsheet, Upload } from 'lucide-react'
-import { buildTemplateRows, downloadCsv, eventLabel, parseQuickEntry, safeFilename } from '../utils/quickEntry'
+import { buildTemplateRows, downloadCsv, eventLabel, importAdditions, parseQuickEntry, safeFilename } from '../utils/quickEntry'
 
 const EXAMPLES = [
   ['Rodriguez', 'Maria', 'F', '15/05/2013', '25m Crawl', '32.56'],
@@ -45,15 +45,7 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
   }
 
   const importValid = () => {
-    const grouped = new Map()
-    validRows.forEach(row => {
-      const key = `${row.lastName}|${row.firstName}|${row.birthDate}|${row.sex}`.toLowerCase()
-      if (!grouped.has(key)) grouped.set(key, { id: crypto.randomUUID(), lastName: row.lastName, firstName: row.firstName, sex: row.sex, birthDate: row.birthDate, age: row.age, category: row.category, events: [] })
-      const athlete = grouped.get(key)
-      if (!athlete.events.some(entry => entry.eventIndex === row.eventIndex)) athlete.events.push({ eventIndex: row.eventIndex, label: row.label, time: row.time })
-    })
-    const additions = [...grouped.values()].filter(item => !roster.some(old => `${old.firstName} ${old.lastName}`.toLowerCase() === `${item.firstName} ${item.lastName}`.toLowerCase()))
-    onImport(additions)
+    onImport(importAdditions(validRows, roster))
     setText((parsed || []).filter(row => row.errors.length || row.warnings.length).map(row => row.rawLine).join('\n'))
     setParsed(null)
   }

@@ -1,6 +1,9 @@
-import { calculateAge, categoryForAge } from './ageCalculator'
-import { eventAllowsSex } from './eventEligibility'
-import { formatTimeInput, validateTime } from './timeParser'
+// v1.20.0 — COPIA CONGELADA del parser del modo experto tal como estaba en v1.19.2 (64b9486),
+// más la agrupación de importValid (QuickEntryMode.jsx). Solo la usa el test del invariante:
+// para la misma entrada válida de hoy, lo que se guarda tiene que ser idéntico. NO editar.
+import { calculateAge, categoryForAge } from '../ageCalculator'
+import { eventAllowsSex } from '../eventEligibility'
+import { formatTimeInput, validateTime } from '../timeParser'
 
 const SEPARATORS = ['\t', ',', ';', '|']
 const HEADER_WORDS = ['apellido', 'nombre', 'sexo', 'fecha nac', 'evento', 'tiempo']
@@ -84,36 +87,14 @@ export function parseQuickEntry(text, { referenceDate, events = [] }) {
   })
 }
 
-// Filas válidas → nadadores nuevos para el roster (lo que se guarda). Un nadador por
-// apellido+nombre+fecha+sexo, un evento una sola vez; se omiten los que ya están en el roster.
-export function importAdditions(validRows, roster = [], newId = () => crypto.randomUUID()) {
+// importValid de QuickEntryMode.jsx (v1.19.2), sin el id aleatorio.
+export function legacyImportAdditions(validRows, roster = []) {
   const grouped = new Map()
   validRows.forEach(row => {
     const key = `${row.lastName}|${row.firstName}|${row.birthDate}|${row.sex}`.toLowerCase()
-    if (!grouped.has(key)) grouped.set(key, { id: newId(), lastName: row.lastName, firstName: row.firstName, sex: row.sex, birthDate: row.birthDate, age: row.age, category: row.category, events: [] })
+    if (!grouped.has(key)) grouped.set(key, { lastName: row.lastName, firstName: row.firstName, sex: row.sex, birthDate: row.birthDate, age: row.age, category: row.category, events: [] })
     const athlete = grouped.get(key)
     if (!athlete.events.some(entry => entry.eventIndex === row.eventIndex)) athlete.events.push({ eventIndex: row.eventIndex, label: row.label, time: row.time })
   })
   return [...grouped.values()].filter(item => !roster.some(old => `${old.firstName} ${old.lastName}`.toLowerCase() === `${item.firstName} ${item.lastName}`.toLowerCase()))
-}
-
-export function csvEscape(value) {
-  const string = String(value ?? '')
-  return /[",\r\n]/.test(string) ? `"${string.replaceAll('"', '""')}"` : string
-}
-
-export function downloadCsv(rows, filename) {
-  const content = `\uFEFF${rows.map(row => row.map(csvEscape).join(',')).join('\r\n')}`
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
-export function safeFilename(value = 'club') {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase() || 'club'
 }
