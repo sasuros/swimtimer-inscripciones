@@ -41,11 +41,12 @@ async function adminAuthHeader() {
   }
 }
 
-async function postPublicWizard(path, body, fallbackMessage) {
+async function postPublicWizard(path, body, fallbackMessage, { keepalive = false } = {}) {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await adminAuthHeader()) },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    ...(keepalive ? { keepalive: true } : {})
   })
   const data = await response.json()
   if (!response.ok) throw Object.assign(new Error(data.error || fallbackMessage), { ...data, status: response.status })
@@ -61,6 +62,12 @@ export const submitInscription = (payload) =>
   DEMO_MODE
     ? Promise.resolve(storage.submitInscription(payload))
     : postPublicWizard('/api/submit-inscription', payload, 'No se pudo enviar la inscripcion')
+// v1.21.0: guarda el borrador en el servidor. En modo demo no hay servidor: el borrador
+// vive solo en este navegador. `keepalive` deja terminar el envío al cerrar la pestaña.
+export const saveDraft = (payload, options) =>
+  DEMO_MODE
+    ? Promise.reject(new Error('Sin servidor en modo demo'))
+    : postPublicWizard('/api/save-draft', payload, 'No se pudo guardar el borrador', options)
 export const adminLogin = (...args) =>
   DEMO_MODE
     ? Promise.resolve(storage.adminLogin(...args))

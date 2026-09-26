@@ -8,7 +8,7 @@ import PreviewPlanilla from '../components/PreviewPlanilla'
 import ConfirmationScreen from '../components/ConfirmationScreen'
 import InvalidToken from './InvalidToken'
 import { buildMMExport } from '../utils/mmSchema'
-import { submitInscription } from '../services/api'
+import { saveDraft, submitInscription } from '../services/api'
 import BrandFooter from '../components/BrandFooter'
 import EventStatusBanner from '../components/EventStatusBanner'
 import ClosedEvent from './ClosedEvent'
@@ -18,12 +18,17 @@ import PinVerification from '../components/PinVerification'
 import { deriveRosterView } from '../utils/wizardRosterView'
 import { lateReviewView } from '../utils/clubInscriptionView'
 import { hasLateDecision } from '../services/lateDecision'
-import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
+import { CONFLICT_TEXT, DRAFT_CONFLICT_TEXT, DRAFT_SAVED_LOCAL_TEXT, DRAFT_SAVED_ONLINE_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
 import { AlreadySubmittedNotice, ConflictPanel, LateRegularNotice } from '../components/WizardNotices'
 import { isRegistrationOpen } from '../utils/registrationStatus'
+import { DEMO_MODE } from '../config'
 
 // v1.16.0: el PIN se guarda solo en esta pestaña (sessionStorage) y viaja en cada
-// validación y en el envío; el servidor lo verifica siempre.
+// validación, en el envío y (v1.21.0) en el guardado del borrador; el servidor lo verifica
+// siempre. Nunca va a localStorage ni dentro del borrador.
+
+// v1.21.0: indicador chico del borrador. Nunca es un error.
+export const DRAFT_STATUS_TEXT = { local: DRAFT_SAVED_LOCAL_TEXT, online: DRAFT_SAVED_ONLINE_TEXT, conflict: DRAFT_CONFLICT_TEXT }
 const pinKey = (token) => `swimtimer-pin:${token}`
 const readPin = (token) => {
   try {
@@ -61,9 +66,14 @@ function WizardContent({ token, pin, access }) {
   // v1.18.0: versión de la fila del servidor al cargar (sin fila = 0). El borrador guarda
   // sobre cuál se trabajó (baseVersion) y el envío la manda como expected_version.
   const serverVersion = access.inscription?.version ?? 0
-  const [roster, setRoster, draft] = useRoster(rosterKey, editableInitial, legacyKey, serverVersion)
   // D1: una tardía que el organizador ya revisó no se puede re-enviar desde aquí.
   const lateDecided = isLate && hasLateDecision(access.inscription)
+  // v1.21.0: el borrador también se guarda en el servidor (con PIN). El PIN viaja solo en
+  // la petición; lo que queda en localStorage es { roster, baseVersion, draftRev, dirty }.
+  const [roster, setRoster, draft] = useRoster(rosterKey, editableInitial, legacyKey, serverVersion, {
+    remote: access.draft || null,
+    save: DEMO_MODE || lateDecided ? null : (body, options) => saveDraft({ token, pin, ...body }, options)
+  })
   const [conflict, setConflict] = useState(null)
   const sendingRef = useRef(false)
   const validationRoster = isLate ? [...locked, ...roster] : roster
@@ -120,6 +130,7 @@ function WizardContent({ token, pin, access }) {
       })
       if (!result.success) throw new Error(result.error || 'No se pudo enviar')
       setFinalData({ ...output, _swimtimer_roster: roster })
+      draft.stop()
       localStorage.removeItem(rosterKey)
       localStorage.removeItem(legacyKey)
       setScreen('done')
@@ -164,6 +175,11 @@ function WizardContent({ token, pin, access }) {
         ) : (
           <>
             <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
+            {draft.status && (
+              <p role="status" className="text-xs text-slate-500" data-draft-status={draft.status}>
+                {DRAFT_STATUS_TEXT[draft.status]}
+              </p>
+            )}
             {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
             {entryMethod && (
               <button type="button" className="text-sm font-bold text-brand-700 hover:underline" onClick={changeMethod}>
