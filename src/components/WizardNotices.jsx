@@ -20,6 +20,17 @@ export function ConflictPanel({ conflict, onReload }) {
   )
 }
 
+// v1.19.1: en modo tardías, recuerda la inscripción regular (solo lectura). Invita a agregar
+// nadadores, y eso contradice al panel de conflicto, así que con un panel activo no se muestra.
+export function LateRegularNotice({ isLate, lockedCount, conflict, lateDecided }) {
+  if (!isLate || !lockedCount || conflict) return null
+  return (
+    <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
+      <strong>Ya enviaste tu inscripción regular con {lockedCount} {lockedCount === 1 ? 'nadador' : 'nadadores'}.</strong> Está abajo, solo para consultar.{!lateDecided && ' Agrega abajo a quienes quieras inscribir por la vía tardía.'}
+    </div>
+  )
+}
+
 // Avisos de "ya enviaste… vuelve a enviar cuando quieras". Contradicen a un panel de
 // conflicto y a una tardía ya revisada (D1), así que en esos casos no se muestran.
 export function AlreadySubmittedNotice({ isLate, alreadySubmitted, rosterCount, conflict, lateDecided }) {

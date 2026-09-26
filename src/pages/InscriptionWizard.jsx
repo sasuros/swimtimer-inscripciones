@@ -19,7 +19,7 @@ import { deriveRosterView } from '../utils/wizardRosterView'
 import { lateReviewView } from '../utils/clubInscriptionView'
 import { hasLateDecision } from '../services/lateDecision'
 import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
-import { AlreadySubmittedNotice, ConflictPanel } from '../components/WizardNotices'
+import { AlreadySubmittedNotice, ConflictPanel, LateRegularNotice } from '../components/WizardNotices'
 
 // v1.16.0: el PIN se guarda solo en esta pestaña (sessionStorage) y viaja en cada
 // validación y en el envío; el servidor lo verifica siempre.
@@ -153,11 +153,7 @@ function WizardContent({ token, pin, access }) {
         {conflict && <ConflictPanel key={conflict.at} conflict={conflict} onReload={conflict.keepDraft ? () => window.location.reload() : reloadLatest} />}
         {draft.replaced && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm text-warning-800">{ROSTER_REPLACED_TEXT}</div>}
         {lateDecided && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm font-bold text-warning-800">{LATE_DECIDED_TEXT}</div>}
-        {isLate && locked.length > 0 && (
-          <div className="rounded-xl bg-success-50 p-4 text-sm text-success-800">
-            <strong>Ya enviaste tu inscripción regular con {locked.length} {locked.length === 1 ? 'nadador' : 'nadadores'}.</strong> Está abajo, solo para consultar.{!lateDecided && ' Agrega abajo a quienes quieras inscribir por la vía tardía.'}
-          </div>
-        )}
+        <LateRegularNotice isLate={isLate} lockedCount={locked.length} conflict={conflict} lateDecided={lateDecided} />
         {isLate && locked.length > 0 && <RosterPanel roster={locked} readOnly title="Ya inscritos (inscripción regular)" />}
         <AlreadySubmittedNotice isLate={isLate} alreadySubmitted={access.already_submitted} rosterCount={roster.length} conflict={conflict} lateDecided={lateDecided} />
         {lateDecided ? (
