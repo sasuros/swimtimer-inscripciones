@@ -69,14 +69,14 @@ describe('filas y numeración', () => {
 describe('codificación del archivo', () => {
   it('CSV real de Excel en ANSI (Windows-1252, ";", CRLF) con ñ y tildes: los nombres llegan bien', () => {
     const bytes = readFileSync(new URL('./testSupport/excel-ansi.csv', import.meta.url))
-    expect(new TextDecoder('utf-8').decode(bytes)).toContain('�') // así llegaba antes
+    expect(new TextDecoder('utf-8').decode(bytes)).toContain('\uFFFD') // así llegaba antes
     const rows = parse(decodeCsvBytes(bytes))
     expect(rows.map((row) => `${row.lastName}, ${row.firstName}`)).toEqual(['Muñoz, José', 'Pérez Núñez, María Ángela', 'Ibáñez, Sofía'])
     expect(rows.every(ok)).toBe(true)
   })
 
   it('UTF-8 (con o sin BOM) se lee tal cual; sin U+FFFD no hay relectura', () => {
-    const utf8 = new TextEncoder().encode('﻿Apellido;Nombre\nMuñoz;José')
+    const utf8 = new TextEncoder().encode('\uFEFFApellido;Nombre\nMuñoz;José')
     expect(decodeCsvBytes(utf8)).toBe('Apellido;Nombre\nMuñoz;José')
     expect(decodeCsvBytes(new TextEncoder().encode('Ibáñez'))).toBe('Ibáñez')
   })

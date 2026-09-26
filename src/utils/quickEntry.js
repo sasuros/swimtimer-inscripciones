@@ -1,6 +1,6 @@
 import { calculateAge, categoryForAge } from './ageCalculator'
 import { eventAllowsSex } from './eventEligibility'
-import { formatTimeInput, validateTime } from './timeParser'
+import { NO_TIME, formatTimeInput, validateTime } from './timeParser'
 
 const SEPARATORS = ['\t', ',', ';', '|']
 const HEADER_WORDS = ['apellido', 'nombre', 'sexo', 'fecha nac', 'evento', 'tiempo']
@@ -88,26 +88,95 @@ export function resolveColumns(headerValues) {
 }
 
 // v1.20.0: Excel en Windows (español) guarda "CSV (delimitado por comas)" en ANSI
-// (Windows-1252). Leído como UTF-8, "Muñoz" llega como "Mu�oz" y se guardaría así. Solo si
+// (Windows-1252). Leído como UTF-8, "Muñoz" llega con el carácter de reemplazo (U+FFFD) y se guardaría así. Solo si
 // aparece el carácter de reemplazo (U+FFFD) se vuelve a leer como Windows-1252.
 export function decodeCsvBytes(buffer) {
   const utf8 = new TextDecoder('utf-8').decode(buffer)
-  const text = utf8.includes('�') ? new TextDecoder('windows-1252').decode(buffer) : utf8
-  return text.replace(/^﻿/, '')
+  const text = utf8.includes('\uFFFD') ? new TextDecoder('windows-1252').decode(buffer) : utf8
+  return text.replace(/^\uFEFF/, '')
+}
+
+const REPLACEMENT_CHAR = String.fromCharCode(0xfffd)
+const pad = (number) => String(number).padStart(2, '0')
+const realDate = (year, month, day) => {
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
+const DATE_HELP = 'Escríbela como DD/MM/AAAA, por ejemplo 05/03/2017.'
+
+// v1.20.0: fecha de nacimiento → { date: 'AAAA-MM-DD' } o { error } (nunca se adivina).
+// D/M/AAAA con / - o . es día/mes (el formato documentado, igual que 05/03/2017 hasta hoy).
+export function parseBirthDate(raw = '') {
+  const value = String(raw ?? '').trim()
+  if (!value) return { error: `Falta la fecha de nacimiento. ${DATE_HELP}` }
+  let year, month, day
+  const iso = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  const dayFirst = value.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d+)$/)
+  if (iso) [year, month, day] = iso.slice(1).map(Number)
+  else if (dayFirst) {
+    ;[day, month, year] = dayFirst.slice(1).map(Number)
+    if (dayFirst[3].length !== 4) return { error: `En la fecha "${value}" el año tiene que ir completo, con 4 cifras. ${DATE_HELP}` }
+    if (month > 12) {
+      return day <= 12 && month <= 31
+        ? { error: `La fecha "${value}" parece estar como mes/día. Escríbela como día/mes/año: ${pad(month)}/${pad(day)}/${year}.` }
+        : { error: `La fecha "${value}" no existe. ${DATE_HELP}` }
+    }
+  } else if (/^\d{5}$/.test(value)) {
+    // Número de serie de Excel: no se convierte (Excel usa dos sistemas de fechas, 1900 y 1904).
+    return { error: `Excel convirtió la fecha en un número (${value}). Pon esa columna en formato Fecha, o ${DATE_HELP.charAt(0).toLowerCase()}${DATE_HELP.slice(1)}` }
+  } else return { error: `La fecha "${value}" no se entiende. ${DATE_HELP}` }
+  if (!realDate(year, month, day)) return { error: `La fecha "${value}" no existe. ${DATE_HELP}` }
+  return { date: `${year}-${pad(month)}-${pad(day)}` }
 }
 
 export function normalizeBirthDate(value = '') {
-  const clean = value.trim()
-  const match = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-  if (match) return `${match[3]}-${match[2]}-${match[1]}`
-  return /^\d{4}-\d{2}-\d{2}$/.test(clean) ? clean : ''
+  return parseBirthDate(value).date || ''
+}
+
+// v1.20.0: sexo, solo sinónimos inequívocos. Cualquier otra cosa → null (se rechaza).
+const SEX_SYNONYMS = { F: ['f', 'femenino', 'mujer'], M: ['m', 'masculino', 'hombre', 'h'] }
+export function normalizeSex(value = '') {
+  const clean = normalizeText(value)
+  return Object.keys(SEX_SYNONYMS).find(sex => SEX_SYNONYMS[sex].includes(clean)) || null
+}
+
+// v1.20.0: tiempo. NT / N/T / S/T / "sin tiempo" → 00.00 (el NT del sistema); coma decimal →
+// punto. Lo demás pasa tal cual a formatTimeInput (el mismo de siempre).
+const NO_TIME_WORDS = ['nt', 'n t', 's t', 'sin tiempo']
+export function normalizeCsvTime(raw = '') {
+  const value = String(raw ?? '').trim()
+  if (NO_TIME_WORDS.includes(normalizeText(value))) return NO_TIME
+  if (/^\d{1,2}(:\d{2})?,\d{1,2}$/.test(value)) return value.replace(',', '.')
+  return value
+}
+
+// v1.20.0: estilo → clave canónica. Solo sinónimos inequívocos; lo demás se compara tal cual
+// (sin tildes ni mayúsculas), p. ej. "Tablita".
+const STYLE_SYNONYMS = [
+  ['crawl', ['crawl', 'libre', 'free', 'freestyle']],
+  ['espalda', ['espalda', 'dorso', 'back', 'backstroke']],
+  ['pecho', ['pecho', 'braza', 'breast', 'breaststroke']],
+  ['mariposa', ['mariposa', 'fly', 'butterfly']],
+  ['comb', ['comb individual', 'combinado', 'combinado individual', 'ci', 'im']]
+]
+export function styleKey(style = '') {
+  const clean = normalizeText(style).replace(/^estilo /, '')
+  return STYLE_SYNONYMS.find(([, words]) => words.includes(clean))?.[0] || clean
+}
+
+const eventKey = (event) => `${Number(event.distance)}|${styleKey(event.style)}`
+
+// "25 Crawl", "25m crawl", "25 mts Crawl", "25 metros Libre", "25m Estilo Libre" → '25|crawl'.
+export function eventTextKey(value = '') {
+  const match = normalizeText(value).match(/^(\d+)\s*(?:metros|metro|mts|mt|m)?\s+(.+)$/)
+  return match ? `${Number(match[1])}|${styleKey(match[2])}` : null
 }
 
 // v1.20.0: rowIndex es el número de fila de la hoja (el encabezado es la fila 1), para que
 // "Fila 7" sea la fila 7 de Excel. headerLine viaja con cada fila: si quedan filas por
 // corregir, se devuelven con su encabezado (sin él, un archivo desordenado se leería mal).
 export function parseQuickEntry(text, { referenceDate, events = [] }) {
-  const sourceLines = text.replace(/^﻿/, '').split(/\r?\n/)
+  const sourceLines = text.replace(/^\uFEFF/, '').split(/\r?\n/)
     .map((line, index) => ({ line, lineNumber: index + 1 }))
     .filter(({ line }) => line.trim() && !line.trim().startsWith('#'))
   if (!sourceLines.length) return []
@@ -124,29 +193,55 @@ export function parseQuickEntry(text, { referenceDate, events = [] }) {
     const values = splitDelimitedLine(rawLine, separator)
     // Filas que Excel deja al final con solo separadores (",,,,,"): no son datos.
     if (values.every(value => !value)) return null
-    const [lastName, firstName, sexRaw, dateRaw, labelRaw, rawTime] = FIELDS.map(field => values[columns[field]])
-    const sex = sexRaw?.toUpperCase()
-    const birthDate = normalizeBirthDate(dateRaw)
+    const [lastName, firstName, sexRaw = '', dateRaw, labelRaw, rawTime = ''] = FIELDS.map(field => values[columns[field]])
+    const errors = []
+    const warnings = []
+    // Una causa, un error: si falla el sexo o la fecha, no se suma "evento no encontrado".
+    if (!lastName) errors.push('Falta el apellido.')
+    if (!firstName) errors.push('Falta el nombre.')
+    if ([lastName, firstName].some(value => value?.includes(REPLACEMENT_CHAR))) errors.push(`El nombre tiene caracteres que no se leen (${REPLACEMENT_CHAR}). Guarda el archivo como "CSV UTF-8" y vuelve a cargarlo.`)
+    const sex = normalizeSex(sexRaw) || sexRaw.toUpperCase()
+    if (!normalizeSex(sexRaw)) errors.push(sexRaw ? `El sexo "${sexRaw}" no se entiende. Escribe F (femenino) o M (masculino).` : 'Falta el sexo. Escribe F o M.')
+    const parsedDate = parseBirthDate(dateRaw)
+    const birthDate = parsedDate.date || ''
     const age = calculateAge(birthDate, referenceDate)
     const ranges = [...new Map(events.map(event => [`${event.age_lo}-${event.age_hi}`, [event.age_lo, event.age_hi]])).values()]
     const category = categoryForAge(age, ranges)
+    if (parsedDate.error) errors.push(parsedDate.error)
+    else if (age == null) errors.push(`No pudimos calcular la edad con la fecha "${dateRaw}". Revísala.`)
+    else if (!category) errors.push(`Con esa fecha tendría ${age} años y no entra en ninguna categoría de este torneo (${ranges.map(([lo, hi]) => `${lo}-${hi}`).join(', ')}). Revisa la fecha.`)
     const wantedLabel = labelRaw?.trim() || ''
     const eligible = events.filter(event => event.active !== false && eventAllowsSex(event.sex, sex) && age >= Number(event.age_lo) && age <= Number(event.age_hi))
-    const candidate = eligible.find(event => eventLabel(event).toLowerCase() === wantedLabel.toLowerCase())
-    const time = formatTimeInput(rawTime || '')
-    const errors = []
-    const warnings = []
-    if (!lastName || !firstName) errors.push('Faltan nombre o apellido')
-    if (!['F', 'M'].includes(sex)) errors.push('El sexo debe ser F o M')
-    if (!birthDate || age == null || !category) errors.push('Fecha o edad inválida')
-    if (!candidate) {
-      const available = [...new Set(eligible.map(eventLabel))]
-      errors.push(available.length
-        ? `Evento no encontrado. Eventos disponibles para ${sex || 'este sexo'}, ${age ?? '?'} años: ${available.join(', ')}`
-        : 'Evento no encontrado para la edad y sexo indicados')
+    // Primero el nombre exacto (como hasta v1.19.2); si no, por distancia + estilo con sinónimos.
+    let candidate = eligible.find(event => eventLabel(event).toLowerCase() === wantedLabel.toLowerCase())
+    let eventError = ''
+    const available = [...new Set(eligible.map(eventLabel))]
+    const who = `${sex} de ${age} años`
+    if (!candidate && normalizeSex(sexRaw) && category) {
+      const key = eventTextKey(wantedLabel)
+      const sameKey = key ? events.filter(event => event.active !== false && eventKey(event) === key) : []
+      const labels = [...new Set(sameKey.map(eventLabel))]
+      if (!wantedLabel) eventError = `Falta el evento. Escribe, por ejemplo, ${available[0] || '25m Crawl'}.`
+      else if (labels.length > 1) eventError = `"${wantedLabel}" coincide con más de un evento (${labels.join(', ')}). Escribe el nombre exacto.`
+      else if (!labels.length) eventError = `El evento "${wantedLabel}" no existe en este torneo. ${available.length ? `Para ${who} puedes usar: ${available.join(', ')}.` : `No hay eventos para ${who}.`}`
+      else {
+        candidate = eligible.find(event => eventKey(event) === key)
+        if (!candidate) eventError = `"${labels[0]}" no está disponible para ${who}. ${available.length ? `Puedes usar: ${available.join(', ')}.` : ''}`.trim()
+      }
     }
-    const timeError = validateTime(time)
-    if (timeError) (rawTime && /\.\d$/.test(rawTime.trim()) ? warnings : errors).push(timeError)
+    if (eventError) errors.push(eventError)
+    // Coma decimal con el archivo separado por comas: "25,30" llega partido en dos columnas.
+    const nextValue = values[columns.time + 1]
+    const splitByComma = separator === ',' && /^\d{1,2}(:\d{2})?$/.test(rawTime.trim()) && /^\d{1,2}$/.test(nextValue || '')
+    const time = splitByComma ? rawTime.trim() : formatTimeInput(normalizeCsvTime(rawTime))
+    if (splitByComma) errors.push(`El tiempo tiene coma decimal y el archivo separa las columnas con comas. Escribe ${rawTime.trim()}.${nextValue} con punto, o guarda el archivo con punto y coma (;).`)
+    else if (!rawTime.trim()) errors.push('Escribe el tiempo, o NT si no tiene.')
+    else {
+      const timeError = validateTime(time)
+      if (timeError && /\.\d$/.test(time)) warnings.push(timeError)
+      else if (timeError && /centésimas|segundos/.test(timeError)) errors.push(timeError)
+      else if (timeError) errors.push(`El tiempo "${rawTime.trim()}" no se entiende. Escríbelo como 25.30 o 1:25.30, o NT si no tiene.`)
+    }
     return { rowIndex: lineNumber, rawLine, headerLine, lastName, firstName, sex, birthDate, age, category, eventIndex: candidate?.event_ptr, label: candidate ? eventLabel(candidate) : wantedLabel, time, errors, warnings }
   }).filter(Boolean)
 }

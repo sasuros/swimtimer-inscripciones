@@ -148,7 +148,8 @@ describe('v1.19.0 ajustes — mensaje de formato del wizard (el CSV no cambia)',
     expect(validateTime('1:7')).toBe('El formato debe ser MM:SS.CC o SS.CC — ejemplo: 1:25.30')
     expect(validateTime('32.5')).toContain('centésimas')
     const [row] = parseQuickEntry('Perez,Ana,F,10/03/2014,50m Libre,1:7', { referenceDate: '2026-12-31', events: [{ event_ptr: 1, distance: 50, style: 'Libre', age_lo: 11, age_hi: 12, sex: 'F' }] })
-    expect(row.errors.join(' ')).toContain('El formato debe ser')
+    // v1.20.0: el CSV tolerante tiene su propio texto (validateTime no cambia).
+    expect(row.errors.join(' ')).toContain('El tiempo "1:7" no se entiende. Escríbelo como 25.30 o 1:25.30, o NT si no tiene.')
     expect(row.errors.join(' ')).not.toContain('Ese tiempo no se entiende')
   })
 })

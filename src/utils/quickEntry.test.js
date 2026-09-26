@@ -23,7 +23,7 @@ describe('quick entry parser', () => {
 
   it('reports incomplete hundredths and contextual available events', () => {
     const [row] = parseQuickEntry('Lopez;Carlos;M;22/03/2012;200m Mariposa;28.9', options)
-    expect(row.errors.join(' ')).toContain('Eventos disponibles para M, 13 años: 50m Espalda')
+    expect(row.errors.join(' ')).toContain('El evento "200m Mariposa" no existe en este torneo. Para M de 13 años puedes usar: 50m Espalda.')
     expect(row.warnings.join(' ')).toContain('centésimas')
   })
 
