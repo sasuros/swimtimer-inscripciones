@@ -29,3 +29,21 @@ describe('botones de contacto de la pantalla cerrada (v1.19.2)', () => {
     expect(html).toContain('href="mailto:albertosuros@yahoo.com?')
   })
 })
+
+describe('evento no abierto: texto según el estado (v1.19.2)', () => {
+  const render = (status) => renderToStaticMarkup(<ClosedEvent event={{ ...event, status }} />)
+
+  it('draft → "todavía no están abiertas", nunca "cerradas"', () => {
+    const html = render('draft')
+    expect(html).toContain('Las inscripciones para este evento todavía no están abiertas.')
+    expect(html).not.toContain('cerradas')
+    expect(html).toContain('I Copa')
+  })
+
+  it.each(['closed', 'archived'])('%s → "cerradas" como hasta ahora', (status) => {
+    const html = render(status)
+    expect(html).toContain('Las inscripciones están cerradas')
+    expect(html).toContain('Ya no se reciben inscripciones para I Copa.')
+    expect(html).not.toContain('todavía no')
+  })
+})

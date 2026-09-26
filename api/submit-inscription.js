@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     // v1.18.0: conflicto de versión (sin escribir nada): conflict / lateDecided / staleClient.
     if (error.status === 409) return json(res, 409, { error: error.message, ...error.details })
     const message = error.message || ''
-    const status = /Código de acceso/.test(message) ? 401 : /enlace|cerradas|Supabase/.test(message) ? 400 : 500
+    const status = /Código de acceso/.test(message) ? 401 : /enlace|cerradas|abiertas|Supabase/.test(message) ? 400 : 500
     return json(res, status, { error: message || 'No se pudo enviar la inscripcion' })
   }
 }

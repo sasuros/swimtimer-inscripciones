@@ -6,6 +6,7 @@ import { isShortId } from '../utils/shortId.js'
 import { RateLimitError, checkPinRateLimit, clearPinRateLimit } from './pinRateLimit.js'
 import { hasLateDecision } from './lateDecision.js'
 import { CONFLICT_TEXT, ConflictError, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, sameRoster } from './concurrency.js'
+import { isRegistrationOpen, notOpenText } from '../utils/registrationStatus.js'
 
 const DEFAULT_WHATSAPP = '584120000000'
 
@@ -116,8 +117,9 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
           .maybeSingle()
       )
       if (!stored) return { valid: false }
+      // v1.19.2: un evento no abierto ya no invalida el enlace (antes el del correo decía "no
+      // es válido"); validateToken lo recorta a lo básico para la pantalla de cerradas.
       const event = await getWizardEvent(db(), magic.e)
-      if (!['active', 'accepting_late'].includes(event.status)) return { valid: false }
       const club = event.clubs.find((item) => Number(item.code) === Number(magic.c))
       if (!club || club.participation_status === 'not_participating' || String(club.email || '').toLowerCase() !== magic.em) return { valid: false }
       const [normal, late] = await Promise.all([latestInscription(db(), event.id, club.code, false), latestInscription(db(), event.id, club.code, true)])
@@ -216,6 +218,10 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     // Sin fila guardada (o sin backend) no hay datos del servidor que proteger;
     // además no se puede enviar (submit exige backendAvailable).
     if (!access.valid || !access.backendAvailable) return access
+    // v1.19.2: evento no abierto (draft/closed/archived): solo lo básico para mostrar la
+    // pantalla correspondiente. Nunca el roster, con o sin PIN (tampoco en la vista previa del
+    // admin), y el PIN no se evalúa: no hay nada detrás que proteger.
+    if (!isRegistrationOpen(access.event.status)) return basicAccess(access)
     if (admin) return { ...access, pinVerified: true }
     // Sin PIN (primera carga) no es un intento: no cuenta para el límite.
     if (pin === undefined || pin === null || pin === '') return basicAccess(access)
@@ -251,8 +257,9 @@ export function createSupabaseWizardStorage({ client, adminPassword = 'swimtimer
     if (access.rateLimited) throw new RateLimitError(access.retryAfter)
     if (!access.valid) throw new Error('El enlace no es válido')
     if (!access.backendAvailable) throw new Error('No se pudo conectar con Supabase')
+    // v1.19.2: antes que el PIN, porque con el evento no abierto validateToken no lo evalúa.
+    if (!isRegistrationOpen(access.event.status)) throw new Error(notOpenText(access.event.status))
     if (!access.pinVerified) throw new Error('Código de acceso incorrecto o faltante')
-    if (['draft', 'closed', 'archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
     const isLate = access.event.status === 'accepting_late'
     // v1.18.0: escritura condicional por versión (anti-pisado). expected_version es la
     // versión de la fila sobre la que el cliente trabajó (0/null = no había fila).

@@ -6,6 +6,7 @@ import { teamIdentity } from '../utils/teamUtils'
 import { buildConsolidatedExport } from '../utils/mmSchema'
 import { lateReviewView, mergeClubInscriptions } from '../utils/clubInscriptionView'
 import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/demoToken'
+import { isRegistrationOpen, notOpenText } from '../utils/registrationStatus'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
 import { referenceDateFor } from '../utils/referenceDate'
 import { applyLateDecision, needsReview } from './lateDecision'
@@ -311,7 +312,7 @@ export function demoSubmitInscription(payload) {
   const access = demoValidateToken(payload.token, { pin: payload.pin })
   if (!access.valid) throw new Error('El enlace no es válido o caducó')
   if (access.localMode && !access.pinVerified) throw new Error('Código de acceso incorrecto o faltante')
-  if (['draft', 'closed', 'archived'].includes(access.event.status)) throw new Error('Las inscripciones para este evento están cerradas')
+  if (!isRegistrationOpen(access.event.status)) throw new Error(notOpenText(access.event.status))
   if (!access.localMode)
     return {
       success: true,

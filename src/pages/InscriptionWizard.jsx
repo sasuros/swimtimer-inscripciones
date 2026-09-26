@@ -20,6 +20,7 @@ import { lateReviewView } from '../utils/clubInscriptionView'
 import { hasLateDecision } from '../services/lateDecision'
 import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
 import { AlreadySubmittedNotice, ConflictPanel, LateRegularNotice } from '../components/WizardNotices'
+import { isRegistrationOpen } from '../utils/registrationStatus'
 
 // v1.16.0: el PIN se guarda solo en esta pestaña (sessionStorage) y viaja en cada
 // validación y en el envío; el servidor lo verifica siempre.
@@ -48,7 +49,7 @@ export default function InscriptionWizard() {
   }
   if (access.loading) return <div className="flex min-h-screen items-center justify-center text-brand-800">Validando invitación…</div>
   if (!access.valid) return <InvalidToken networkError={access.networkError} noToken={access.noToken} />
-  if (['draft', 'closed', 'archived'].includes(access.event.status)) return <ClosedEvent event={access.event} />
+  if (!isRegistrationOpen(access.event.status)) return <ClosedEvent event={access.event} />
   if (access.requiresPin && !access.pinVerified) return <PinVerification token={token} access={access} onVerified={acceptPin} />
   return <WizardContent token={token} pin={pin} access={access} />
 }
