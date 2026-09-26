@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allLinksText, clubLinkText, emailInvitation, whatsappInvitation } from './messageTemplates'
+import { REOPEN_LINE, allLinksText, clubLinkText, emailInvitation, whatsappInvitation } from './messageTemplates'
 import LinkDistributionModal from '../components/LinkDistributionModal'
 
 const event = { name: 'Copa Test', date_start: '2026-10-01', deadline: '2026-09-25', venue: 'Sede', organizer: 'Org' }
@@ -9,6 +9,15 @@ describe('mensajes con PIN (v1.16.0)', () => {
   it('WhatsApp y correo incluyen el código de acceso', () => {
     expect(whatsappInvitation(event, url, '1234')).toContain('Código de acceso (PIN): 1234')
     expect(emailInvitation(event, url, '1234').body).toContain('Código de acceso (PIN): 1234')
+  })
+
+  it('WhatsApp y correo recuerdan que el enlace sirve para volver (v1.19.1)', () => {
+    const line = 'Puedes volver a abrir este enlace cuando quieras para agregar o corregir nadadores.'
+    expect(REOPEN_LINE).toBe(line)
+    expect(whatsappInvitation(event, url, '1234')).toContain(`Código de acceso (PIN): 1234\n\n${line}\n\nFecha límite`)
+    expect(emailInvitation(event, url, '1234').body).toContain(`Código de acceso (PIN): 1234\n\n${line}\n\nFecha del evento`)
+    expect(whatsappInvitation(event, url)).toContain(`${url}\n\n${line}\n\n`)
+    expect(emailInvitation(event, url).body).toContain(`${url}\n\n${line}\n\n`)
   })
 
   it('sin PIN no agregan la línea', () => {

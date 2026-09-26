@@ -47,7 +47,29 @@ describe('correo de invitacion', () => {
     expect(html).toContain('&lt;Club&gt;')
     expect(html).not.toContain('<Club>')
     expect(html).toContain('4827')
-    expect(html).toContain('Tu codigo de acceso')
+    expect(html).toContain('Tu código de acceso')
+  })
+
+  // v1.19.1: todo el correo en tú, con tildes, y el enlace se comparte dentro del club.
+  it('habla en tú, declara UTF-8 y explica cómo volver y compartir el enlace', () => {
+    const html = generateEmailHTML({
+      clubName: 'CAC',
+      eventName: 'Copa',
+      eventDate: '2026-12-01',
+      venue: 'Sede',
+      deadline: '2026-11-20',
+      magicLink: 'https://example.com/token',
+      email: 'coach@example.com',
+      pin: '4827'
+    })
+    expect(html).toContain('<meta charset="utf-8">')
+    expect(html).toContain('Te invitamos a inscribir a los nadadores de')
+    expect(html).toContain('Fecha límite: 2026-11-20')
+    expect(html).toContain('Puedes volver a abrir este enlace cuando quieras para agregar o corregir nadadores.')
+    expect(html).toContain('Si otro entrenador de tu club necesita inscribir, compártele este enlace junto con el código. No lo compartas fuera de tu club.')
+    expect(html).toContain('Si tienes problemas para entrar, escríbele al organizador del evento.')
+    expect(html).not.toMatch(/\busted\b|Ha sido invitado|\bcomparta\b|\bcontacte\b|Si tiene\b|exclusivo para/i)
+    expect(html).not.toMatch(/codigo|limite|Invitacion|Necesitaras|inscripcion\b/)
   })
 
   it('rechaza metodos distintos de POST', async () => {
