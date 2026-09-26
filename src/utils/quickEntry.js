@@ -39,9 +39,61 @@ export function splitDelimitedLine(line, separator) {
   return values
 }
 
+// Minúsculas, sin tildes, puntuación como espacio, espacios simples. "Fecha Nac." → "fecha nac".
+export function normalizeText(value = '') {
+  return String(value).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[._\-/]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+// v1.20.0: columnas en su orden de siempre (sin encabezado, o encabezado en ese orden).
+export const FIELDS = ['lastName', 'firstName', 'sex', 'birthDate', 'event', 'time']
+export const FIELD_NAMES = { lastName: 'Apellido', firstName: 'Nombre', sex: 'Sexo', birthDate: 'Fecha Nac.', event: 'Evento', time: 'Tiempo' }
+const HEADER_SYNONYMS = [
+  ['lastName', (cell) => cell.includes('apellido')],
+  ['firstName', (cell) => cell.includes('nombre')],
+  ['sex', (cell) => cell.includes('sexo') || cell.includes('genero')],
+  ['birthDate', (cell) => cell.includes('nac') || cell.startsWith('fecha')],
+  ['event', (cell) => cell.includes('evento') || cell.includes('prueba')],
+  ['time', (cell) => cell.includes('tiempo') || cell.includes('marca')]
+]
+
+// Encabezado → índice de cada campo por su nombre (tildes, mayúsculas y sinónimos da igual).
+// Un campo que no aparece queda sin índice.
+export function headerColumns(values) {
+  const columns = {}
+  values.forEach((value, index) => {
+    const cell = normalizeText(value)
+    const field = HEADER_SYNONYMS.find(([name, matches]) => columns[name] === undefined && matches(cell))?.[0]
+    if (field) columns[field] = index
+  })
+  return columns
+}
+
 export function isHeaderRow(values) {
   const normalized = values.map(value => value.toLowerCase().replace(/[._-]/g, ' ').trim())
-  return HEADER_WORDS.filter(word => normalized.some(value => value.includes(word))).length >= 4
+  const legacy = HEADER_WORDS.filter(word => normalized.some(value => value.includes(word))).length >= 4
+  return legacy || Object.keys(headerColumns(values)).length >= 4
+}
+
+const DEFAULT_COLUMNS = Object.fromEntries(FIELDS.map((field, index) => [field, index]))
+
+// Con encabezado completo se lee por nombre (el orden de las columnas da igual). Incompleto
+// pero con lo que sí reconoce en su lugar de siempre, por posición (como hasta v1.19.2).
+// Incompleto y desordenado: no se adivina, se dice qué columna falta.
+export function resolveColumns(headerValues) {
+  const found = headerColumns(headerValues)
+  const missing = FIELDS.filter(field => found[field] === undefined)
+  if (!missing.length) return { columns: found }
+  if (Object.entries(found).every(([field, index]) => DEFAULT_COLUMNS[field] === index)) return { columns: DEFAULT_COLUMNS }
+  return { missing }
+}
+
+// v1.20.0: Excel en Windows (español) guarda "CSV (delimitado por comas)" en ANSI
+// (Windows-1252). Leído como UTF-8, "Muñoz" llega como "Mu�oz" y se guardaría así. Solo si
+// aparece el carácter de reemplazo (U+FFFD) se vuelve a leer como Windows-1252.
+export function decodeCsvBytes(buffer) {
+  const utf8 = new TextDecoder('utf-8').decode(buffer)
+  const text = utf8.includes('�') ? new TextDecoder('windows-1252').decode(buffer) : utf8
+  return text.replace(/^﻿/, '')
 }
 
 export function normalizeBirthDate(value = '') {
@@ -51,13 +103,28 @@ export function normalizeBirthDate(value = '') {
   return /^\d{4}-\d{2}-\d{2}$/.test(clean) ? clean : ''
 }
 
+// v1.20.0: rowIndex es el número de fila de la hoja (el encabezado es la fila 1), para que
+// "Fila 7" sea la fila 7 de Excel. headerLine viaja con cada fila: si quedan filas por
+// corregir, se devuelven con su encabezado (sin él, un archivo desordenado se leería mal).
 export function parseQuickEntry(text, { referenceDate, events = [] }) {
-  const sourceLines = text.split(/\r?\n/).filter(line => line.trim() && !line.trim().startsWith('#'))
+  const sourceLines = text.replace(/^﻿/, '').split(/\r?\n/)
+    .map((line, index) => ({ line, lineNumber: index + 1 }))
+    .filter(({ line }) => line.trim() && !line.trim().startsWith('#'))
   if (!sourceLines.length) return []
-  const separator = detectSeparator(sourceLines[0])
-  const header = isHeaderRow(splitDelimitedLine(sourceLines[0], separator))
-  return sourceLines.slice(header ? 1 : 0).map((rawLine, index) => {
-    const [lastName, firstName, sexRaw, dateRaw, labelRaw, rawTime] = splitDelimitedLine(rawLine, separator)
+  const separator = detectSeparator(sourceLines[0].line)
+  const firstValues = splitDelimitedLine(sourceLines[0].line, separator)
+  const header = isHeaderRow(firstValues)
+  const headerLine = header ? sourceLines[0].line : null
+  const { columns, missing } = header ? resolveColumns(firstValues) : { columns: DEFAULT_COLUMNS }
+  if (missing) {
+    const names = missing.map(field => FIELD_NAMES[field]).join(', ')
+    return [{ rowIndex: sourceLines[0].lineNumber, rawLine: sourceLines[0].line, headerLine: null, lastName: '', firstName: '', label: '', errors: [`En el encabezado no encontramos la columna ${names}. Agrégala (o pon las columnas en el orden Apellido, Nombre, Sexo, Fecha Nac., Evento, Tiempo) y vuelve a cargar el archivo.`], warnings: [] }]
+  }
+  return sourceLines.slice(header ? 1 : 0).map(({ line: rawLine, lineNumber }) => {
+    const values = splitDelimitedLine(rawLine, separator)
+    // Filas que Excel deja al final con solo separadores (",,,,,"): no son datos.
+    if (values.every(value => !value)) return null
+    const [lastName, firstName, sexRaw, dateRaw, labelRaw, rawTime] = FIELDS.map(field => values[columns[field]])
     const sex = sexRaw?.toUpperCase()
     const birthDate = normalizeBirthDate(dateRaw)
     const age = calculateAge(birthDate, referenceDate)
@@ -80,8 +147,16 @@ export function parseQuickEntry(text, { referenceDate, events = [] }) {
     }
     const timeError = validateTime(time)
     if (timeError) (rawTime && /\.\d$/.test(rawTime.trim()) ? warnings : errors).push(timeError)
-    return { rowIndex: index + 1, rawLine, lastName, firstName, sex, birthDate, age, category, eventIndex: candidate?.event_ptr, label: candidate ? eventLabel(candidate) : wantedLabel, time, errors, warnings }
-  })
+    return { rowIndex: lineNumber, rawLine, headerLine, lastName, firstName, sex, birthDate, age, category, eventIndex: candidate?.event_ptr, label: candidate ? eventLabel(candidate) : wantedLabel, time, errors, warnings }
+  }).filter(Boolean)
+}
+
+// Lo que queda en el cuadro tras importar: las filas por corregir, con su encabezado.
+export function pendingText(rows = []) {
+  const pending = rows.filter(row => row.errors.length || row.warnings.length)
+  if (!pending.length) return ''
+  const header = pending.find(row => row.headerLine)?.headerLine
+  return [...(header ? [header] : []), ...pending.map(row => row.rawLine)].join('\n')
 }
 
 // Filas válidas → nadadores nuevos para el roster (lo que se guarda). Un nadador por

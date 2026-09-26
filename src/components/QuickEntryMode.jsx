@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { ChevronDown, Download, FileSpreadsheet, Upload } from 'lucide-react'
-import { buildTemplateRows, downloadCsv, eventLabel, importAdditions, parseQuickEntry, safeFilename } from '../utils/quickEntry'
+import { buildTemplateRows, decodeCsvBytes, downloadCsv, eventLabel, importAdditions, parseQuickEntry, pendingText, safeFilename } from '../utils/quickEntry'
 
 const EXAMPLES = [
   ['Rodriguez', 'Maria', 'F', '15/05/2013', '25m Crawl', '32.56'],
@@ -34,19 +34,19 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
     if (!/\.(csv|txt|tsv)$/i.test(file.name)) { setFileInfo({ error: 'Elige un archivo .csv, .txt o .tsv' }); return }
     const reader = new FileReader()
     reader.onload = () => {
-      const content = String(reader.result || '').replace(/^\uFEFF/, '')
+      const content = decodeCsvBytes(reader.result)
       const rows = parseQuickEntry(content, { referenceDate, events })
       setText(content)
       setParsed(rows)
       setFileInfo({ name: file.name, count: rows.length })
     }
     reader.onerror = () => setFileInfo({ error: 'No se pudo leer el archivo seleccionado' })
-    reader.readAsText(file)
+    reader.readAsArrayBuffer(file)
   }
 
   const importValid = () => {
     onImport(importAdditions(validRows, roster))
-    setText((parsed || []).filter(row => row.errors.length || row.warnings.length).map(row => row.rawLine).join('\n'))
+    setText(pendingText(parsed || []))
     setParsed(null)
   }
 
