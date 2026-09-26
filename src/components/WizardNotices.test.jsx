@@ -104,7 +104,7 @@ describe('estado del borrador', () => {
 
   it('choque con otro dispositivo: aviso ámbar visible con el mismo estilo que los avisos del wizard', () => {
     const html = renderToStaticMarkup(<DraftStatusNotice status="conflict" />)
-    expect(DRAFT_CONFLICT_NOTICE_TEXT).toBe('Otro dispositivo guardó cambios más nuevos. Recarga la página para verlos antes de seguir; lo que agregaste aquí sigue guardado en este dispositivo.')
+    expect(DRAFT_CONFLICT_NOTICE_TEXT).toBe('Otro dispositivo guardó cambios más nuevos. Antes de recargar, anota lo que agregaste aquí: al recargar verás la lista del otro dispositivo y tendrás que volver a agregarlo.')
     expect(html).toContain(DRAFT_CONFLICT_NOTICE_TEXT)
     expect(html).toContain('role="alert"')
     expect(html).toContain(`class="${AMBER}"`)
