@@ -42,8 +42,9 @@ export async function buildConsolidatedExport({ event, inscriptions = [], lateIn
   const results = []
   const nextByTeam = new Map()
   const addSubmission = (submission, late) => {
-    const approved = new Set(submission.approved_athletes || [])
-    const selectedAthletes = submission.athletes.filter(athlete => !late || approved.has(athlete.Ath_no))
+    // v1.19.1: Ath_no puede llegar como string o como número; se comparan como número (igual que lateDecision).
+    const approved = new Set((submission.approved_athletes || []).map(Number))
+    const selectedAthletes = submission.athletes.filter(athlete => !late || approved.has(Number(athlete.Ath_no)))
     const idMap = new Map()
     selectedAthletes.forEach(athlete => {
       const team = Number(athlete.Team_no)
