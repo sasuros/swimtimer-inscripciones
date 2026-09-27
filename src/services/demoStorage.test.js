@@ -102,6 +102,24 @@ describe('storage local de la demo', () => {
     expect(demoListEvents().find(item => item.id === event.id).is_live).toBe('upcoming')
   })
 
+  // v1.22.0: misma regla que Supabase. Antes, en demo, un re-envío borraba las decisiones.
+  it('tardía revisada: agregar al final conserva las decisiones; cambiar a un fijo → 409', () => {
+    const [first] = demoGenerateTokens().tokens
+    const code = first.club.code
+    const athletes = n => Array.from({ length: n }, (_, i) => ({ Ath_no: code * 1000 + i + 1, Team_no: code, Last_name: `N${i}`, First_name: 'X', Ath_age: 12 }))
+    const results = n => athletes(n).map(athlete => ({ Event_ptr: 1, Ath_no: athlete.Ath_no, ActualSeed_time: '32.50' }))
+    const roster = (n, prefix = 'T') => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}` }))
+    demoUpdateEventStatus('evt_demo_2025', 'accepting_late')
+    submitWithPin({ token: first.id, meta: { club_code: code }, athletes: athletes(2), results: results(2), roster: roster(2) })
+    demoReviewLate('evt_demo_2025', code, 'approve', [code * 1000 + 1])
+    expect(() => submitWithPin({ token: first.id, meta: { club_code: code }, athletes: athletes(3), results: results(3), roster: roster(3, 'Z') })).toThrow(expect.objectContaining({ status: 409, lateFixedChanged: true }))
+    submitWithPin({ token: first.id, meta: { club_code: code }, athletes: athletes(3), results: results(3), roster: roster(3) })
+    const late = demoGetClubInscriptions('evt_demo_2025', code).late
+    expect(late).toMatchObject({ status: 'partially_approved', approved_athletes: [code * 1000 + 1] })
+    expect(late.roster.map(item => item.id)).toEqual(['T0', 'T1', 'T2'])
+    expect(demoDashboard('evt_demo_2025').counts.late_pending).toBe(1)
+  })
+
   it('procesa tardías y genera los tres consolidados v2', async () => {
     const token = demoGenerateTokens().tokens[0].id
     const athlete = { Ath_no: 2001, Last_name: 'Suros', First_name: 'Ana', Ath_Sex: 'F', Birth_date: '2013-05-15', Team_no: 2, Ath_age: 12, Comp_no: 2001 }

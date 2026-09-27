@@ -4,8 +4,8 @@ import { generateClubPin } from '../utils/clubPin.js'
 import { teamIdentity } from '../utils/teamUtils.js'
 import { isShortId } from '../utils/shortId.js'
 import { RateLimitError, checkPinRateLimit, clearPinRateLimit, pinRateLimitStatus } from './pinRateLimit.js'
-import { hasLateDecision } from './lateDecision.js'
-import { CONFLICT_TEXT, ConflictError, DRAFT_CONFLICT_TEXT, DRAFT_STALE_TEXT, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, sameRoster } from './concurrency.js'
+import { canAddToReviewedLate, hasLateDecision, keepsFixedRoster, reviewedLateContent } from './lateDecision.js'
+import { CONFLICT_TEXT, ConflictError, DRAFT_CONFLICT_TEXT, DRAFT_STALE_TEXT, LATE_DECIDED_TEXT, LATE_FIXED_CHANGED_TEXT, STALE_CLIENT_SERVER_MESSAGE, sameRoster } from './concurrency.js'
 import { isRegistrationOpen, notOpenText } from '../utils/registrationStatus.js'
 
 const DEFAULT_WHATSAPP = ''
@@ -317,9 +317,10 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
     if (expected === undefined) throw new ConflictError(STALE_CLIENT_SERVER_MESSAGE, { staleClient: true })
     const expectedVersion = expected === null ? 0 : Number(expected)
     if (!Number.isInteger(expectedVersion) || expectedVersion < 0) throw new ConflictError(STALE_CLIENT_SERVER_MESSAGE, { staleClient: true })
-    // (a) Tardía ya revisada por el organizador (D1): el entrenador no puede re-enviarla.
-    // Si el admin decide DESPUÉS de esta lectura, reviewLate sube la versión y (b) no calza.
-    if (isLate && hasLateDecision(access.inscription)) throw new ConflictError(LATE_DECIDED_TEXT, { lateDecided: true })
+    // (a) Tardía ya revisada por el organizador: v1.22.0, solo se aceptan nuevos al final con
+    // los fijos idénticos (reviewedLateContent). Si el admin decide DESPUÉS de esta lectura,
+    // reviewLate sube la versión y (b) no calza.
+    const reviewed = isLate && hasLateDecision(access.inscription) ? reviewedLateContent(access.inscription, payload, access.club.code) : null
     const content = {
       token_id: token,
       submitted_at: new Date().toISOString(),
@@ -329,7 +330,8 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
       roster: payload.roster || [],
       meta: payload.meta || {},
       approved_athletes: [],
-      rejected_athletes: []
+      rejected_athletes: [],
+      ...(reviewed || {})
     }
     const key = { event_id: access.eventId, club_code: access.club.code, is_late: isLate }
     // (b) Una sola sentencia atómica: INSERT (sin fila; el UNIQUE frena al segundo) o
@@ -430,7 +432,11 @@ export function createSupabaseWizardStorage({ client, adminPassword, whatsapp = 
     }
 
     const isLate = access.event.status === 'accepting_late'
-    if (isLate && hasLateDecision(access.inscription)) throw new ConflictError(LATE_DECIDED_TEXT, { lateDecided: true })
+    // v1.22.0: tardía revisada → el borrador respeta la misma regla (fijos idénticos al inicio).
+    if (isLate && hasLateDecision(access.inscription)) {
+      if (!canAddToReviewedLate(access.inscription)) throw new ConflictError(LATE_DECIDED_TEXT, { lateDecided: true })
+      if (!keepsFixedRoster(access.inscription, roster)) throw new ConflictError(LATE_FIXED_CHANGED_TEXT, { lateFixedChanged: true })
+    }
     const currentVersion = access.inscription?.version ?? 0
     if (currentVersion > baseVersion) throw new ConflictError(DRAFT_STALE_TEXT, { staleBase: true, currentVersion })
 

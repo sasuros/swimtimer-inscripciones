@@ -5,6 +5,10 @@
 export const CONFLICT_TEXT =
   'Otra persona actualizó la inscripción de tu club mientras la editabas. Para no borrar sus cambios, no enviamos la tuya. Recarga el enlace: verás la lista más reciente y podrás agregar lo que falte.'
 export const LATE_DECIDED_TEXT = 'El organizador ya revisó tu inscripción tardía. Para hacer cambios, escríbele.'
+// v1.22.0 — Tardía con decisiones: los ya enviados quedan fijos y solo se agregan nuevos al final.
+export const LATE_ADD_MORE_TEXT = 'El organizador ya revisó algunos nadadores. Puedes agregar nuevos; para cambiar a alguno ya enviado, escríbele.'
+export const LATE_FIXED_CHANGED_TEXT = 'Tu lista de tardías ya no coincide con la que revisó el organizador. Recarga la página: verás los nadadores ya enviados y podrás agregar nuevos.'
+export const LATE_NOTHING_NEW_TEXT = 'No agregaste nadadores nuevos.'
 // Cliente sin expected_version. El wizard nuevo lo muestra en su propio panel. El bundle
 // viejo (anterior al deploy) hace alert(`${error}. Tu lista sigue guardada…`) y no se puede
 // cambiar: por eso el servidor manda el mismo texto SIN el punto final (evita "enviado..").

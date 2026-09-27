@@ -3,6 +3,8 @@
 // decide sobre pendientes y los no seleccionados no se tocan. late_status se deriva de los
 // conteos; "necesita revisión" = queda al menos un nadador pendiente (no depende del status).
 
+import { ConflictError, LATE_DECIDED_TEXT, LATE_FIXED_CHANGED_TEXT, LATE_NOTHING_NEW_TEXT, sameRoster } from './concurrency.js'
+
 export class LateDecisionError extends Error {
   constructor(message) {
     super(message)
@@ -63,5 +65,71 @@ export function applyLateDecision(late, action, athleteIds = []) {
     approved_athletes: [...approved],
     rejected_athletes: [...rejected],
     status: lateStatusFor(athletes.length, approved.size, rejected.size)
+  }
+}
+
+// v1.22.0 — Agregar nadadores a una tardía ya revisada. Los Ath_no son posicionales
+// (club*1000 + posición + 1), y approved/rejected guardan esos números: por eso, con alguna
+// decisión, TODOS los ya enviados (decididos o pendientes) quedan fijos, en el mismo orden,
+// y solo se agregan nuevos al final.
+
+// Filas de antes de v1.18.0 (o sin la lista del entrenador): estado final sin decisiones por
+// nadador. Siguen bloqueadas como antes (D1): no se sabe quién quedó aprobado.
+export const canAddToReviewedLate = (late) =>
+  hasLateDecision(late) &&
+  (late.approved_athletes || []).length + (late.rejected_athletes || []).length > 0 &&
+  (late.athletes || []).length > 0 &&
+  (late.roster || []).length === (late.athletes || []).length
+
+// Cantidad de nadadores fijos (0 si la tardía no tiene decisiones).
+export const lateFixedCount = (late) => (canAddToReviewedLate(late) ? late.athletes.length : 0)
+
+export class LateResubmissionError extends Error {
+  constructor(reason) {
+    super(reason)
+    this.name = 'LateResubmissionError'
+    this.reason = reason // 'fixedChanged' | 'nothingNew'
+  }
+}
+
+// ¿La lista empieza con los fijos, idénticos y en el mismo orden?
+export const keepsFixedRoster = (stored, roster = []) => sameFixed(stored.roster, roster, stored.athletes.length)
+const sameFixed = (storedRoster, roster, count) => roster.length >= count && sameRoster(roster.slice(0, count), (storedRoster || []).slice(0, count))
+
+// Arma la tardía nueva: los fijos se toman TAL COMO ESTÁN GUARDADOS (nadadores y pruebas), y
+// del envío solo se aceptan los nuevos, en las posiciones siguientes. Las decisiones no se
+// tocan y late_status se recalcula (los nuevos quedan pendientes: vuelve al panel).
+export function mergeLateResubmission(stored, payload, clubCode) {
+  const fixed = stored.athletes.length
+  const roster = payload.roster || []
+  if (!keepsFixedRoster(stored, roster)) throw new LateResubmissionError('fixedChanged')
+  if (roster.length <= fixed) throw new LateResubmissionError('nothingNew')
+  const newNos = new Set(roster.slice(fixed).map((_, index) => Number(clubCode) * 1000 + fixed + index + 1))
+  const newAthletes = (payload.athletes || []).filter((athlete) => newNos.has(Number(athlete.Ath_no)))
+  const unknown = (payload.athletes || []).some((athlete) => !newNos.has(Number(athlete.Ath_no)) && !stored.athletes.some((item) => Number(item.Ath_no) === Number(athlete.Ath_no)))
+  if (unknown || newAthletes.length !== newNos.size) throw new LateResubmissionError('fixedChanged')
+  const approved = stored.approved_athletes || []
+  const rejected = stored.rejected_athletes || []
+  const athletes = [...stored.athletes, ...newAthletes.sort((a, b) => Number(a.Ath_no) - Number(b.Ath_no))]
+  return {
+    athletes,
+    results: [...(stored.results || []), ...(payload.results || []).filter((result) => newNos.has(Number(result.Ath_no)))],
+    roster,
+    approved_athletes: approved,
+    rejected_athletes: rejected,
+    late_status: lateStatusFor(athletes.length, approved.length, rejected.length)
+  }
+}
+
+// v1.22.0 — Re-envío de una tardía con decisiones: fijos idénticos + nuevos al final. Devuelve
+// los campos a escribir o lanza un 409 claro. Filas viejas sin decisiones por nadador: D1.
+export function reviewedLateContent(stored, payload, clubCode) {
+  if (!canAddToReviewedLate(stored)) throw new ConflictError(LATE_DECIDED_TEXT, { lateDecided: true })
+  try {
+    return mergeLateResubmission(stored, payload, clubCode)
+  } catch (error) {
+    if (!(error instanceof LateResubmissionError)) throw error
+    if (error.reason === 'nothingNew') throw new ConflictError(LATE_NOTHING_NEW_TEXT, { lateNothingNew: true })
+    throw new ConflictError(LATE_FIXED_CHANGED_TEXT, { lateFixedChanged: true })
   }
 }

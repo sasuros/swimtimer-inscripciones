@@ -9,7 +9,7 @@ import { accessFromDemoToken, decodeDemoToken, encodeDemoToken } from '../utils/
 import { isRegistrationOpen, notOpenText } from '../utils/registrationStatus'
 import { ensureClubPin, generateClubPin } from '../utils/clubPin'
 import { referenceDateFor } from '../utils/referenceDate'
-import { applyLateDecision, needsReview } from './lateDecision'
+import { applyLateDecision, hasLateDecision, needsReview, reviewedLateContent } from './lateDecision'
 
 const LEGACY_EVENT_ID = 'evt_demo_2025'
 const read = (key, fallback) => {
@@ -308,6 +308,15 @@ function demoFullAccess(token) {
   }
 }
 
+// Los errores de la demo llevan los detalles arriba, como la respuesta de /api.
+function demoReviewedLate(stored, payload, clubCode) {
+  try {
+    return reviewedLateContent(stored, payload, clubCode)
+  } catch (error) {
+    throw Object.assign(error, error.details || {})
+  }
+}
+
 export function demoSubmitInscription(payload) {
   const access = demoValidateToken(payload.token, { pin: payload.pin })
   if (!access.valid) throw new Error('El enlace no es válido o caducó')
@@ -325,6 +334,9 @@ export function demoSubmitInscription(payload) {
     }
   if (access.event.status === 'accepting_late') {
     const late = read(STORAGE_KEYS.lateInscriptions, {})
+    const stored = late[inscriptionKey(access.eventId, access.club.code)]
+    // v1.22.0: misma regla que Supabase. Antes, en demo, un re-envío borraba las decisiones.
+    const reviewed = hasLateDecision(stored) ? demoReviewedLate(stored, payload, access.club.code) : null
     late[inscriptionKey(access.eventId, access.club.code)] = {
       meta: payload.meta,
       athletes: payload.athletes,
@@ -334,9 +346,10 @@ export function demoSubmitInscription(payload) {
       token: payload.token,
       eventId: access.eventId,
       club: access.club,
-      status: 'pending',
-      approved_athletes: [],
-      rejected_athletes: []
+      status: reviewed ? reviewed.late_status : 'pending',
+      approved_athletes: reviewed ? reviewed.approved_athletes : [],
+      rejected_athletes: reviewed ? reviewed.rejected_athletes : [],
+      ...(reviewed ? { athletes: reviewed.athletes, results: reviewed.results } : {})
     }
     write(STORAGE_KEYS.lateInscriptions, late)
     return {

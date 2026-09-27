@@ -10,7 +10,7 @@ const { default: validateHandler } = await import('../../api/validate-token.js')
 const { __setSupabaseClient, getDashboard, reviewLate } = await import('./supabaseStorage.js')
 const { payload, seed } = await import('./testSupport/fakeSupabase.js')
 const { createSupabaseWizardStorage } = await import('./wizardSupabase.js')
-const { CONFLICT_TEXT, LATE_DECIDED_TEXT, STALE_CLIENT_SERVER_MESSAGE, STALE_CLIENT_TEXT } = await import('./concurrency.js')
+const { CONFLICT_TEXT, LATE_FIXED_CHANGED_TEXT, STALE_CLIENT_SERVER_MESSAGE, STALE_CLIENT_TEXT } = await import('./concurrency.js')
 const { MAGIC_SIGNING_KEY } = await import('../config.js')
 
 const names = (row) => (row?.roster || []).map((athlete) => athlete.lastName)
@@ -137,21 +137,24 @@ describe('tardías: D1 y aprobaciones', () => {
     await wizard.submitInscription(payload(token, 2, 'TARDE'))
   })
 
-  it('tardía aprobada + re-envío del entrenador (versión vieja o al día) → 409 lateDecided y la aprobación queda intacta', async () => {
+  // v1.22.0: con decisiones, los ya enviados quedan fijos y solo se agregan nuevos al final.
+  it('tardía aprobada: con versión vieja → conflicto sin tocar nada; al día + un nuevo → se agrega y las aprobaciones quedan', async () => {
     await reviewLate('evt-1', 5, 'approve_pending', [], await seenLate())
     expect(lateRow()).toMatchObject({ late_status: 'approved', approved_athletes: [5001, 5002], version: 2 })
     expect(clubStatus()).toBe('late_approved')
-    for (const body of [stale(payload(token, 3, 'TARDE'), 1), payload(token, 3, 'TARDE')]) {
-      await expect(wizard.submitInscription(body)).rejects.toMatchObject({ status: 409, message: LATE_DECIDED_TEXT, details: { lateDecided: true } })
-    }
+    await expect(wizard.submitInscription(stale(payload(token, 3, 'TARDE'), 1))).rejects.toMatchObject({ status: 409, details: { conflict: true } })
     expect(lateRow()).toMatchObject({ late_status: 'approved', approved_athletes: [5001, 5002], version: 2 })
-    expect(clubStatus()).toBe('late_approved')
+    await expect(wizard.submitInscription(payload(token, 3, 'TARDE'))).resolves.toMatchObject({ success: true, version: 3 })
+    expect(lateRow()).toMatchObject({ late_status: 'partially_approved', approved_athletes: [5001, 5002], rejected_athletes: [], version: 3 })
+    expect(names(lateRow())).toEqual(['TARDE0', 'TARDE1', 'TARDE2'])
+    expect(clubStatus()).toBe('late_pending')
   })
 
-  it('también bloquea tras una decisión parcial o un rechazo', async () => {
+  it('tras un rechazo: cambiar a un ya enviado → 409 lateFixedChanged y nada cambia', async () => {
     await reviewLate('evt-1', 5, 'reject', [5001], await seenLate())
-    await expect(wizard.submitInscription(payload(token, 3, 'TARDE'))).rejects.toMatchObject({ details: { lateDecided: true } })
-    expect(lateRow()).toMatchObject({ late_status: 'partially_approved', rejected_athletes: [5001] })
+    await expect(wizard.submitInscription(payload(token, 3, 'OTRO'))).rejects.toMatchObject({ status: 409, message: LATE_FIXED_CHANGED_TEXT, details: { lateFixedChanged: true } })
+    expect(lateRow()).toMatchObject({ late_status: 'partially_approved', rejected_athletes: [5001], version: 2 })
+    expect(names(lateRow())).toEqual(['TARDE0', 'TARDE1'])
   })
 
   it('carrera: el admin decide ENTRE el chequeo (a) y el UPDATE (b) → la versión frena el pisado', async () => {

@@ -8,7 +8,7 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: () => mocks.client }))
 const { __setSupabaseClient, getDashboard, reviewLate } = await import('./supabaseStorage.js')
 const { payload, seed } = await import('./testSupport/fakeSupabase.js')
 const { createSupabaseWizardStorage } = await import('./wizardSupabase.js')
-const { LATE_DECIDED_TEXT } = await import('./concurrency.js')
+const { LATE_DECIDED_TEXT, LATE_FIXED_CHANGED_TEXT } = await import('./concurrency.js')
 const { applyLateDecision, lateStatusFor, needsReview } = await import('./lateDecision.js')
 const { MAGIC_SIGNING_KEY } = await import('../config.js')
 
@@ -113,9 +113,9 @@ describe('tabla de decisiones — 3 nadadores', () => {
     expect(lateRow()).toEqual(before)
   })
 
-  it('T10: ap=[A] → el entrenador ya no puede re-enviar (D1)', async () => {
+  it('T10: ap=[A] → el entrenador no puede cambiar a los ya enviados (v1.22.0: 409 lateFixedChanged)', async () => {
     await review('approve', [A])
-    await expect(wizard.submitInscription(payload(token, 3, 'OTRO'))).rejects.toMatchObject({ status: 409, message: LATE_DECIDED_TEXT })
+    await expect(wizard.submitInscription(payload(token, 3, 'OTRO'))).rejects.toMatchObject({ status: 409, message: LATE_FIXED_CHANGED_TEXT })
     expect(lateRow()).toMatchObject({ approved_athletes: [A] })
   })
 
@@ -206,9 +206,17 @@ describe('audit late.reviewed (commit 6): club, conteos, versión y resultado; s
 describe('D1 por decisiones, no solo por status (revisión adversarial #1)', () => {
   beforeEach(() => setup(2))
 
-  it('fila sucia/vieja: late_status pending con decisiones → el entrenador tampoco puede re-enviar', async () => {
+  it('fila sucia: late_status pending con decisiones → también cuenta como revisada (fijos)', async () => {
     Object.assign(lateRow(), { late_status: 'pending', approved_athletes: [A], rejected_athletes: [B] })
-    await expect(wizard.submitInscription(payload(token, 2, 'OTRO'))).rejects.toMatchObject({ status: 409, message: LATE_DECIDED_TEXT })
+    await expect(wizard.submitInscription(payload(token, 2, 'OTRO'))).rejects.toMatchObject({ status: 409, message: LATE_FIXED_CHANGED_TEXT })
     expect(lateRow()).toMatchObject({ approved_athletes: [A], rejected_athletes: [B] })
+  })
+
+  it('fila vieja (antes de v1.18.0): estado final sin decisiones por nadador → sigue bloqueada (D1)', async () => {
+    for (const status of ['approved', 'rejected']) {
+      Object.assign(lateRow(), { late_status: status, approved_athletes: [], rejected_athletes: [] })
+      await expect(wizard.submitInscription(payload(token, 3, 'T'))).rejects.toMatchObject({ status: 409, message: LATE_DECIDED_TEXT, details: { lateDecided: true } })
+      expect(lateRow().roster).toHaveLength(2)
+    }
   })
 })

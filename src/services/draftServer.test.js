@@ -133,9 +133,15 @@ describe('guardar el borrador', () => {
     db.tables.events[0].status = 'accepting_late'
     await wizard.submitInscription(payload(v3, 1, 'TARDIA'))
     Object.assign(db.tables.inscriptions.find((row) => row.is_late), { late_status: 'rejected', rejected_athletes: [5001] })
+    // v1.22.0: tardía revisada → el borrador debe empezar con los fijos, idénticos.
     const decided = await call(saveHandler, draftBody(v3, { base_version: 1 }))
     expect(decided.statusCode).toBe(409)
-    expect(decided.body.lateDecided).toBe(true)
+    expect(decided.body.lateFixedChanged).toBe(true)
+    // Fila vieja sin decisiones por nadador: sigue bloqueada (D1).
+    Object.assign(db.tables.inscriptions.find((row) => row.is_late), { rejected_athletes: [] })
+    const legacy = await call(saveHandler, draftBody(v3, { base_version: 1 }))
+    expect(legacy.statusCode).toBe(409)
+    expect(legacy.body.lateDecided).toBe(true)
     expect(db.tables.inscription_drafts).toHaveLength(0)
   })
 })
