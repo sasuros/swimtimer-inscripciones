@@ -10,10 +10,11 @@ import useEventFilter from '../hooks/useEventFilter'
 import ErrorMessage from './ErrorMessage'
 import EventSelector from './EventSelector'
 import TimeInput from './TimeInput'
+import { AddedNotice } from './WizardNotices'
 
 const emptyForm = { lastName: '', firstName: '', sex: '', birthDate: '', selectedEvents: [], times: {} }
 
-export default function AthleteForm({ roster, referenceDate, eventConfig, editing, onSave, onCancelEdit }) {
+export default function AthleteForm({ roster, referenceDate, eventConfig, editing, onSave, onCancelEdit, notice = null }) {
   const [form, setForm] = useState(() => editing ? toForm(editing) : emptyForm)
   const [attempted, setAttempted] = useState(false)
   const [interacted, setInteracted] = useState(false)
@@ -47,6 +48,7 @@ export default function AthleteForm({ roster, referenceDate, eventConfig, editin
   }
   const fieldClass = key => `input ${showErrors && errors[key] ? 'input-error' : ''}`
   return <form ref={formRef} onSubmit={submit} noValidate className={`card scroll-mt-4 p-4 sm:p-6 ${editing ? 'ring-2 ring-brand-600' : ''}`} data-editing={editing ? 'true' : undefined}>
+    <AddedNotice notice={notice} className="mb-6" />
     {editing
       ? <div className="mb-6 flex items-start gap-3 rounded-lg border border-brand-600/30 bg-brand-50 p-3" role="status"><Pencil className="mt-0.5 size-5 shrink-0 text-brand-700" /><div><h2 className="text-lg font-bold text-brand-800">{`Editando a ${editing.firstName} ${editing.lastName}`}</h2><p className="text-sm text-slate-600">Cambia lo que necesites y toca «Guardar cambios». «Cancelar» deja todo como estaba.</p></div></div>
       : <div className="mb-6"><p className="text-sm font-semibold text-brand-600">Nuevo registro</p><h2 className="text-xl font-bold">{`Inscribir nadador #${roster.length + 1}`}</h2></div>}

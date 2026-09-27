@@ -40,6 +40,21 @@ export function DraftStatusNotice({ status }) {
   )
 }
 
+// v1.21.1: confirmación al agregar/editar/importar. El contenedor con role="status" está
+// siempre presente y solo cambia el texto: así VoiceOver lo anuncia. Clases de los avisos
+// existentes (verde / ámbar).
+export function AddedNotice({ notice, className = '' }) {
+  return (
+    <div role="status" aria-live="polite">
+      {notice && (
+        <div data-added-notice={notice.kind} className={`${className} rounded-xl p-4 text-sm ${notice.kind === 'warning' ? 'bg-warning-50 text-warning-800' : 'bg-success-50 text-success-800'}`}>
+          {notice.text}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // v1.19.1: en modo tardías, recuerda la inscripción regular (solo lectura). Invita a agregar
 // nadadores, y eso contradice al panel de conflicto, así que con un panel activo no se muestra.
 export function LateRegularNotice({ isLate, lockedCount, conflict, lateDecided }) {

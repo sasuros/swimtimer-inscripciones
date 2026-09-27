@@ -8,7 +8,7 @@ const DECISION_BADGE = {
   pending: ['bg-warning-50 text-warning-800', 'Pendiente']
 }
 
-export default function RosterPanel({ roster, onEdit, onDelete, highlightId, readOnly = false, title = 'Lista de nadadores del club' }) {
+export default function RosterPanel({ roster, onEdit, onDelete, highlightIds = [], readOnly = false, title = 'Lista de nadadores del club' }) {
   const [open, setOpen] = useState(true)
   const total = roster.reduce((sum, athlete) => sum + athlete.events.length, 0)
   return <section className="card overflow-hidden">
@@ -17,7 +17,7 @@ export default function RosterPanel({ roster, onEdit, onDelete, highlightId, rea
       <ChevronDown className={`size-5 transition ${open ? 'rotate-180' : ''}`} />
     </button>
     {open && <div className="border-t">
-      {!roster.length ? <p className="px-4 py-6 text-center text-sm text-slate-500">Aún no has inscrito nadadores</p> : roster.map((athlete, index) => <div key={athlete.id} className={`flex items-center gap-3 border-b px-4 py-3 last:border-0 transition ${highlightId === athlete.id ? 'bg-success-50' : ''}`}>
+      {!roster.length ? <p className="px-4 py-6 text-center text-sm text-slate-500">Aún no has inscrito nadadores</p> : roster.map((athlete, index) => <div key={athlete.id} className={`flex items-center gap-3 border-b px-4 py-3 last:border-0 transition ${highlightIds.includes(athlete.id) ? 'bg-success-50' : ''}`}>
         <span className="w-6 text-sm font-bold text-slate-400">{index + 1}</span>
         <div className="min-w-0 flex-1"><p className="truncate font-semibold">{athlete.lastName}, {athlete.firstName}</p><p className="text-xs text-slate-500">{athlete.events.length} eventos{athlete.category?.label ? ` · ${athlete.category.label}` : ''}</p></div>
         {athlete.decision && <span data-decision={athlete.decision} className={`rounded-full px-2 py-1 text-xs font-bold ${DECISION_BADGE[athlete.decision][0]}`}>{DECISION_BADGE[athlete.decision][1]}</span>}

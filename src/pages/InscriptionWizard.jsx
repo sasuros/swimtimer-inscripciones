@@ -20,6 +20,8 @@ import { lateReviewView } from '../utils/clubInscriptionView'
 import { hasLateDecision } from '../services/lateDecision'
 import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
 import { AlreadySubmittedNotice, ConflictPanel, DraftStatusNotice, LateRegularNotice } from '../components/WizardNotices'
+import useAddFeedback from '../hooks/useAddFeedback'
+import { addedText, editedText, importedNotice } from '../utils/addFeedback'
 import { isRegistrationOpen } from '../utils/registrationStatus'
 import { DEMO_MODE } from '../config'
 
@@ -75,7 +77,8 @@ function WizardContent({ token, pin, access }) {
   const sendingRef = useRef(false)
   const validationRoster = isLate ? [...locked, ...roster] : roster
   const [editing, setEditing] = useState(null)
-  const [highlightId, setHighlightId] = useState(null)
+  // v1.21.1: confirmación visible al agregar/editar/importar (sin mover la pantalla).
+  const feedback = useAddFeedback()
   const [screen, setScreen] = useState('form')
   const [sending, setSending] = useState(false)
   const [finalData, setFinalData] = useState(null)
@@ -83,14 +86,19 @@ function WizardContent({ token, pin, access }) {
   const save = (athlete) => {
     setRoster((current) => (editing ? current.map((item) => (item.id === athlete.id ? athlete : item)) : [...current, athlete]))
     setEditing(null)
-    setHighlightId(athlete.id)
-    setTimeout(() => setHighlightId(null), 2000)
+    feedback.show({ text: editing ? editedText(athlete) : addedText(athlete, roster.length + 1, isLate) }, [athlete.id])
+  }
+  const importAthletes = (items, { skipped = 0 } = {}) => {
+    setRoster((current) => [...current, ...items])
+    feedback.show(importedNotice(items.length, skipped, isLate), items.map((item) => item.id))
   }
   const editAthlete = (athlete) => {
+    feedback.dismiss()
     setEditing({ ...athlete })
     setEntryMethod('manual')
   }
   const changeMethod = () => {
+    feedback.dismiss()
     setEditing(null)
     setEntryMethod(null)
   }
@@ -171,7 +179,7 @@ function WizardContent({ token, pin, access }) {
           <RosterPanel roster={lateReviewView(access.inscription).rows} readOnly title="Nadadores nuevos para tardías" />
         ) : (
           <>
-            <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightId={highlightId} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
+            <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightIds={feedback.highlightIds} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
             <DraftStatusNotice status={draft.status} />
             {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
             {entryMethod && (
@@ -179,8 +187,8 @@ function WizardContent({ token, pin, access }) {
                 ← Cambiar método
               </button>
             )}
-            {entryMethod === 'manual' && <AthleteForm roster={validationRoster} referenceDate={access.event.reference_date} eventConfig={access.event} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} />}
-            {entryMethod === 'expert' && <QuickEntryMode referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} roster={validationRoster} onImport={(items) => setRoster((current) => [...current, ...items])} />}
+            {entryMethod === 'manual' && <AthleteForm roster={validationRoster} referenceDate={access.event.reference_date} eventConfig={access.event} editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} notice={feedback.notice} />}
+            {entryMethod === 'expert' && <QuickEntryMode referenceDate={access.event.reference_date} eventConfig={access.event} club={access.club} roster={validationRoster} onImport={importAthletes} notice={feedback.notice} />}
           </>
         )}
       </main>

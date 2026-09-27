@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { ChevronDown, Download, FileSpreadsheet, Upload } from 'lucide-react'
+import { AddedNotice } from './WizardNotices'
 import { buildTemplateRows, decodeCsvBytes, downloadCsv, eventLabel, importAdditions, parseQuickEntry, pendingText, safeFilename } from '../utils/quickEntry'
 
 const EXAMPLES = [
@@ -28,7 +29,7 @@ export function fileProblem(name = '') {
   return ''
 }
 
-export default function QuickEntryMode({ referenceDate, eventConfig, club, roster, onImport }) {
+export default function QuickEntryMode({ referenceDate, eventConfig, club, roster, onImport, notice = null }) {
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState(null)
   const [guideOpen, setGuideOpen] = useState(true)
@@ -56,7 +57,9 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
   }
 
   const importValid = () => {
-    onImport(importAdditions(validRows, roster))
+    // v1.21.1: los que ya estaban en la lista no se repiten; se cuentan para el aviso.
+    const additions = importAdditions(validRows, roster)
+    onImport(additions, { skipped: importAdditions(validRows, []).length - additions.length })
     setText(pendingText(parsed || []))
     setParsed(null)
   }
@@ -97,6 +100,8 @@ export default function QuickEntryMode({ referenceDate, eventConfig, club, roste
     <textarea id="quick-entry" className="input min-h-40 font-mono text-sm" value={text} onChange={event => { setText(event.target.value); setParsed(null) }} placeholder="Apellido | Nombre | F/M | DD/MM/AAAA | Evento | Tiempo" />
     <p className="field-help">Detectamos automáticamente tabulaciones, comas, punto y coma o barras verticales.</p>
     <div className="mt-3 flex flex-col gap-2 sm:flex-row"><button type="button" className="btn-secondary" onClick={parse} disabled={!text.trim()}>Validar filas</button>{validRows.length > 0 && <button type="button" className="btn-primary" onClick={importValid}>Importar {validRows.length} {validRows.length === 1 ? 'fila válida' : 'filas válidas'}</button>}</div>
+    {/* v1.21.1: junto al botón "Importar", donde está la vista tras importar. */}
+    <AddedNotice notice={notice} className="mt-4" />
     {parsed && <div className="mt-4 space-y-2 text-sm">{parsed.map(row => { const warning = row.warnings.length > 0; const invalid = row.errors.length > 0; return <div key={row.rowIndex} className={`rounded-lg px-3 py-2 ${invalid ? 'bg-danger-50 text-danger-700' : warning ? 'bg-amber-50 text-amber-700' : 'bg-success-50 text-success-800'}`}><strong>{invalid ? '❌' : warning ? '⚠️' : '✅'} Fila {row.rowIndex}: {row.lastName || '—'}, {row.firstName || '—'} — {row.label || 'sin evento'} — </strong>{invalid ? row.errors.join(' · ') : warning ? row.warnings.join(' · ') : 'OK'}</div> })}</div>}
   </div>
 }
