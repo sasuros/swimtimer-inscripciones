@@ -75,7 +75,7 @@ export const readRosterDraft = (storage, keys, initial = []) => resolveRosterDra
 
 // Estado del indicador: 'local' (solo en este navegador), 'online' o 'conflict'
 // (otro dispositivo guardó algo más nuevo). null: nada que indicar todavía.
-export default function useRoster(key, initial = [], legacyKey = null, serverVersion = null, { remote = null, save = null } = {}) {
+export default function useRoster(key, initial = [], legacyKey = null, serverVersion = null, { remote = null, save = null, onSaveError = null } = {}) {
   const [draft] = useState(() => {
     try {
       return resolveRosterDraft(localStorage, [key, legacyKey].filter(Boolean), { roster: initial, version: serverVersion }, remote)
@@ -89,6 +89,10 @@ export default function useRoster(key, initial = [], legacyKey = null, serverVer
   const mounted = useRef(false)
   const saveRef = useRef(save)
   saveRef.current = save
+  // v1.22.0: el wizard se entera de un rechazo que el entrenador debe ver (p. ej. la lista ya
+  // no respeta a los fijos de una tardía revisada). El indicador sigue igual.
+  const onSaveErrorRef = useRef(onSaveError)
+  onSaveErrorRef.current = onSaveError
 
   const writeLocal = useCallback(() => {
     try {
@@ -121,6 +125,7 @@ export default function useRoster(key, initial = [], legacyKey = null, serverVer
           setStatus('conflict')
         } else {
           setStatus('local')
+          onSaveErrorRef.current?.(error)
         }
       })
       .finally(() => {

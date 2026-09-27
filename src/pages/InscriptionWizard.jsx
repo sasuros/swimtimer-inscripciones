@@ -17,8 +17,8 @@ import RegistrationMethodSelector from '../components/RegistrationMethodSelector
 import PinVerification from '../components/PinVerification'
 import { deriveRosterView } from '../utils/wizardRosterView'
 import { lateReviewView } from '../utils/clubInscriptionView'
-import { hasLateDecision } from '../services/lateDecision'
-import { CONFLICT_TEXT, LATE_DECIDED_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
+import { canAddToReviewedLate, hasLateDecision, lateFixedCount } from '../services/lateDecision'
+import { CONFLICT_TEXT, LATE_ADD_MORE_TEXT, LATE_DECIDED_TEXT, LATE_FIXED_CHANGED_TEXT, LATE_NOTHING_NEW_TEXT, ROSTER_REPLACED_TEXT, STALE_CLIENT_TEXT } from '../services/concurrency'
 import { AlreadySubmittedNotice, ConflictPanel, DraftStatusNotice, LateRegularNotice } from '../components/WizardNotices'
 import useAddFeedback from '../hooks/useAddFeedback'
 import { addedText, editedText, importedNotice } from '../utils/addFeedback'
@@ -65,15 +65,24 @@ function WizardContent({ token, pin, access }) {
   // v1.18.0: versión de la fila del servidor al cargar (sin fila = 0). El borrador guarda
   // sobre cuál se trabajó (baseVersion) y el envío la manda como expected_version.
   const serverVersion = access.inscription?.version ?? 0
-  // D1: una tardía que el organizador ya revisó no se puede re-enviar desde aquí.
-  const lateDecided = isLate && hasLateDecision(access.inscription)
+  // v1.22.0: tardía con decisiones → los ya enviados quedan fijos (solo lectura, con su estado)
+  // y solo se agregan nuevos al final. Filas viejas sin decisiones por nadador: D1 (bloqueo).
+  const lateBlocked = isLate && hasLateDecision(access.inscription) && !canAddToReviewedLate(access.inscription)
+  const fixedCount = isLate ? lateFixedCount(access.inscription) : 0
+  const fixedRows = fixedCount ? lateReviewView(access.inscription).rows : []
+  const [conflict, setConflict] = useState(null)
+  const fixedChanged = () => ({ text: LATE_FIXED_CHANGED_TEXT, reload: 'Cargar la versión más reciente', lateFixedChanged: true, at: Date.now() })
   // v1.21.0: el borrador también se guarda en el servidor (con PIN). El PIN viaja solo en
   // la petición; lo que queda en localStorage es { roster, baseVersion, draftRev, dirty }.
   const [roster, setRoster, draft] = useRoster(rosterKey, editableInitial, legacyKey, serverVersion, {
     remote: access.draft || null,
-    save: DEMO_MODE || lateDecided ? null : (body, options) => saveDraft({ token, pin, ...body }, options)
+    save: DEMO_MODE || lateBlocked ? null : (body, options) => saveDraft({ token, pin, ...body }, options),
+    // El borrador rechazado porque no respeta a los fijos: mismo aviso que el envío (una vez).
+    onSaveError: (error) => {
+      if (error?.lateFixedChanged) setConflict((current) => (current?.lateFixedChanged ? current : fixedChanged()))
+    }
   })
-  const [conflict, setConflict] = useState(null)
+  const newRows = roster.slice(fixedCount)
   const sendingRef = useRef(false)
   const validationRoster = isLate ? [...locked, ...roster] : roster
   const [editing, setEditing] = useState(null)
@@ -144,7 +153,7 @@ function WizardContent({ token, pin, access }) {
         // No se escribió nada. Se vuelve al formulario con el aviso (y la lista intacta).
         // `at` remonta el panel en cada rechazo: vuelve a hacer scroll y foco.
         const at = Date.now()
-        setConflict(error.lateDecided ? { text: LATE_DECIDED_TEXT, at } : error.staleClient ? { text: STALE_CLIENT_TEXT, reload: 'Recargar la página', keepDraft: true, at } : { text: CONFLICT_TEXT, reload: 'Cargar la versión más reciente', at })
+        setConflict(error.lateFixedChanged ? fixedChanged() : error.lateNothingNew ? { text: LATE_NOTHING_NEW_TEXT, at } : error.lateDecided ? { text: LATE_DECIDED_TEXT, at } : error.staleClient ? { text: STALE_CLIENT_TEXT, reload: 'Recargar la página', keepDraft: true, at } : { text: CONFLICT_TEXT, reload: 'Cargar la versión más reciente', at })
         setScreen('form')
       } else {
         window.alert(`${error.message}. Tu lista sigue guardada en este navegador.`)
@@ -169,17 +178,26 @@ function WizardContent({ token, pin, access }) {
         <EventStatusBanner event={access.event} />
         {conflict && <ConflictPanel key={conflict.at} conflict={conflict} onReload={conflict.keepDraft ? () => window.location.reload() : reloadLatest} />}
         {draft.replaced && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm text-warning-800">{ROSTER_REPLACED_TEXT}</div>}
-        {lateDecided && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm font-bold text-warning-800">{LATE_DECIDED_TEXT}</div>}
-        <LateRegularNotice isLate={isLate} lockedCount={locked.length} conflict={conflict} lateDecided={lateDecided} />
+        {lateBlocked && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm font-bold text-warning-800">{LATE_DECIDED_TEXT}</div>}
+        {fixedCount > 0 && !conflict && <div className="rounded-xl bg-warning-50 p-4 text-sm font-bold text-warning-800">{LATE_ADD_MORE_TEXT}</div>}
+        <LateRegularNotice isLate={isLate} lockedCount={locked.length} conflict={conflict} lateDecided={lateBlocked} />
         {isLate && locked.length > 0 && <RosterPanel roster={locked} readOnly title="Ya inscritos (inscripción regular)" />}
-        <AlreadySubmittedNotice isLate={isLate} alreadySubmitted={access.already_submitted} rosterCount={roster.length} conflict={conflict} lateDecided={lateDecided} />
-        {lateDecided ? (
-          // D1 completo: la tardía que el organizador ya revisó es solo lectura, con la lista
-          // del SERVIDOR (no el borrador local) y el estado de cada nadador.
+        <AlreadySubmittedNotice isLate={isLate} alreadySubmitted={access.already_submitted} rosterCount={roster.length} conflict={conflict} lateDecided={lateBlocked || fixedCount > 0} />
+        {lateBlocked ? (
+          // D1: fila vieja sin decisiones por nadador. Solo lectura, con la lista del SERVIDOR.
           <RosterPanel roster={lateReviewView(access.inscription).rows} readOnly title="Nadadores nuevos para tardías" />
         ) : (
           <>
-            <RosterPanel roster={roster} onEdit={editAthlete} onDelete={remove} highlightIds={feedback.highlightIds} title={isLate ? 'Nadadores nuevos para tardías' : undefined} />
+            {fixedCount > 0 && (
+              <>
+                {/* v1.22.0: los ya enviados, fijos (sin editar ni borrar) y con su estado. */}
+                <RosterPanel roster={fixedRows} readOnly title="Nadadores tardíos ya enviados" />
+                <h2 className="text-lg font-bold text-brand-800">Agregar más nadadores tardíos</h2>
+              </>
+            )}
+            {(fixedCount === 0 || newRows.length > 0) && (
+              <RosterPanel roster={newRows} startIndex={fixedCount} onEdit={editAthlete} onDelete={remove} highlightIds={feedback.highlightIds} title={fixedCount ? 'Nadadores nuevos por enviar' : isLate ? 'Nadadores nuevos para tardías' : undefined} />
+            )}
             <DraftStatusNotice status={draft.status} />
             {!entryMethod && <RegistrationMethodSelector onSelect={setEntryMethod} />}
             {entryMethod && (
@@ -193,7 +211,7 @@ function WizardContent({ token, pin, access }) {
         )}
       </main>
       <BrandFooter />
-      {roster.length > 0 && !lateDecided && (
+      {roster.length > fixedCount && !lateBlocked && (
         <div className="fixed inset-x-0 bottom-0 border-t bg-white/95 p-3 backdrop-blur">
           <div className="mx-auto flex max-w-[720px] items-center justify-between gap-3">
             <p className="hidden text-sm text-slate-600 sm:block">
